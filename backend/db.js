@@ -3,10 +3,10 @@ const sql = require("mssql");
 require('dotenv').config();
 
 const config = {
-  user: process.env.DB_USER || "appuser",
-  password: process.env.DB_PASSWORD || "AppUser@123",
-  server: process.env.DB_SERVER || "localhost",
-  database: process.env.DB_DATABASE || "FormDb",
+  user: process.env.DB_USER || "bubloo_SQLLogin_1",
+  password: process.env.DB_PASSWORD || "y4kde2jber",
+  server: process.env.DB_SERVER || "FormDb1.mssql.somee.com",
+  database: process.env.DB_DATABASE || "FormDb1",
   options: {
     encrypt: false,
     trustServerCertificate: true
