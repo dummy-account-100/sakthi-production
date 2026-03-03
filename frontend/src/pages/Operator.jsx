@@ -8,6 +8,7 @@ const Operator = () => {
     
     { name: "DISAmatic Production Report", path: "/operator/disamatic-report" },
     { name: "Unpoured Mould Details", path: "/operator/unpoured-mould" },
+    {name:"Moulding Quality Inspection", path:"/operator/moulding-quality-inspection"},
 
     // ✅ MATCHES FORM PLACEHOLDER KEY
     { name: "DISA Setting Adjustment", path: "/operator/disa-setting-adjustment" },

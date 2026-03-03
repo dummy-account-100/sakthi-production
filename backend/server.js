@@ -16,6 +16,7 @@ const errorProofRoutes2 = require('./routes/errorProofRoutes2');
 const userRoutes = require("./routes/userRoutes");
 const dailyPerformanceRoutes = require("./routes/dailyPerformanceRoutes");
 const configRoutes = require("./routes/configRoutes");
+const mouldQualityRoutes = require('./routes/mouldQualityRoutes');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/error-proof2', errorProofRoutes2);
 app.use("/api/users", userRoutes);
 app.use("/api", dailyPerformanceRoutes);
 app.use("/api/config", configRoutes);
+app.use('/api/mould-quality', mouldQualityRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

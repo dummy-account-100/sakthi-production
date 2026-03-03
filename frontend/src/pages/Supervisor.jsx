@@ -50,6 +50,12 @@ const Supervisor = () => {
   const [isErrorPdfLoading, setIsErrorPdfLoading] = useState(false);
   const errorSigCanvas = useRef({});
 
+  // --- States for Moulding Quality ---
+  const [mouldQualityReports, setMouldQualityReports] = useState([]);
+  const [selectedMQReport, setSelectedMQReport] = useState(null);
+  const [mqPdfUrl, setMqPdfUrl] = useState(null);
+  const mqSigCanvas = useRef({});
+
   useEffect(() => {
     fetchDisaReports();
     fetchBottomReports();
@@ -57,6 +63,7 @@ const Supervisor = () => {
     fetchDmmReports();
     fetchFourMReports();
     fetchErrorReports(); 
+    fetchMouldQualityReports();
   }, []);
 
   const formatDate = (dateString) => { 
@@ -69,7 +76,7 @@ const Supervisor = () => {
       return new Date(dateString).toLocaleTimeString("en-GB", { hour: '2-digit', minute: '2-digit' });
   };
 
-  // 🔥 NEW HELPER: Filters duplicates based on Date, Shift, and Disa Machine
+  // 🔥 HELPER: Filters duplicates based on Date, Shift, and Disa Machine
   // Keeps only the report with the highest ID (latest submission)
   const filterUniqueReports = (data) => {
     const uniqueMap = {};
@@ -77,7 +84,7 @@ const Supervisor = () => {
     data.forEach((item) => {
       // Create a unique key: YYYY-MM-DD | Shift | Disa
       const dateStr = new Date(item.reportDate).toISOString().split('T')[0];
-      const key = `${dateStr}|${item.shift}|${item.disa}`;
+      const key = `${dateStr}|${item.shift}|${item.disa || item.disaMachine}`;
 
       // If key doesn't exist OR current item is newer (higher ID), store it
       if (!uniqueMap[key] || item.id > uniqueMap[key].id) {
@@ -99,7 +106,6 @@ const Supervisor = () => {
   const fetchDisaReports = async () => {
     try {
       const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/forms/supervisor/${currentSupervisor}`);
-      // 🔥 Apply filter here to remove duplicates
       setDisaReports(filterUniqueReports(res.data));
     } catch (err) { toast.error("Failed to load Disamatic reports."); }
   };
@@ -120,8 +126,6 @@ const Supervisor = () => {
   const fetchBottomReports = async () => {
     try {
       const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/bottom-level-audit/supervisor/${currentSupervisor}`);
-      // Bottom level audits are usually one per shift/day, but we can filter by ID just in case
-      // For now, we leave as is unless duplicates occur there too.
       setBottomReports(res.data);
     } catch (err) { toast.error("Failed to load Bottom Level Audits."); }
   };
@@ -254,7 +258,6 @@ const Supervisor = () => {
   const fetchDmmReports = async () => {
     try {
       const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/dmm-settings/supervisor/${currentSupervisor}`);
-      // 🔥 Apply filter here too, as DMM is also shift-based
       setDmmReports(filterUniqueReports(res.data));
     } catch (err) { toast.error("Failed to load DMM Settings."); }
   };
@@ -346,7 +349,7 @@ const Supervisor = () => {
   };
 
   // ==========================================
-  // 5. 4M CHANGE LOGIC
+  // 5. 4M CHANGE LOGIC 
   // ==========================================
   const fetchFourMReports = async () => {
     try {
@@ -376,7 +379,7 @@ const Supervisor = () => {
   };
 
   // ==========================================
-  // 6. ERROR PROOF REACTION PLANS LOGIC
+  // 6. ERROR PROOF REACTION PLANS LOGIC (🔥 FULL-SCREEN PDF FIX)
   // ==========================================
   const fetchErrorReports = async () => {
     try {
@@ -420,6 +423,36 @@ const Supervisor = () => {
       toast.success("Reaction Plan Approved!");
       setSelectedErrorReport(null); fetchErrorReports();
     } catch (err) { toast.error("Failed to save signature."); }
+  };
+
+  // ==========================================
+  // 7. MOULDING QUALITY LOGIC
+  // ==========================================
+  const fetchMouldQualityReports = async () => {
+    try {
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/mould-quality/supervisor/${currentSupervisor}`);
+      setMouldQualityReports(filterUniqueReports(res.data));
+    } catch (err) { console.error(err); }
+  };
+
+  const handleOpenMQModal = async (report) => {
+    setSelectedMQReport(report);
+    setMqPdfUrl(null);
+    try {
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/mould-quality/report?reportId=${report.id}`, { responseType: 'blob' });
+      setMqPdfUrl(URL.createObjectURL(res.data));
+    } catch (err) { toast.error("Failed to load PDF preview"); }
+  };
+
+  const submitMQSignature = async () => {
+    if (mqSigCanvas.current.isEmpty()) return toast.warning("Please provide a signature");
+    const signature = mqSigCanvas.current.getCanvas().toDataURL("image/png");
+    try {
+      await axios.post(`${process.env.REACT_APP_API_URL}/api/mould-quality/sign-supervisor`, { reportId: selectedMQReport.id, signature });
+      toast.success("Signed successfully!");
+      setSelectedMQReport(null);
+      fetchMouldQualityReports();
+    } catch (err) { toast.error("Failed to save signature"); }
   };
 
   return (
@@ -565,8 +598,8 @@ const Supervisor = () => {
                     const status = report.Status || report.status;
                     return (
                       <tr key={idx} className="hover:bg-yellow-50">
-                        <td className="p-3 border border-gray-300 text-center font-bold text-gray-400">#{report.reportId || report.Id}</td>
-                        <td className="p-3 border border-gray-300 font-bold">{report.shift}</td>
+                        <td className="p-3 border border-gray-300 text-center font-bold text-gray-400">#{report.reportId || report.VerificationId}</td>
+                        <td className="p-3 border border-gray-300 font-bold">{report.shift || formatDate(report.recordDate)}</td>
                         <td className="p-3 border border-gray-300 font-bold">{report.DisaMachine || report.disaMachine || report.line}</td>
                         <td className="p-3 border border-gray-300">{report.ErrorProofName || report.errorProofName}</td>
                         <td className="p-3 border border-gray-300">{status === 'Completed' ? <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">✓ Completed</span> : <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">Pending</span>}</td>
@@ -580,6 +613,32 @@ const Supervisor = () => {
                       </tr>
                     )
                   })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* SECTION 7: MOULDING QUALITY INSPECTION */}
+        <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-2xl p-8 border-t-4 border-purple-500">
+          <div className="flex justify-between items-center mb-6 border-b pb-4">
+            <h1 className="text-2xl font-bold text-gray-800">Moulding Quality Inspection</h1>
+          </div>
+          {mouldQualityReports.length === 0 ? <p className="text-gray-500 italic">No Moulding Quality reports pending.</p> : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse border border-gray-300">
+                <thead className="bg-gray-800 text-white"><tr><th className="p-3 border border-gray-300 w-20 text-center">ID</th><th className="p-3 border border-gray-300">Date</th><th className="p-3 border border-gray-300">Machine</th><th className="p-3 border border-gray-300">Operator</th><th className="p-3 border border-gray-300">Status</th><th className="p-3 border border-gray-300 text-center">Action</th></tr></thead>
+                <tbody>
+                  {mouldQualityReports.map((report) => (
+                    <tr key={report.id} className="hover:bg-purple-50">
+                      <td className="p-3 border border-gray-300 text-center font-bold text-gray-400">#{report.id}</td>
+                      <td className="p-3 border border-gray-300 font-medium">{formatDate(report.reportDate)}</td>
+                      <td className="p-3 border border-gray-300 font-bold">{report.disaMachine}</td>
+                      <td className="p-3 border border-gray-300">{report.verifiedBy}</td>
+                      <td className="p-3 border border-gray-300">{report.status === 'Completed' ? <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">✓ Signed</span> : <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">Pending</span>}</td>
+                      <td className="p-3 border border-gray-300 text-center">{report.status !== 'Completed' && <button onClick={() => handleOpenMQModal(report)} className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-1.5 rounded font-bold text-sm shadow transition-colors">Review & Sign</button>}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -741,7 +800,7 @@ const Supervisor = () => {
         </div>
       )}
 
-      {/* 6. ERROR PROOF MODAL */}
+      {/* 6. ERROR PROOF MODAL (🔥 FULL-SCREEN SPLIT UI FIX) */}
       {selectedErrorReport && (
         <div className="fixed inset-0 z-[9999] bg-white flex flex-col overflow-hidden animate-fade-in">
           <div className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center shrink-0 shadow-md z-10">
@@ -758,7 +817,7 @@ const Supervisor = () => {
             <div className="w-full lg:w-[400px] bg-gray-50 border-l border-gray-300 flex flex-col shrink-0 shadow-2xl z-10 overflow-y-auto">
               <div className="p-6 flex-1 flex flex-col">
                   <div className="bg-yellow-100 p-4 rounded-xl border border-yellow-200 mb-6 text-sm flex flex-col gap-2 shadow-sm text-yellow-900">
-                    <p><span className="font-bold">Report ID:</span> #{selectedErrorReport.reportId || selectedErrorReport.Id}</p>
+                    <p><span className="font-bold">Report ID:</span> #{selectedErrorReport.reportId || selectedErrorReport.VerificationId}</p>
                     <p><span className="font-bold">Machine:</span> {selectedErrorReport.DisaMachine || selectedErrorReport.disaMachine || selectedErrorReport.line}</p>
                     <p><span className="font-bold">Problem:</span> {selectedErrorReport.Problem || selectedErrorReport.problem}</p>
                     <p><span className="font-bold">Action Taken:</span> {selectedErrorReport.CorrectiveAction || selectedErrorReport.correctiveAction}</p>
@@ -774,6 +833,32 @@ const Supervisor = () => {
                       </button>
                   </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. MOULD QUALITY MODAL */}
+      {selectedMQReport && (
+        <div className="fixed inset-0 z-[9999] bg-white flex flex-col overflow-hidden animate-fade-in">
+          <div className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center shrink-0 shadow-md z-10">
+            <h3 className="font-bold text-xl uppercase tracking-wider">Review & Approve Mould Quality Report</h3>
+            <button onClick={() => { setSelectedMQReport(null); setMqPdfUrl(null); }} className="text-gray-400 hover:text-red-400 transition-colors"><X size={28} /></button>
+          </div>
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            <div className="flex-1 h-full bg-[#525659] relative flex items-center justify-center">
+              {mqPdfUrl ? <iframe src={`${mqPdfUrl}#toolbar=0&view=FitH`} className="w-full h-full border-none" title="PDF" /> : <Loader className="animate-spin text-white w-12 h-12" />}
+            </div>
+            <div className="w-full lg:w-[400px] bg-gray-50 border-l border-gray-300 flex flex-col shrink-0 shadow-2xl p-6">
+              <div className="bg-purple-100 p-4 rounded-xl border border-purple-200 mb-6 text-sm text-purple-900 space-y-2 shadow-sm">
+                <p><span className="font-bold">Report ID:</span> #{selectedMQReport.id}</p>
+                <p><span className="font-bold">Date:</span> {formatDate(selectedMQReport.reportDate)}</p>
+                <p><span className="font-bold">Operator:</span> {selectedMQReport.verifiedBy}</p>
+              </div>
+              <label className="text-xs font-black text-gray-500 uppercase mb-2 block tracking-widest">Supervisor Signature</label>
+              <div className="border-2 border-dashed border-gray-300 bg-white rounded-xl mb-2 shadow-inner"><SignatureCanvas ref={mqSigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-64 cursor-crosshair' }} /></div>
+              <button onClick={() => mqSigCanvas.current.clear()} className="text-xs text-red-500 hover:text-red-700 font-bold uppercase underline tracking-wider self-end mb-auto">Clear Signature</button>
+              <button onClick={submitMQSignature} className="mt-8 w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">Approve & Sign</button>
             </div>
           </div>
         </div>
