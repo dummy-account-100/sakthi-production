@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import logo from "../assets/logo.png"; // Imported logo
+import logo from "../Assets/logo.png"; // Imported logo
 
 // --- HELPER: Calculate Production Date & Shift ---
 const getProductionDateTime = () => {

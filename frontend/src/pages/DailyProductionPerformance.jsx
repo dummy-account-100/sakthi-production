@@ -3,7 +3,7 @@ import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import SignatureCanvas from "react-signature-canvas";
-import logo from "../assets/logo.png";
+import logo from "../Assets/logo.png";
 
 // --- HELPER: Calculate Production Date (Strict 7 AM to 7 AM Logic) ---
 const getProductionDate = () => {

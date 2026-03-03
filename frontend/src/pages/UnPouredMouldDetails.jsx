@@ -4,7 +4,7 @@ import { CheckCircle, AlertTriangle, Save, Loader, FileDown } from 'lucide-react
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import SignatureCanvas from 'react-signature-canvas';
-import logo from '../assets/logo.png';
+import logo from '../Assets/logo.png';
 
 const NotificationModal = ({ data, onClose }) => {
   if (!data.show) return null;

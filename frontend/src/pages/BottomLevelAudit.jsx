@@ -3,7 +3,7 @@ import axios from 'axios';
 import { X, CheckCircle, AlertTriangle, FileDown, Loader, Save } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import logo from '../assets/logo.png';
+import logo from '../Assets/logo.png';
 
 // --- Upgraded to Toast Notification ---
 const ToastNotification = ({ data, onClose }) => {
