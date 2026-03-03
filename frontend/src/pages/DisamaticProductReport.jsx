@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import logo from "../assets/logo.png"; // Imported logo
 
 // --- HELPER: Calculate Production Date & Shift ---
 const getProductionDateTime = () => {
@@ -554,9 +555,14 @@ const DisamaticProductReport = () => {
       <ToastContainer position="top-right" autoClose={3000} theme="colored" />
       
       <div className="bg-white w-full max-w-[90rem] rounded-xl p-8 shadow-2xl overflow-x-auto">
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
-          DISAMATIC PRODUCTION REPORT
-        </h2>
+        
+        {/* HEADER WITH LOGO */}
+        <div className="flex items-center gap-4 border-b-2 border-gray-800 pb-4 mb-6">
+            <img src={logo} alt="Sakthi Auto" className="h-10 w-auto object-contain bg-white p-1 rounded" />
+            <h1 className="text-2xl font-bold text-gray-800 tracking-wide uppercase">
+              DISAMATIC PRODUCTION REPORT
+            </h1>
+        </div>
 
         <form onSubmit={handleSubmit} className="min-w-[1100px] flex flex-col gap-6">
           

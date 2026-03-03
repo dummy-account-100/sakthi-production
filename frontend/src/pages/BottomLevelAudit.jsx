@@ -3,6 +3,7 @@ import axios from 'axios';
 import { X, CheckCircle, AlertTriangle, FileDown, Loader, Save } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import logo from '../assets/logo.png';
 
 // --- Upgraded to Toast Notification ---
 const ToastNotification = ({ data, onClose }) => {
@@ -14,7 +15,7 @@ const ToastNotification = ({ data, onClose }) => {
   }, [data, onClose]);
 
   if (!data.show) return null;
-  
+
   const isError = data.type === 'error';
   const isLoading = data.type === 'loading';
 
@@ -336,12 +337,15 @@ const BottomLevelAudit = () => {
   return (
     <div className="min-h-screen bg-gray-100 py-10 px-4 flex justify-center pb-24">
       <ToastNotification data={notification} onClose={() => setNotification({ ...notification, show: false })} />
-      
+
       <div className="w-full max-w-6xl bg-white shadow-xl rounded-2xl flex flex-col">
         <div className="bg-gray-900 py-6 px-8 flex justify-between items-center rounded-t-2xl">
-          <h2 className="text-xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <span className="text-blue-500 text-2xl">📋</span> Bottom Level Audit
-          </h2>
+          <div className="flex items-center gap-4">
+            <img src={logo} alt="Sakthi Auto" className="h-10 w-auto object-contain bg-white p-1 rounded" />
+            <h2 className="text-xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <span className="text-blue-500 text-2xl">📋</span> Bottom Level Audit
+            </h2>
+          </div>
           <div className="flex items-center gap-3">
             <span className="text-blue-400 text-lg font-black uppercase tracking-wider">DISA:</span>
             <select value={headerData.disaMachine} onChange={(e) => setHeaderData({ ...headerData, disaMachine: e.target.value })} className="bg-gray-800 text-white font-bold border-2 border-blue-500 rounded-md p-2 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500">

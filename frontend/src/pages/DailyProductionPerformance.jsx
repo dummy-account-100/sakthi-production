@@ -3,6 +3,7 @@ import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import SignatureCanvas from "react-signature-canvas";
+import logo from "../assets/logo.png";
 
 // --- HELPER: Calculate Production Date (Strict 7 AM to 7 AM Logic) ---
 const getProductionDate = () => {
@@ -13,12 +14,12 @@ const getProductionDate = () => {
   if (hours < 7) {
     prodDate.setDate(prodDate.getDate() - 1);
   }
-  
+
   const year = prodDate.getFullYear();
   const month = String(prodDate.getMonth() + 1).padStart(2, '0');
   const day = String(prodDate.getDate()).padStart(2, '0');
-  
-  return `${year}-${month}-${day}`; 
+
+  return `${year}-${month}-${day}`;
 };
 
 // --- HELPER: Safe Number Parsing for Totals ---
@@ -52,7 +53,7 @@ const SearchableSelect = ({ label, options, displayKey, onSelect, value, placeho
         onChange={(e) => {
           setSearch(e.target.value);
           setOpen(true);
-          onSelect({ [displayKey]: e.target.value }); 
+          onSelect({ [displayKey]: e.target.value });
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 200)}
@@ -69,7 +70,7 @@ const SearchableSelect = ({ label, options, displayKey, onSelect, value, placeho
                 onClick={() => {
                   setSearch(item[displayKey]);
                   setOpen(false);
-                  onSelect(item); 
+                  onSelect(item);
                 }}
                 className="p-2 hover:bg-orange-100 cursor-pointer text-sm border-b border-gray-100 last:border-0"
               >
@@ -90,7 +91,7 @@ const SearchableSelect = ({ label, options, displayKey, onSelect, value, placeho
 // ==========================================
 const DailyProductionPerformance = () => {
   const [productionDate, setProductionDate] = useState(getProductionDate());
-  const [disa, setDisa] = useState(""); 
+  const [disa, setDisa] = useState("");
   const [resetKey, setResetKey] = useState(0);
 
   const opSigCanvas = useRef({});
@@ -128,28 +129,28 @@ const DailyProductionPerformance = () => {
   useEffect(() => {
     const fetchData = async () => {
       if (!productionDate || disa === "-" || !disa) {
-        setDelays([]); 
-        return; 
+        setDelays([]);
+        return;
       }
-      
+
       try {
         const sumRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/daily-performance/summary?date=${productionDate}&disa=${disa}`);
         const fetchedData = sumRes.data;
-        
+
         setSummary((prev) => {
           const newSummary = { ...prev };
           ["I", "II", "III"].forEach(s => {
             newSummary[s].pouredMoulds = "-";
             newSummary[s].tonnage = "-";
             // 🔥 FIX: Properly reset editable fields when DISA/Date changes
-            newSummary[s].casted = ""; 
-            newSummary[s].value = ""; 
+            newSummary[s].casted = "";
+            newSummary[s].value = "";
           });
 
           fetchedData.forEach(item => {
             if (newSummary[item.shift]) {
               newSummary[item.shift].pouredMoulds = item.totalPouredMoulds > 0 ? item.totalPouredMoulds : "-";
-              
+
               if (item.totalTonnageKg > 0) {
                 newSummary[item.shift].tonnage = (item.totalTonnageKg / 1000).toFixed(3);
               }
@@ -170,12 +171,12 @@ const DailyProductionPerformance = () => {
     };
 
     fetchData();
-  }, [productionDate, disa]); 
+  }, [productionDate, disa]);
 
   // --- STATE: DETAILS TABLE (Defaulted to "-") ---
   const [details, setDetails] = useState([
     {
-      patternCode: "", itemDescription: "-", planned: "", unplanned: "", 
+      patternCode: "", itemDescription: "-", planned: "", unplanned: "",
       mouldsProd: "", mouldsPour: "", cavity: "-", unitWeight: "-", totalWeight: "-",
     },
   ]);
@@ -218,19 +219,19 @@ const DailyProductionPerformance = () => {
   // 🔥 AUTO FETCH PRODUCED & POURED FOR DETAILS 🔥
   const handleComponentSelect = async (index, item) => {
     const updated = [...details];
-    
+
     updated[index].patternCode = item.code || "";
     updated[index].itemDescription = item.description || "-";
     updated[index].cavity = item.cavity !== null && item.cavity !== undefined ? item.cavity : "-";
-    
+
     const unitWt = item.pouredWeight !== null && item.pouredWeight !== undefined ? item.pouredWeight : "-";
     updated[index].unitWeight = unitWt;
-    
+
     // Clear temporarily while fetching
     updated[index].mouldsProd = "";
     updated[index].mouldsPour = "";
     updated[index].totalWeight = "-";
-    setDetails([...updated]); 
+    setDetails([...updated]);
 
     if (productionDate && disa && disa !== "-" && item.description && item.description !== "-") {
       try {
@@ -245,11 +246,11 @@ const DailyProductionPerformance = () => {
           const newDetails = [...prev];
           newDetails[index].mouldsProd = fetchedProd;
           newDetails[index].mouldsPour = fetchedPour;
-          
+
           const pourNum = Number(fetchedPour);
           const wtNum = Number(unitWt);
           newDetails[index].totalWeight = (!isNaN(pourNum) && !isNaN(wtNum) && pourNum > 0 && wtNum > 0) ? Math.round(pourNum * wtNum) : "-";
-          
+
           return newDetails;
         });
 
@@ -297,7 +298,7 @@ const DailyProductionPerformance = () => {
     if (shift === "I") { groupedDelaysMap[reason].I += dur; totalShiftI += dur; }
     else if (shift === "II") { groupedDelaysMap[reason].II += dur; totalShiftII += dur; }
     else if (shift === "III") { groupedDelaysMap[reason].III += dur; totalShiftIII += dur; }
-    
+
     groupedDelaysMap[reason].total += dur;
     grandTotalDelay += dur;
   });
@@ -342,29 +343,29 @@ const DailyProductionPerformance = () => {
     const signatureData = opSigCanvas.current.getCanvas().toDataURL("image/png");
 
     const payload = {
-        productionDate, disa, summary, details, unplannedReasons, signatures, delays,
-        operatorSignature: signatureData 
+      productionDate, disa, summary, details, unplannedReasons, signatures, delays,
+      operatorSignature: signatureData
     };
 
     try {
-        await axios.post(`${process.env.REACT_APP_API_URL}/api/daily-performance`, payload);
-        toast.success("Report saved successfully!");
-        
-        setSummary({
-            I: { pouredMoulds: "-", tonnage: "-", casted: "", value: "" },
-            II: { pouredMoulds: "-", tonnage: "-", casted: "", value: "" },
-            III: { pouredMoulds: "-", tonnage: "-", casted: "", value: "" },
-        });
-        setDetails([{ patternCode: "", itemDescription: "-", planned: "", unplanned: "", mouldsProd: "", mouldsPour: "", cavity: "-", unitWeight: "-", totalWeight: "-" }]);
-        setUnplannedReasons("");
-        setSignatures({ incharge: "", hof: "", hod: "" });
-        setDisa(""); 
-        opSigCanvas.current.clear(); 
-        setResetKey(prev => prev + 1); 
+      await axios.post(`${process.env.REACT_APP_API_URL}/api/daily-performance`, payload);
+      toast.success("Report saved successfully!");
+
+      setSummary({
+        I: { pouredMoulds: "-", tonnage: "-", casted: "", value: "" },
+        II: { pouredMoulds: "-", tonnage: "-", casted: "", value: "" },
+        III: { pouredMoulds: "-", tonnage: "-", casted: "", value: "" },
+      });
+      setDetails([{ patternCode: "", itemDescription: "-", planned: "", unplanned: "", mouldsProd: "", mouldsPour: "", cavity: "-", unitWeight: "-", totalWeight: "-" }]);
+      setUnplannedReasons("");
+      setSignatures({ incharge: "", hof: "", hod: "" });
+      setDisa("");
+      opSigCanvas.current.clear();
+      setResetKey(prev => prev + 1);
 
     } catch (err) {
-        console.error(err);
-        toast.error("Submission failed.");
+      console.error(err);
+      toast.error("Submission failed.");
     }
   };
 
@@ -375,9 +376,9 @@ const DailyProductionPerformance = () => {
     }
 
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/daily-performance/download-pdf`, { 
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/daily-performance/download-pdf`, {
         params: { date: productionDate, disa: disa },
-        responseType: "blob" 
+        responseType: "blob"
       });
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -387,7 +388,7 @@ const DailyProductionPerformance = () => {
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
-      
+
       toast.success("PDF Downloaded successfully!");
     } catch (err) {
       console.error("Download failed", err);
@@ -404,19 +405,22 @@ const DailyProductionPerformance = () => {
       <ToastContainer position="top-right" autoClose={3000} theme="colored" />
 
       <div className="bg-white w-full max-w-[90rem] rounded-xl p-8 shadow-2xl overflow-x-auto border-4 border-gray-100">
-        
+
         {/* HEADER */}
         <div className="flex justify-between items-center border-b-2 border-gray-800 pb-4 mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 tracking-wide uppercase">
-            DAILY PRODUCTION PERFORMANCE (FOUNDRY - B)
-          </h1>
-          
+          <div className="flex items-center gap-4">
+            <img src={logo} alt="Sakthi Auto" className="h-10 w-auto object-contain bg-white p-1 rounded" />
+            <h1 className="text-2xl font-bold text-gray-800 tracking-wide uppercase">
+              DAILY PRODUCTION PERFORMANCE (FOUNDRY - B)
+            </h1>
+          </div>
+
           <div className="flex items-center gap-6">
             <div className="w-40">
               <label className="font-bold text-gray-700 block mb-1 text-sm">DISA-</label>
-              <select 
-                name="disa" value={disa} 
-                onChange={(e) => setDisa(e.target.value)} 
+              <select
+                name="disa" value={disa}
+                onChange={(e) => setDisa(e.target.value)}
                 className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm font-semibold bg-white"
               >
                 <option value="">Select DISA</option>
@@ -431,11 +435,11 @@ const DailyProductionPerformance = () => {
 
             <div className="w-48">
               <label className="font-bold text-gray-700 block mb-1 text-sm">DATE OF PRODUCTION :</label>
-              <input 
-                type="date" 
-                value={productionDate} 
+              <input
+                type="date"
+                value={productionDate}
                 onChange={(e) => setProductionDate(e.target.value)}
-                className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm font-semibold text-gray-800 bg-white" 
+                className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm font-semibold text-gray-800 bg-white"
               />
             </div>
           </div>
@@ -490,17 +494,17 @@ const DailyProductionPerformance = () => {
             <div className="flex items-center justify-end mb-2">
               <button type="button" onClick={addDetailRow} className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-1 rounded shadow text-sm">+ Add Row</button>
             </div>
-            
+
             <table className="w-full border-collapse border border-gray-800 text-sm text-center relative z-0">
               <thead className="bg-gray-100 text-gray-800 font-bold border-b-2 border-gray-800">
                 <tr>
-                  <th className="border border-gray-800 p-2 w-10" rowSpan="2">Sl.<br/>No.</th>
+                  <th className="border border-gray-800 p-2 w-10" rowSpan="2">Sl.<br />No.</th>
                   <th className="border border-gray-800 p-2 w-48" rowSpan="2">Pattern Code</th>
                   <th className="border border-gray-800 p-2 w-64" rowSpan="2">Item Description</th>
                   <th className="border border-gray-800 p-1" colSpan="2">Item</th>
-                  <th className="border border-gray-800 p-2 w-24" rowSpan="2">Number of<br/>Moulds Prod.</th>
-                  <th className="border border-gray-800 p-2 w-24" rowSpan="2">Number of<br/>Moulds Pour.</th>
-                  <th className="border border-gray-800 p-2 w-16" rowSpan="2">No. of<br/>Cavity</th>
+                  <th className="border border-gray-800 p-2 w-24" rowSpan="2">Number of<br />Moulds Prod.</th>
+                  <th className="border border-gray-800 p-2 w-24" rowSpan="2">Number of<br />Moulds Pour.</th>
+                  <th className="border border-gray-800 p-2 w-16" rowSpan="2">No. of<br />Cavity</th>
                   <th className="border border-gray-800 p-2 w-56" rowSpan="2">Poured WT (Kg)</th>
                   <th className="border border-gray-800 p-2 w-10" rowSpan="2">Act</th>
                 </tr>
@@ -513,24 +517,24 @@ const DailyProductionPerformance = () => {
                 {details.map((row, index) => (
                   <tr key={index} className="bg-white hover:bg-gray-50 transition-colors">
                     <td className="border border-gray-800 p-1 font-bold">{index + 1}</td>
-                    
+
                     <td className="border border-gray-800 p-1 relative overflow-visible">
-                      <SearchableSelect 
+                      <SearchableSelect
                         key={`pattern-${index}-${resetKey}`}
-                        options={components} displayKey="code" 
+                        options={components} displayKey="code"
                         value={row.patternCode} placeholder="Type '-'"
-                        onSelect={(item) => handleComponentSelect(index, item)} 
+                        onSelect={(item) => handleComponentSelect(index, item)}
                       />
                     </td>
-                    
+
                     <td className="border border-gray-800 p-0">
                       <input type="text" value={String(row.itemDescription)} readOnly className="w-full h-full text-left outline-none bg-gray-50 text-gray-700 py-2 px-2 cursor-not-allowed" />
                     </td>
                     <td className="border border-gray-800 p-0">
-                      <input type="text" value={String(row.planned)} onChange={(e) => handleDetailChange(index, "planned", e.target.value)}  className="w-full h-full text-center outline-none bg-transparent py-2" />
+                      <input type="text" value={String(row.planned)} onChange={(e) => handleDetailChange(index, "planned", e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2" />
                     </td>
                     <td className="border border-gray-800 p-0">
-                      <input type="text" value={String(row.unplanned)} onChange={(e) => handleDetailChange(index, "unplanned", e.target.value)}  className="w-full h-full text-center outline-none bg-transparent py-2" />
+                      <input type="text" value={String(row.unplanned)} onChange={(e) => handleDetailChange(index, "unplanned", e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2" />
                     </td>
                     <td className="border border-gray-800 p-0">
                       <input type="text" value={String(row.mouldsProd)} onChange={(e) => handleDetailChange(index, "mouldsProd", e.target.value)} placeholder="-" className="w-full h-full text-center outline-none bg-transparent py-2" />
@@ -558,7 +562,7 @@ const DailyProductionPerformance = () => {
                     </td>
                   </tr>
                 ))}
-                
+
                 {/* DETAILS TOTAL ROW */}
                 <tr className="bg-gray-100 font-bold text-gray-800 border-t-2 border-gray-800">
                   <td className="border border-gray-800 p-2"></td><td className="border border-gray-800 p-2"></td><td className="border border-gray-800 p-2"></td><td className="border border-gray-800 p-2"></td>
@@ -610,7 +614,7 @@ const DailyProductionPerformance = () => {
                 ) : (
                   <tr className="bg-white h-10"><td className="border border-gray-800 p-2 text-gray-500 font-semibold italic" colSpan="6">{(disa !== "-" && disa) ? "No delays recorded for this date and DISA." : "Select DISA to view delays."}</td></tr>
                 )}
-                
+
                 {/* DELAYS TOTAL ROW */}
                 {groupedDelays.length > 0 && (
                   <tr className="bg-gray-100 font-bold border-t-2 border-gray-800">
@@ -634,36 +638,36 @@ const DailyProductionPerformance = () => {
           {/* 5. SIGNATURES & ASSIGNMENTS */}
           <div className="flex justify-between items-end mt-8 mb-4 px-10 gap-6">
             <div className="flex flex-col w-64">
-                <label className="font-bold text-gray-700 block mb-1 text-sm text-center">Operator Signature</label>
-                <div className="border-2 border-dashed border-gray-400 rounded-lg overflow-hidden h-24 mb-1">
-                    <SignatureCanvas ref={opSigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-full cursor-crosshair bg-gray-50' }} />
-                </div>
-                <button type="button" onClick={() => opSigCanvas.current.clear()} className="text-xs text-red-500 hover:text-red-700 font-bold self-end uppercase">Clear</button>
+              <label className="font-bold text-gray-700 block mb-1 text-sm text-center">Operator Signature</label>
+              <div className="border-2 border-dashed border-gray-400 rounded-lg overflow-hidden h-24 mb-1">
+                <SignatureCanvas ref={opSigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-full cursor-crosshair bg-gray-50' }} />
+              </div>
+              <button type="button" onClick={() => opSigCanvas.current.clear()} className="text-xs text-red-500 hover:text-red-700 font-bold self-end uppercase">Clear</button>
             </div>
-            
+
             <div className="w-64">
-              <SearchableSelect 
+              <SearchableSelect
                 key={`sign-inc-${resetKey}`} label="Assign In-charge"
-                options={incharges} displayKey="name" value={signatures.incharge} 
-                onSelect={(item) => setSignatures({...signatures, incharge: item.name || item.name})} 
+                options={incharges} displayKey="name" value={signatures.incharge}
+                onSelect={(item) => setSignatures({ ...signatures, incharge: item.name || item.name })}
               />
             </div>
             <div className="w-64">
-              <SearchableSelect 
+              <SearchableSelect
                 key={`sign-hof-${resetKey}`} label="Assign HOF"
-                options={hofs} displayKey="name" value={signatures.hof} 
-                onSelect={(item) => setSignatures({...signatures, hof: item.name || item.name})} 
+                options={hofs} displayKey="name" value={signatures.hof}
+                onSelect={(item) => setSignatures({ ...signatures, hof: item.name || item.name })}
               />
             </div>
             <div className="w-64">
-              <SearchableSelect 
+              <SearchableSelect
                 key={`sign-hod-${resetKey}`} label="Assign HOD - Production"
-                options={hods} displayKey="name" value={signatures.hod} 
-                onSelect={(item) => setSignatures({...signatures, hod: item.name || item.name})} 
+                options={hods} displayKey="name" value={signatures.hod}
+                onSelect={(item) => setSignatures({ ...signatures, hod: item.name || item.name })}
               />
             </div>
           </div>
-          
+
           {/* BUTTONS */}
           <div className="flex justify-end gap-4 mt-2 pt-4 border-t border-gray-300">
             <button type="button" onClick={handleDownload} className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-2 rounded font-bold transition-colors flex items-center gap-2 shadow-lg"><span>⬇️</span> Generate Report (PDF)</button>

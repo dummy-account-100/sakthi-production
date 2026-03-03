@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 // Import the logo from your Assets folder
-import logo from "../Assets/logo.jpg"; 
+import logo from "../assets/logo.png";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -23,13 +23,13 @@ const Header = () => {
 
   return (
     <div className="flex justify-between items-center px-6 py-3 bg-gray-800 text-white shadow-md">
-      
+
       {/* 1. Logo Section (Left) */}
       <div className="flex-1 flex justify-start">
-        <img 
-          src={logo} 
-          alt="Sakthi Auto" 
-          className="h-10 w-auto object-contain brightness-110" 
+        <img
+          src={logo}
+          alt="Sakthi Auto"
+          className="h-10 w-auto object-contain bg-white p-1 rounded"
         />
       </div>
 

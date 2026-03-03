@@ -4,6 +4,7 @@ import { CheckCircle, AlertTriangle, Save, Loader, FileDown } from 'lucide-react
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import SignatureCanvas from 'react-signature-canvas';
+import logo from '../assets/logo.png';
 
 const NotificationModal = ({ data, onClose }) => {
   if (!data.show) return null;
@@ -388,9 +389,12 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
         {/* --- Header Bar (Hidden in Admin Mode) --- */}
         {!isAdminMode && (
           <div className="bg-gray-900 py-6 px-8 flex justify-between items-center rounded-t-2xl">
-            <h2 className="text-xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <span className="text-orange-500 text-2xl">📉</span> Un Poured Mould Details
-            </h2>
+            <div className="flex items-center gap-4">
+              <img src={logo} alt="Sakthi Auto" className="h-10 w-auto object-contain bg-white p-1 rounded" />
+              <h2 className="text-xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <span className="text-orange-500 text-2xl">📉</span> Un Poured Mould Details
+              </h2>
+            </div>
             <div className="flex items-center gap-3">
               <select value={headerData.disaMachine} onChange={(e) => setHeaderData({ ...headerData, disaMachine: e.target.value })} className="bg-gray-800 text-white font-bold border-2 border-orange-500 rounded-md p-2 text-lg focus:outline-none focus:ring-2 focus:ring-orange-500">
                 <option value="DISA - I">DISA - I</option><option value="DISA - II">DISA - II</option><option value="DISA - III">DISA - III</option><option value="DISA - IV">DISA - IV</option>

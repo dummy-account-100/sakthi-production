@@ -4,6 +4,7 @@ import { X, CheckCircle, AlertTriangle, FileDown, Loader, Save } from 'lucide-re
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import SignatureCanvas from 'react-signature-canvas';
+import logo from '../assets/logo.png';
 
 const NotificationModal = ({ data, onClose }) => {
   if (!data.show) return null;
@@ -450,9 +451,12 @@ const DisaMachineCheckList = () => {
 
       <div className="w-full max-w-6xl bg-white shadow-xl rounded-2xl flex flex-col">
         <div className="bg-gray-900 py-6 px-8 flex justify-between items-center rounded-t-2xl">
-          <h2 className="text-xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <span className="text-orange-500 text-2xl">📋</span> Operator Checklist
-          </h2>
+          <div className="flex items-center gap-4">
+            <img src={logo} alt="Sakthi Auto" className="h-10 w-auto object-contain bg-white p-1 rounded" />
+            <h2 className="text-xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <span className="text-orange-500 text-2xl">📋</span> Operator Checklist
+            </h2>
+          </div>
           <div className="flex items-center gap-3">
             <select
               value={headerData.disaMachine}
