@@ -2,8 +2,6 @@ const express = require("express");
 const router = express.Router();
 const sql = require("mssql");
 const PDFDocument = require("pdfkit");
-const fs = require("fs");
-const path = require("path");
 
 // GET next S.No
 router.get("/next-sno", async (req, res) => {
@@ -186,41 +184,12 @@ router.get("/report", async (req, res) => {
 
     const wLine = 45, wName = 120, wNature = 145, wFreq = 65;
     const wDateBox = 135; 
-    const totalTableWidth = wLine + wName + wNature + wFreq + (wDateBox * 3); // 780
 
     const drawMainHeaders = (y, datesArr = []) => {
-      // ==============================================================
-      // 🔥 3-BOX HEADER FOR VERIFICATION LIST (Width: 780)
-      // ==============================================================
-      doc.lineWidth(1);
-      
-      // Box 1: LOGO
-      doc.rect(startX, y, 100, 40).stroke();
-      const logoPath = path.join(__dirname, 'logo.jpg');
-      if (fs.existsSync(logoPath)) {
-          doc.image(logoPath, startX + 10, y + 5, { width: 80, height: 30, fit: [80, 30], align: 'center', valign: 'center' });
-      } else {
-          doc.font("Helvetica-Bold").fontSize(12).fillColor('black').text("SAKTHI\nAUTO", startX, y + 10, { width: 100, align: "center" });
-      }
-
-      // Box 2: TITLE
-      doc.rect(startX + 100, y, 530, 40).stroke();
-      doc.font("Helvetica-Bold").fontSize(14).fillColor('black').text("SAKTHI AUTO COMPONENT LIMITED", startX + 100, y + 8, { width: 530, align: "center" });
-      doc.fontSize(12).text("ERROR PROOF VERIFICATION CHECK LIST - FDY", startX + 100, y + 24, { width: 530, align: "center" });
-
-      // Box 3: META
-      const displayLine = line || "ALL LINES";
-      const displayDate = date ? new Date(date).toLocaleDateString('en-GB') : "ALL DATES";
-      doc.rect(startX + 630, y, 150, 40).stroke();
-      doc.font("Helvetica-Bold").fontSize(11).text(displayLine, startX + 630, y + 7, { width: 150, align: "center" });
-      doc.moveTo(startX + 630, y + 20).lineTo(startX + 780, y + 20).stroke();
-      doc.font("Helvetica").fontSize(10).text(`DATE: ${displayDate}`, startX + 630, y + 26, { width: 150, align: "center" });
-      // ==============================================================
-
-      const headerTopY = y + 55;
+      doc.font("Helvetica-Bold").fontSize(14).fillColor('black').text("ERROR PROOF VERIFICATION CHECK LIST - FDY", startX, y, { align: "center" });
+      const headerTopY = y + 25;
       
       doc.rect(startX, headerTopY, wLine, 60).stroke();
-      doc.font("Helvetica-Bold").fontSize(9).fillColor('black');
       doc.text("Line", startX, headerTopY + 25, { width: wLine, align: "center" });
 
       let cx = startX + wLine;
@@ -369,35 +338,8 @@ router.get("/report", async (req, res) => {
       const rHeaders = ["S.No", "Error\nProof No", "Error proof\nName", "Date", "Problem", "Root Cause", "Corrective\naction", "Status", "Reviewed\nBy (Op)", "Approved By\n(Sup)", "Remarks"];
 
       const drawReactionHeaders = (ry) => {
-        // ==============================================================
-        // 🔥 3-BOX HEADER FOR REACTION PLAN (Width: 750)
-        // ==============================================================
-        doc.lineWidth(1);
-        
-        // Box 1: LOGO
-        doc.rect(startX, ry, 100, 40).stroke();
-        const logoPath = path.join(__dirname, 'logo.jpg');
-        if (fs.existsSync(logoPath)) {
-            doc.image(logoPath, startX + 10, ry + 5, { width: 80, height: 30, fit: [80, 30], align: 'center', valign: 'center' });
-        } else {
-            doc.font("Helvetica-Bold").fontSize(12).fillColor('black').text("SAKTHI\nAUTO", startX, ry + 10, { width: 100, align: "center" });
-        }
-
-        // Box 2: TITLE
-        doc.rect(startX + 100, ry, 500, 40).stroke();
-        doc.font("Helvetica-Bold").fontSize(14).fillColor('black').text("SAKTHI AUTO COMPONENT LIMITED", startX + 100, ry + 8, { width: 500, align: "center" });
-        doc.fontSize(12).text("REACTION PLAN", startX + 100, ry + 24, { width: 500, align: "center" });
-
-        // Box 3: META
-        const displayLine = line || "ALL LINES";
-        const displayDate = date ? new Date(date).toLocaleDateString('en-GB') : "ALL DATES";
-        doc.rect(startX + 600, ry, 150, 40).stroke();
-        doc.font("Helvetica-Bold").fontSize(11).text(displayLine, startX + 600, ry + 7, { width: 150, align: "center" });
-        doc.moveTo(startX + 600, ry + 20).lineTo(startX + 750, ry + 20).stroke();
-        doc.font("Helvetica").fontSize(10).text(`DATE: ${displayDate}`, startX + 600, ry + 26, { width: 150, align: "center" });
-        // ==============================================================
-
-        const headerY = ry + 55;
+        doc.font("Helvetica-Bold").fontSize(14).fillColor('black').text("REACTION PLAN", startX, ry, { align: "center" });
+        const headerY = ry + 25;
         doc.fontSize(8);
         
         let currX = startX;
@@ -473,6 +415,141 @@ router.get("/report", async (req, res) => {
   } catch (err) {
     console.error("Error generating report:", err);
     res.status(500).json({ message: "Report generation failed" });
+  }
+});
+
+// ==========================================
+//        ADMIN EDIT & BULK APIS (NEW)
+// ==========================================
+
+// 1. GET Details by Date & Machine for Admin Edit
+router.get("/details", async (req, res) => {
+  try {
+    const { machine, date } = req.query;
+    const verifications = await sql.query`
+        SELECT * FROM ErrorProofVerification 
+        WHERE line = ${machine} AND recordDate = ${date}
+    `;
+    
+    // Only grab reaction plans that match the date and the error proofs from this line
+    const reactionPlans = await sql.query`
+        SELECT * FROM ReactionPlan 
+        WHERE recordDate = ${date} 
+        AND errorProofName IN (
+            SELECT errorProofName FROM ErrorProofVerification WHERE line = ${machine} AND recordDate = ${date}
+        )
+    `;
+
+    res.json({ 
+        verifications: verifications.recordset, 
+        reactionPlans: reactionPlans.recordset 
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "DB error" });
+  }
+});
+
+// 2. POST Bulk Update from Admin Edit
+router.post("/bulk-update", async (req, res) => {
+  try {
+    const { verifications, reactionPlans } = req.body;
+    
+    // Update Verifications (OK / NOT OK)
+    for (let v of verifications) {
+        if (v.id) {
+            await sql.query`
+                UPDATE ErrorProofVerification 
+                SET observationResult = ${v.observationResult} 
+                WHERE id = ${v.id}
+            `;
+        }
+    }
+    
+    // Update Reaction Plans (Problem, Root Cause, Status, etc)
+    for (let rp of reactionPlans) {
+        if (rp.sNo) {
+            await sql.query`
+                UPDATE ReactionPlan 
+                SET problem = ${rp.problem}, 
+                    rootCause = ${rp.rootCause}, 
+                    correctiveAction = ${rp.correctiveAction}, 
+                    status = ${rp.status}, 
+                    remarks = ${rp.remarks} 
+                WHERE sNo = ${rp.sNo}
+            `;
+        }
+    }
+    
+    res.json({ success: true, message: "Updated Successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "DB error" });
+  }
+});
+
+// 3. GET Bulk Data for Admin PDF Export
+router.get('/bulk-data', async (req, res) => {
+  try {
+    const { fromDate, toDate } = req.query;
+    
+    const verifications = await sql.query`
+        SELECT * FROM ErrorProofVerification 
+        WHERE recordDate BETWEEN ${fromDate} AND ${toDate}
+        ORDER BY recordDate ASC, id ASC
+    `;
+    
+    const plans = await sql.query`
+        SELECT * FROM ReactionPlan 
+        WHERE recordDate BETWEEN ${fromDate} AND ${toDate}
+        ORDER BY recordDate ASC, sNo ASC
+    `;
+
+    res.json({ 
+        verifications: verifications.recordset, 
+        plans: plans.recordset 
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Bulk data failed" });
+  }
+});
+
+// ==========================================
+//   ADMIN EDIT BULK UPDATE (V1)
+// ==========================================
+router.post("/bulk-update", async (req, res) => {
+  try {
+    const { verifications, reactionPlans } = req.body;
+    
+    for (let v of verifications) {
+        if (v.id) {
+            await sql.query`
+                UPDATE ErrorProofVerification 
+                SET observationResult = ${v.observationResult} 
+                WHERE id = ${v.id}
+            `;
+        }
+    }
+    
+    for (let rp of reactionPlans) {
+        if (rp.sNo) {
+            await sql.query`
+                UPDATE ReactionPlan 
+                SET problem = ${rp.problem}, 
+                    rootCause = ${rp.rootCause}, 
+                    correctiveAction = ${rp.correctiveAction}, 
+                    status = ${rp.status}, 
+                    remarks = ${rp.remarks} 
+                WHERE sNo = ${rp.sNo}
+            `;
+        }
+    }
+    
+    res.json({ success: true, message: "Updated Successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "DB error" });
   }
 });
 

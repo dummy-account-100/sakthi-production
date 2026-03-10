@@ -78,7 +78,6 @@ export const generateUnPouredMouldPDF = async (data, dateRange) => {
             doc.setFontSize(11); doc.text(` ${disa}`, 8, 25);
             doc.text(`DATE: ${formatDate(dateKey)}`, 289 - doc.getTextWidth(`DATE: ${formatDate(dateKey)}`) - 8, 25);
 
-            // 🔥 REMOVED 'SIGNATURE' COLUMN FOR PDF HEADERS
             const headRow1 = [
               { content: 'SHIFT', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
               ...(() => {
@@ -136,7 +135,6 @@ export const generateUnPouredMouldPDF = async (data, dateRange) => {
                 }
             });
 
-            // 🔥 DRAW SIGNATURES HORIZONTALLY AT THE BOTTOM OF THE TABLE
             let sigY = doc.lastAutoTable.finalY + 10;
             if (sigY + 30 > 210) { 
                 doc.addPage();
@@ -144,7 +142,7 @@ export const generateUnPouredMouldPDF = async (data, dateRange) => {
             }
 
             const shiftLabels = ["1st shift", "2nd shift", "3rd shift"];
-            const xPositions = [50, 148.5, 247]; // Spaced evenly across A4 Landscape width (297mm)
+            const xPositions = [50, 148.5, 247]; 
 
             doc.setFontSize(10).setFont('helvetica', 'bold');
 
@@ -331,31 +329,70 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
         return;
     }
 
-    const machines = [...new Set(trans.map(t => t.DisaMachine))].sort();
-    let isFirstPage = true;
-
     const isLPA = title1.includes('AUDIT');
 
-    machines.forEach(machine => {
+    const reportGroups = [];
+    
+    trans.forEach(t => {
+        const d = new Date(t.LogDate || t.RecordDate || t.date);
+        const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const machine = t.DisaMachine;
+        const groupKey = `${machine}_${monthKey}`;
+        
+        let group = reportGroups.find(g => g.key === groupKey);
+        if (!group) {
+            group = { key: groupKey, machine, monthKey, trans: [], ncr: [] };
+            reportGroups.push(group);
+        }
+        group.trans.push(t);
+    });
+
+    if (ncr) {
+        ncr.forEach(n => {
+            const d = new Date(n.ReportDate || n.RecordDate || n.date);
+            if (isNaN(d.getTime())) return;
+            const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const groupKey = `${n.DisaMachine}_${monthKey}`;
+            
+            let group = reportGroups.find(g => g.key === groupKey);
+            if (group) {
+                group.ncr.push(n);
+            } else {
+                reportGroups.push({ key: groupKey, machine: n.DisaMachine, monthKey, trans: [], ncr: [n] });
+            }
+        });
+    }
+    
+    reportGroups.sort((a, b) => a.key.localeCompare(b.key));
+    let isFirstPage = true;
+
+    reportGroups.forEach(group => {
         if (!isFirstPage) doc.addPage();
         isFirstPage = false;
 
-        const machineTrans = trans.filter(t => t.DisaMachine === machine);
-        const machineNc = ncr ? ncr.filter(n => n.DisaMachine === machine) : [];
+        const { machine, monthKey, trans: machineTrans, ncr: machineNc } = group;
+        const [year, month] = monthKey.split('-');
+        const reportMonthDate = new Date(year, parseInt(month) - 1, 1);
 
         const historyMap = {};
         const holidayDays = new Set();
         const vatDays = new Set();
+        const prevMaintDays = new Set();
         const sig1Map = {}; 
         const sig2Map = {};
 
         machineTrans.forEach(log => {
-            const dateObj = new Date(log.LogDate);
+            const dateObj = new Date(log.LogDate || log.RecordDate || log.date);
             const logDay = dateObj.getDate();
             const key = String(log.MasterId);
 
-            if (Number(log.IsHoliday) === 1 || log.IsHoliday === true) holidayDays.add(logDay);
-            if (Number(log.IsVatCleaning) === 1 || log.IsVatCleaning === true) vatDays.add(logDay);
+            const isHol = Number(log.IsHoliday) === 1 || log.IsHoliday === true || String(log.IsHoliday) === '1';
+            const isVat = Number(log.IsVatCleaning) === 1 || log.IsVatCleaning === true || String(log.IsVatCleaning) === '1';
+            const isPM = Number(log.IsPreventiveMaintenance) === 1 || log.IsPreventiveMaintenance === true || String(log.IsPreventiveMaintenance) === '1';
+
+            if (isHol) holidayDays.add(logDay);
+            else if (isVat) vatDays.add(logDay);
+            else if (isPM) prevMaintDays.add(logDay);
 
             if (log.OperatorSignature) sig1Map[logDay] = log.OperatorSignature;
             if (log.SupervisorSignature) sig1Map[logDay] = log.SupervisorSignature;
@@ -365,7 +402,9 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
 
             if (!historyMap[key]) historyMap[key] = {};
             
-            if (Number(log.IsNa) === 1 || log.IsNa === true || Number(log.IsNA) === 1 || log.IsNA === true) {
+            if (isHol || isVat || isPM) {
+                historyMap[key][logDay] = '';
+            } else if (Number(log.IsNa) === 1 || log.IsNa === true || Number(log.IsNA) === 1 || log.IsNA === true) {
                 historyMap[key][logDay] = 'NA';
             } else if (log.ReadingValue) {
                 historyMap[key][logDay] = log.ReadingValue;
@@ -382,7 +421,8 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
         doc.rect(230, 10, 57, 20); doc.setFontSize(11);
         doc.text(`${machine}`, 258, 18, { align: 'center' });
         doc.line(230, 22, 287, 22);
-        doc.setFontSize(10); doc.text(`Month: ${getReportMonthYear(dateRange.from)}`, 235, 27);
+        
+        doc.setFontSize(10); doc.text(`Month: ${getReportMonthYear(reportMonthDate)}`, 235, 27);
 
         const days = Array.from({ length: 31 }, (_, i) => (i + 1).toString());
 
@@ -393,6 +433,12 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
                     if (rowIndex === 0) row.push({ content: 'H\nO\nL\nI\nD\nA\nY', rowSpan: master.length, styles: { halign: 'center', valign: 'middle', fillColor: [230, 230, 230], fontStyle: 'bold', textColor: [100, 100, 100] } });
                 } else if (vatDays.has(i)) {
                     if (rowIndex === 0) row.push({ content: 'V\nA\nT\n\nC\nL\nE\nA\nN\nI\nN\nG', rowSpan: master.length, styles: { halign: 'center', valign: 'middle', fillColor: [210, 230, 255], fontStyle: 'bold', textColor: [50, 100, 150] } });
+                } else if (prevMaintDays.has(i)) {
+                    if (rowIndex === 0) row.push({
+                        content: 'P\nR\nE\nV\nE\nN\nT\nI\nV\nE\n\nM\nA\nI\nN\nT\nE\nN\nA\nN\nC\nE',
+                        rowSpan: master.length,
+                        styles: { halign: 'center', valign: 'middle', fillColor: [243, 232, 255], fontStyle: 'bold', textColor: [126, 34, 206], fontSize: 4.5 }
+                    });
                 } else {
                     row.push(historyMap[item.MasterId]?.[i] || '');
                 }
@@ -469,7 +515,7 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
             doc.text("Non-Conformance Report", 168, 26, { align: 'center' });
 
             const ncRows = machineNc.map((report, index) => [
-                index + 1, formatDate(report.ReportDate), report.NonConformityDetails || '', report.Correction || '',
+                index + 1, formatDate(report.ReportDate || report.RecordDate || report.date), report.NonConformityDetails || '', report.Correction || '',
                 report.RootCause || '', report.CorrectiveAction || '', report.TargetDate ? formatDate(report.TargetDate) : '',
                 report.Responsibility || '', '', report.Status || ''
             ]);
@@ -507,7 +553,7 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
 };
 
 // ============================================================================
-// 5. ERROR PROOF VERIFICATION
+// 5. ERROR PROOF VERIFICATION (Legacy / Fallback)
 // ============================================================================
 export const generateErrorProofPDF = (data, dateRange) => {
     const doc = new jsPDF('l', 'mm', 'a4');
@@ -603,6 +649,216 @@ export const generateErrorProofPDF = (data, dateRange) => {
     });
 
     doc.save(`ErrorProof_Verification_Bulk_${dateRange.from}_to_${dateRange.to}.pdf`);
+};
+
+// ============================================================================
+// 5a. ERROR PROOF VERIFICATION (V1)
+// ============================================================================
+export const generateErrorProofV1PDF = (data, dateRange) => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+    const verifications = data.verifications || [];
+    const plans = data.plans || [];
+
+    if (verifications.length === 0) {
+        doc.setFontSize(14);
+        doc.text("No V1 Error Proof records found for the selected date range.", 148.5, 40, { align: 'center' });
+        doc.save(`ErrorProof_V1_${dateRange.from}_to_${dateRange.to}.pdf`);
+        return;
+    }
+
+    const grouped = {};
+    verifications.forEach(v => {
+        const d = v.recordDate ? v.recordDate.split('T')[0] : 'Unknown';
+        const l = v.line || 'Unknown';
+        const key = `${d}_${l}`;
+        if (!grouped[key]) grouped[key] = { date: d, line: l, verifications: [], plans: [] };
+        grouped[key].verifications.push(v);
+    });
+
+    plans.forEach(p => {
+        const d = p.recordDate ? p.recordDate.split('T')[0] : 'Unknown';
+        const matchV = verifications.find(v => v.errorProofName === p.errorProofName && v.recordDate && v.recordDate.split('T')[0] === d);
+        const l = matchV ? matchV.line : 'Unknown';
+        const key = `${d}_${l}`;
+        if (grouped[key]) grouped[key].plans.push(p);
+    });
+
+    let pageIndex = 0;
+    Object.values(grouped).forEach(group => {
+        if (pageIndex > 0) doc.addPage();
+        pageIndex++;
+
+        doc.setFontSize(14).setFont('helvetica', 'bold');
+        doc.text("ERROR PROOF VERIFICATION CHECK LIST (V1)", 148.5, 15, { align: 'center' });
+        doc.setFontSize(10);
+        doc.text(`Date: ${group.date}`, 14, 25);
+        doc.text(`Line: ${group.line}`, 280, 25, { align: 'right' });
+
+        autoTable(doc, {
+            startY: 30,
+            head: [['Line', 'Error Proof Name', 'Nature of Error Proof', 'Frequency', 'Observation']],
+            body: group.verifications.map(v => [
+                v.line, v.errorProofName, v.natureOfErrorProof, v.frequency,
+                v.observationResult === 'NOT_OK' ? 'NOT OK' : v.observationResult
+            ]),
+            theme: 'grid',
+            styles: { fontSize: 8, halign: 'center', valign: 'middle' },
+            headStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] }
+        });
+
+        let finalY = doc.lastAutoTable.finalY + 10;
+        const opSig = group.verifications.find(v => v.OperatorSignature)?.OperatorSignature;
+        const hofSig = group.verifications.find(v => v.HOFSignature)?.HOFSignature;
+
+        doc.setFontSize(10).setFont('helvetica', 'bold');
+        doc.text("Operator Signature:", 14, finalY);
+        doc.rect(14, finalY + 2, 45, 18).stroke();
+        if (opSig && opSig.startsWith('data:image')) {
+            try { doc.addImage(opSig, 'PNG', 15, finalY + 3, 43, 16); } catch(e){}
+        }
+
+        doc.text("HOF Signature:", 148.5, finalY);
+        doc.rect(148.5, finalY + 2, 45, 18).stroke();
+        if (hofSig && hofSig.startsWith('data:image')) {
+            try { doc.addImage(hofSig, 'PNG', 149.5, finalY + 3, 43, 16); } catch(e){}
+        }
+
+        finalY += 30;
+
+        if (group.plans.length > 0) {
+            if (finalY > 150) { doc.addPage(); finalY = 20; }
+            doc.setFontSize(12).text("REACTION PLAN", 148.5, finalY, { align: 'center' });
+            autoTable(doc, {
+                startY: finalY + 5,
+                head: [['S.No', 'EP No', 'Error Proof Name', 'Problem', 'Root Cause', 'Corrective Action', 'Status', 'Op Sign', 'Sup Sign', 'Remarks']],
+                body: group.plans.map(p => [
+                    p.sNo, p.errorProofNo, p.errorProofName, p.problem, p.rootCause, p.correctiveAction, p.status,
+                    p.reviewedBy, 'SIG', p.remarks
+                ]),
+                theme: 'grid',
+                styles: { fontSize: 7, halign: 'center', valign: 'middle' },
+                headStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] },
+                didDrawCell: function(data) {
+                    if (data.section === 'body' && data.column.index === 8) {
+                        const p = group.plans[data.row.index];
+                        if (p.SupervisorSignature && p.SupervisorSignature.startsWith('data:image')) {
+                            try { doc.addImage(p.SupervisorSignature, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch(e){}
+                        }
+                    }
+                },
+                didParseCell: function(data) {
+                    if (data.section === 'body' && data.column.index === 8 && data.cell.raw === 'SIG') data.cell.text = '';
+                }
+            });
+        }
+    });
+
+    doc.save(`ErrorProof_V1_Bulk_${dateRange.from}_to_${dateRange.to}.pdf`);
+};
+
+// ============================================================================
+// 5b. ERROR PROOF VERIFICATION (V2)
+// ============================================================================
+export const generateErrorProofV2PDF = (data, dateRange) => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+    const verifications = data.verifications || [];
+    const plans = data.plans || [];
+
+    if (verifications.length === 0) {
+        doc.setFontSize(14);
+        doc.text("No V2 Error Proof records found for the selected date range.", 148.5, 40, { align: 'center' });
+        doc.save(`ErrorProof_V2_${dateRange.from}_to_${dateRange.to}.pdf`);
+        return;
+    }
+
+    const grouped = {};
+    verifications.forEach(v => {
+        const d = v.RecordDate ? v.RecordDate.split('T')[0] : 'Unknown';
+        const l = v.DisaMachine || 'Unknown';
+        const key = `${d}_${l}`;
+        if (!grouped[key]) grouped[key] = { date: d, line: l, verifications: [], plans: [] };
+        grouped[key].verifications.push(v);
+    });
+
+    plans.forEach(p => {
+        const matchV = verifications.find(v => v.Id === p.VerificationId);
+        const d = matchV && matchV.RecordDate ? matchV.RecordDate.split('T')[0] : 'Unknown';
+        const l = matchV ? matchV.DisaMachine : 'Unknown';
+        const key = `${d}_${l}`;
+        if (grouped[key]) grouped[key].plans.push(p);
+    });
+
+    let pageIndex = 0;
+    Object.values(grouped).forEach(group => {
+        if (pageIndex > 0) doc.addPage();
+        pageIndex++;
+
+        doc.setFontSize(14).setFont('helvetica', 'bold');
+        doc.text("ERROR PROOF VERIFICATION CHECK LIST (V2)", 148.5, 15, { align: 'center' });
+        doc.setFontSize(10);
+        doc.text(`Date: ${group.date}`, 14, 25);
+        doc.text(`Line: ${group.line}`, 280, 25, { align: 'right' });
+
+        autoTable(doc, {
+            startY: 30,
+            head: [['Line', 'Error Proof Name', 'Nature', 'Freq', 'Shift 1', 'Shift 2', 'Shift 3']],
+            body: group.verifications.map(v => [
+                v.Line, v.ErrorProofName, v.NatureOfErrorProof, v.Frequency,
+                v.Date1_Shift1_Res, v.Date1_Shift2_Res, v.Date1_Shift3_Res
+            ]),
+            theme: 'grid',
+            styles: { fontSize: 8, halign: 'center', valign: 'middle' },
+            headStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] }
+        });
+
+        let finalY = doc.lastAutoTable.finalY + 10;
+        const opSig = group.verifications.find(v => v.OperatorSignature)?.OperatorSignature;
+        const hofSig = group.verifications.find(v => v.HOFSignature)?.HOFSignature;
+
+        doc.setFontSize(10).setFont('helvetica', 'bold');
+        doc.text("Operator Signature:", 14, finalY);
+        doc.rect(14, finalY + 2, 45, 18).stroke();
+        if (opSig && opSig.startsWith('data:image')) {
+            try { doc.addImage(opSig, 'PNG', 15, finalY + 3, 43, 16); } catch(e){}
+        }
+
+        doc.text("HOF Signature:", 148.5, finalY);
+        doc.rect(148.5, finalY + 2, 45, 18).stroke();
+        if (hofSig && hofSig.startsWith('data:image')) {
+            try { doc.addImage(hofSig, 'PNG', 149.5, finalY + 3, 43, 16); } catch(e){}
+        }
+
+        finalY += 30;
+
+        if (group.plans.length > 0) {
+            if (finalY > 150) { doc.addPage(); finalY = 20; }
+            doc.setFontSize(12).text("REACTION PLAN", 148.5, finalY, { align: 'center' });
+            autoTable(doc, {
+                startY: finalY + 5,
+                head: [['S.No', 'EP No', 'Error Proof Name', 'Shift', 'Problem', 'Root Cause', 'Corrective Action', 'Status', 'Op Sign', 'Sup Sign', 'Remarks']],
+                body: group.plans.map(p => [
+                    p.SNo, p.ErrorProofNo, p.ErrorProofName, p.VerificationDateShift, p.Problem, p.RootCause, p.CorrectiveAction, p.Status,
+                    p.ReviewedBy, 'SIG', p.Remarks
+                ]),
+                theme: 'grid',
+                styles: { fontSize: 7, halign: 'center', valign: 'middle' },
+                headStyles: { fillColor: [220, 220, 220], textColor: [0,0,0] },
+                didDrawCell: function(data) {
+                    if (data.section === 'body' && data.column.index === 9) {
+                        const p = group.plans[data.row.index];
+                        if (p.SupervisorSignature && p.SupervisorSignature.startsWith('data:image')) {
+                            try { doc.addImage(p.SupervisorSignature, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch(e){}
+                        }
+                    }
+                },
+                didParseCell: function(data) {
+                    if (data.section === 'body' && data.column.index === 9 && data.cell.raw === 'SIG') data.cell.text = '';
+                }
+            });
+        }
+    });
+
+    doc.save(`ErrorProof_V2_Bulk_${dateRange.from}_to_${dateRange.to}.pdf`);
 };
 
 // ============================================================================
@@ -813,7 +1069,7 @@ export const generateFourMChangePDF = (data, dateRange) => {
 };
 
 // ============================================================================
-// 8. MOULD QUALITY INSPECTION (🔥 FIXED: Uses autoTable for perfect alignment)
+// 8. MOULD QUALITY INSPECTION (Black & White Edition)
 // ============================================================================
 export const generateMouldQualityPDF = (data, dateRange) => {
     const doc = new jsPDF('l', 'mm', 'a4');
@@ -837,23 +1093,30 @@ export const generateMouldQualityPDF = (data, dateRange) => {
 
         const startX = 14;
         let y = 30;
+        const pageWidth = doc.internal.pageSize.getWidth();
 
-        doc.font("Helvetica-Bold").fontSize(16).text("SAKTHI AUTO COMPONENT LIMITED", 148.5, y, { align: "center" });
-        doc.fontSize(14).text("MOULDING QUALITY INSPECTION REPORT", 148.5, y + 8, { align: "center" });
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.text("SAKTHI AUTO COMPONENT LIMITED", pageWidth / 2, y, { align: "center" });
+        
+        doc.setFontSize(14);
+        doc.text("MOULDING QUALITY INSPECTION REPORT", pageWidth / 2, y + 8, { align: "center" });
         
         const displayDate = formatDate(header.reportDate);
-        doc.fontSize(10).text(`Machine: ${header.disaMachine || '-'}`, startX, y + 22);
-        doc.text(`Date: ${displayDate}`, doc.page.width - startX, y + 22, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.text(`Machine: ${header.disaMachine || '-'}`, startX, y + 22);
+        doc.text(`Date: ${displayDate}`, pageWidth - startX, y + 22, { align: "right" });
 
-        // Build the nested headers specifically for jspdf-autotable
+        // 🔥 FIXED: Removed all individual fillColors for a clean B&W look
         const headMatrix = [
             [
                 { content: 'S.No', rowSpan: 3, styles: { halign: 'center', valign: 'middle' } },
                 { content: 'Shift', rowSpan: 3, styles: { halign: 'center', valign: 'middle' } },
                 { content: 'Part Name', rowSpan: 3, styles: { halign: 'center', valign: 'middle' } },
                 { content: 'Data Code', rowSpan: 3, styles: { halign: 'center', valign: 'middle' } },
-                { content: 'First Moulding', colSpan: 6, styles: { halign: 'center', fillColor: [255, 237, 213] } },
-                { content: 'During Running', colSpan: 11, styles: { halign: 'center', fillColor: [219, 234, 254] } }
+                { content: 'First Moulding', colSpan: 6, styles: { halign: 'center' } },
+                { content: 'During Running', colSpan: 11, styles: { halign: 'center' } }
             ],
             [
                 { content: 'Soft\nRam', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
@@ -867,14 +1130,14 @@ export const generateMouldQualityPDF = (data, dateRange) => {
                 { content: 'Pattern\nSticking', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
                 { content: 'Heat\nCode', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
                 { content: 'Filter\nSize', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-                { content: 'Surface Hardness\n(Min 85)', colSpan: 2, styles: { halign: 'center', fillColor: [224, 231, 255] } },
-                { content: 'Inside Penetrant\n(Min 20)', colSpan: 2, styles: { halign: 'center', fillColor: [204, 251, 241] } },
-                { content: 'Pattern Temp\n(Min 45C)', colSpan: 2, styles: { halign: 'center', fillColor: [255, 228, 230] } }
+                { content: 'Surface Hardness\n(Min 85)', colSpan: 2, styles: { halign: 'center' } },
+                { content: 'Inside Penetrant\n(Min 20)', colSpan: 2, styles: { halign: 'center' } },
+                { content: 'Pattern Temp\n(Min 45C)', colSpan: 2, styles: { halign: 'center' } }
             ],
             [
-                { content: 'PP', styles: { halign: 'center', fillColor: [224, 231, 255] } }, { content: 'SP', styles: { halign: 'center', fillColor: [224, 231, 255] } },
-                { content: 'PP', styles: { halign: 'center', fillColor: [204, 251, 241] } }, { content: 'SP', styles: { halign: 'center', fillColor: [204, 251, 241] } },
-                { content: 'PP', styles: { halign: 'center', fillColor: [255, 228, 230] } }, { content: 'SP', styles: { halign: 'center', fillColor: [255, 228, 230] } }
+                { content: 'PP', styles: { halign: 'center' } }, { content: 'SP', styles: { halign: 'center' } },
+                { content: 'PP', styles: { halign: 'center' } }, { content: 'SP', styles: { halign: 'center' } },
+                { content: 'PP', styles: { halign: 'center' } }, { content: 'SP', styles: { halign: 'center' } }
             ]
         ];
 
@@ -892,23 +1155,29 @@ export const generateMouldQualityPDF = (data, dateRange) => {
             body: bodyData,
             theme: 'grid',
             styles: { fontSize: 6, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0], valign: 'middle', halign: 'center' },
-            headStyles: { textColor: [0, 0, 0], fontStyle: 'bold' },
+            // 🔥 Added a uniform light gray background for all headers instead of the rainbow colors
+            headStyles: { textColor: [0, 0, 0], fillColor: [240, 240, 240], fontStyle: 'bold' },
             columnStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: 15 }, 2: { cellWidth: 35 }, 3: { cellWidth: 20 } }
         });
 
         const sigY = doc.lastAutoTable.finalY + 15;
-        doc.setFontSize(10).setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
         
         doc.text(`Verified By: ${header.verifiedBy || '-'}`, startX, sigY);
         if (header.operatorSignature && header.operatorSignature.startsWith('data:image')) {
-            try { doc.addImage(header.operatorSignature, startX, sigY + 5, { fit: [60, 20] }); } catch(e){}
+            try { doc.addImage(header.operatorSignature, 'PNG', startX, sigY + 5, 60, 20); } catch(e){}
         }
 
-        doc.text(`Approved By: ${header.approvedBy || '-'}`, doc.page.width - 100, sigY);
+        doc.text(`Approved By: ${header.approvedBy || '-'}`, pageWidth - 100, sigY);
         if (header.supervisorSignature && header.supervisorSignature.startsWith('data:image')) {
-            try { doc.image(header.supervisorSignature, doc.page.width - 100, sigY + 5, { fit: [60, 20] }); } catch(e){}
+            try { doc.addImage(header.supervisorSignature, 'PNG', pageWidth - 100, sigY + 5, 60, 20); } catch(e){}
         } else {
-            doc.setFont('helvetica', 'normal').setTextColor(255, 0, 0).text("Pending", doc.page.width - 100, sigY + 15);
+            // 🔥 Made "Pending" text black instead of red for a fully B&W report
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(0, 0, 0); 
+            doc.text("Pending", pageWidth - 100, sigY + 15);
         }
     });
 

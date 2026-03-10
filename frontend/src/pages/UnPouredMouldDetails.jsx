@@ -230,9 +230,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
     try {
       const doc = new jsPDF('l', 'mm', 'a4');
 
-      // ==============================================================
-      // 🔥 STANDARDIZED HEADER WITH IMAGE LOGO 
-      // ==============================================================
       doc.setLineWidth(0.3);
       
       // Box 1: SAKTHI AUTO (Logo Area)
@@ -259,7 +256,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
       doc.setFontSize(10);
       const formattedDate = new Date(headerData.date).toLocaleDateString('en-GB');
       doc.text(`DATE: ${formattedDate}`, 267, 26, { align: 'center' });
-      // ==============================================================
 
       const pdfGroups = [];
       columns.forEach(col => {
@@ -331,7 +327,7 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
 
       const summaryStartY = sigY + 30; 
 
-      const summaryBodyRows = ['I', 'II', 'III', 'IV'].map(disa => {
+      const summaryBodyRows = ['I', 'II', 'III', 'IV', 'V', 'VI'].map(disa => {
         const row = getDisaData(disa);
         return [
           disa, row.mouldCounterClose ?? '-', row.mouldCounterOpen ?? '-', row.producedMould ?? '0',
@@ -352,10 +348,10 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
 
       autoTable(doc, {
         startY: summaryStartY, margin: { left: 220, right: 5 },
-        head: [[{ content: 'NO. OF MOULDS/DAY', colSpan: 5, styles: { halign: 'left' } }], ['', 'DISA 1', 'DISA 2', 'DISA 3', 'DISA 4']],
+        head: [[{ content: 'NO. OF MOULDS/DAY', colSpan: 7, styles: { halign: 'left' } }], ['', 'DISA 1', 'DISA 2', 'DISA 3', 'DISA 4', 'DISA 5', 'DISA 6']],
         body: [
-          ['MOULD / DAY', getDisaData('I').producedMould ?? '0', getDisaData('II').producedMould ?? '0', getDisaData('III').producedMould ?? '0', getDisaData('IV').producedMould ?? '0'],
-          ['TOTAL', { content: totalProduced, colSpan: 4 }]
+          ['MOULD / DAY', getDisaData('I').producedMould ?? '0', getDisaData('II').producedMould ?? '0', getDisaData('III').producedMould ?? '0', getDisaData('IV').producedMould ?? '0', getDisaData('V').producedMould ?? '0', getDisaData('VI').producedMould ?? '0'],
+          ['TOTAL', { content: totalProduced, colSpan: 6 }]
         ],
         theme: 'grid', styles: { fontSize: 6, lineColor: [0, 0, 0], lineWidth: 0.15, textColor: [0, 0, 0], halign: 'center', valign: 'middle' },
         headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
@@ -367,10 +363,10 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
 
       autoTable(doc, {
         startY: doc.lastAutoTable.finalY + 5, margin: { left: 220, right: 5 },
-        head: [[{ content: 'NO. OF QUANTITY/DAY', colSpan: 5, styles: { halign: 'left' } }], ['', 'DISA 1', 'DISA 2', 'DISA 3', 'DISA 4']],
+        head: [[{ content: 'NO. OF QUANTITY/DAY', colSpan: 7, styles: { halign: 'left' } }], ['', 'DISA 1', 'DISA 2', 'DISA 3', 'DISA 4', 'DISA 5', 'DISA 6']],
         body: [
-          ['QTY / DAY', getDisaData('I').pouredMould ?? '0', getDisaData('II').pouredMould ?? '0', getDisaData('III').pouredMould ?? '0', getDisaData('IV').pouredMould ?? '0'],
-          ['TOTAL', { content: totalPoured, colSpan: 4 }]
+          ['QTY / DAY', getDisaData('I').pouredMould ?? '0', getDisaData('II').pouredMould ?? '0', getDisaData('III').pouredMould ?? '0', getDisaData('IV').pouredMould ?? '0', getDisaData('V').pouredMould ?? '0', getDisaData('VI').pouredMould ?? '0'],
+          ['TOTAL', { content: totalPoured, colSpan: 6 }]
         ],
         theme: 'grid', styles: { fontSize: 6, lineColor: [0, 0, 0], lineWidth: 0.15, textColor: [0, 0, 0], halign: 'center', valign: 'middle' },
         headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
@@ -432,6 +428,8 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
                     <option value="DISA - II">DISA - II</option>
                     <option value="DISA - III">DISA - III</option>
                     <option value="DISA - IV">DISA - IV</option>
+                    <option value="DISA - V">DISA - V</option>
+                    <option value="DISA - VI">DISA - VI</option>
                   </select>
                 </div>
                 
@@ -535,7 +533,7 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
                   </tr>
                 </thead>
                 <tbody className="text-gray-800">
-                  {['I', 'II', 'III', 'IV'].map((disaName) => {
+                  {['I', 'II', 'III', 'IV', 'V', 'VI'].map((disaName) => {
                     const row = getDisaData(disaName);
                     return (
                       <tr key={disaName} className="hover:bg-gray-50 transition-colors">
@@ -568,23 +566,23 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <table className="w-full border-collapse border border-gray-300 text-center text-sm shadow-sm rounded-lg overflow-hidden">
                 <thead className="bg-gray-100 font-bold text-gray-700">
-                  <tr><th colSpan="5" className="border border-gray-300 p-3 text-left">NO. OF MOULDS/DAY</th></tr>
-                  <tr><th className="border border-gray-300 p-2 bg-gray-50 w-32"></th><th className="border border-gray-300 p-2">DISA 1</th><th className="border border-gray-300 p-2">DISA 2</th><th className="border border-gray-300 p-2">DISA 3</th><th className="border border-gray-300 p-2">DISA 4</th></tr>
+                  <tr><th colSpan="7" className="border border-gray-300 p-3 text-left">NO. OF MOULDS/DAY</th></tr>
+                  <tr><th className="border border-gray-300 p-2 bg-gray-50 w-32"></th><th className="border border-gray-300 p-2">DISA 1</th><th className="border border-gray-300 p-2">DISA 2</th><th className="border border-gray-300 p-2">DISA 3</th><th className="border border-gray-300 p-2">DISA 4</th><th className="border border-gray-300 p-2">DISA 5</th><th className="border border-gray-300 p-2">DISA 6</th></tr>
                 </thead>
                 <tbody className="text-gray-800">
-                  <tr><td className="border border-gray-300 p-3 font-bold bg-gray-50 text-left text-xs uppercase tracking-wider">MOULD / DAY</td><td className="border border-gray-300 p-3">{getDisaData('I').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('II').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('III').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('IV').producedMould ?? "0"}</td></tr>
-                  <tr className="font-black bg-gray-200"><td className="border border-gray-400 p-3 text-left">TOTAL</td><td className="border border-gray-400 p-3 text-center text-lg text-orange-700" colSpan="4">{totalProduced}</td></tr>
+                  <tr><td className="border border-gray-300 p-3 font-bold bg-gray-50 text-left text-xs uppercase tracking-wider">MOULD / DAY</td><td className="border border-gray-300 p-3">{getDisaData('I').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('II').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('III').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('IV').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('V').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('VI').producedMould ?? "0"}</td></tr>
+                  <tr className="font-black bg-gray-200"><td className="border border-gray-400 p-3 text-left">TOTAL</td><td className="border border-gray-400 p-3 text-center text-lg text-orange-700" colSpan="6">{totalProduced}</td></tr>
                 </tbody>
               </table>
 
               <table className="w-full border-collapse border border-gray-300 text-center text-sm shadow-sm rounded-lg overflow-hidden">
                 <thead className="bg-gray-100 font-bold text-gray-700">
-                  <tr><th colSpan="5" className="border border-gray-300 p-3 text-left">NO. OF QUANTITY/DAY</th></tr>
-                  <tr><th className="border border-gray-300 p-2 bg-gray-50 w-32"></th><th className="border border-gray-300 p-2">DISA 1</th><th className="border border-gray-300 p-2">DISA 2</th><th className="border border-gray-300 p-2">DISA 3</th><th className="border border-gray-300 p-2">DISA 4</th></tr>
+                  <tr><th colSpan="7" className="border border-gray-300 p-3 text-left">NO. OF QUANTITY/DAY</th></tr>
+                  <tr><th className="border border-gray-300 p-2 bg-gray-50 w-32"></th><th className="border border-gray-300 p-2">DISA 1</th><th className="border border-gray-300 p-2">DISA 2</th><th className="border border-gray-300 p-2">DISA 3</th><th className="border border-gray-300 p-2">DISA 4</th><th className="border border-gray-300 p-2">DISA 5</th><th className="border border-gray-300 p-2">DISA 6</th></tr>
                 </thead>
                 <tbody className="text-gray-800">
-                  <tr><td className="border border-gray-300 p-3 font-bold bg-gray-50 text-left text-xs uppercase tracking-wider">QTY / DAY</td><td className="border border-gray-300 p-3">{getDisaData('I').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('II').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('III').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('IV').pouredMould ?? "0"}</td></tr>
-                  <tr className="font-black bg-gray-200"><td className="border border-gray-400 p-3 text-left">TOTAL</td><td className="border border-gray-400 p-3 text-center text-lg text-orange-700" colSpan="4">{totalPoured}</td></tr>
+                  <tr><td className="border border-gray-300 p-3 font-bold bg-gray-50 text-left text-xs uppercase tracking-wider">QTY / DAY</td><td className="border border-gray-300 p-3">{getDisaData('I').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('II').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('III').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('IV').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('V').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('VI').pouredMould ?? "0"}</td></tr>
+                  <tr className="font-black bg-gray-200"><td className="border border-gray-400 p-3 text-left">TOTAL</td><td className="border border-gray-400 p-3 text-center text-lg text-orange-700" colSpan="6">{totalPoured}</td></tr>
                 </tbody>
               </table>
             </div>

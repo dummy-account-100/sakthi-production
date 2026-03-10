@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const sql = require('../db');
+const sql = require("../db");
 const PDFDocument = require("pdfkit");
 
 /* =====================================================
@@ -13,7 +13,6 @@ router.get("/details", async (req, res) => {
     let mainRes;
     let reactionRes;
 
-    // Fetch the Dynamic Master Configuration
     const masterRes = await sql.query`
         SELECT * FROM ErrorProof_Master 
         WHERE IsDeleted = 0 OR IsDeleted IS NULL 
@@ -258,7 +257,51 @@ router.get('/bulk-data', async (req, res) => {
 });
 
 /* =====================================================
-   6️⃣ PDF GENERATOR LOGIC V2
+   🔥 6️⃣ NEW: ADMIN BULK UPDATE (Fixes the 404 Error)
+===================================================== */
+router.post("/bulk-update", async (req, res) => {
+  try {
+    const { verifications, reactionPlans } = req.body;
+    
+    // Update Verifications (Shift 1, 2, 3 values)
+    for (let v of verifications) {
+        if (v.Id) {
+            await sql.query`
+                UPDATE ErrorProofVerifications 
+                SET Date1_Shift1_Res = ${v.Date1_Shift1_Res},
+                    Date1_Shift2_Res = ${v.Date1_Shift2_Res},
+                    Date1_Shift3_Res = ${v.Date1_Shift3_Res}
+                WHERE Id = ${v.Id}
+            `;
+        }
+    }
+    
+    // Update Reaction Plans (Problem, Root Cause, Status, etc)
+    for (let rp of reactionPlans) {
+        // Checking for rp.Id or rp.SNo depending on how the frontend mapped it
+        const planId = rp.Id || rp.SNo;
+        if (planId) {
+            await sql.query`
+                UPDATE ReactionPlans 
+                SET Problem = ${rp.Problem}, 
+                    RootCause = ${rp.RootCause}, 
+                    CorrectiveAction = ${rp.CorrectiveAction}, 
+                    Status = ${rp.Status}, 
+                    Remarks = ${rp.Remarks} 
+                WHERE Id = ${planId} OR SNo = ${planId}
+            `;
+        }
+    }
+    
+    res.json({ success: true, message: "Updated Successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "DB error" });
+  }
+});
+
+/* =====================================================
+   7️⃣ PDF GENERATOR LOGIC V2
 ===================================================== */
 router.get("/report", async (req, res) => {
   try {

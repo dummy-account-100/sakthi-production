@@ -4,7 +4,7 @@ import Header from "../components/Header";
 import SignatureCanvas from "react-signature-canvas";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { Loader, Maximize2, Minimize2 } from "lucide-react";
+import { Loader, X } from "lucide-react"; // 🔥 Updated icons
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -13,7 +13,6 @@ const Hod = () => {
   const [selectedReport, setSelectedReport] = useState(null);
   const [pdfUrl, setPdfUrl] = useState(null);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
-  const [isPdfMaximized, setIsPdfMaximized] = useState(false); 
   const sigCanvas = useRef({});
   
   // 4M Change Reports
@@ -21,26 +20,24 @@ const Hod = () => {
   const [selectedFourMReport, setSelectedFourMReport] = useState(null);
   const [fourMPdfUrl, setFourMPdfUrl] = useState(null);
   const [isFourMPdfLoading, setIsFourMPdfLoading] = useState(false);
-  const [isFourMPdfMaximized, setIsFourMPdfMaximized] = useState(false);
   const fourMSigCanvas = useRef({});
 
-  // 🔥 NEW: Daily Production Performance
+  // Daily Production Performance
   const [dailyReports, setDailyReports] = useState([]);
   const [selectedDailyReport, setSelectedDailyReport] = useState(null);
   const [dailyPdfUrl, setDailyPdfUrl] = useState(null);
   const [isDailyPdfLoading, setIsDailyPdfLoading] = useState(false);
-  const [isDailyPdfMaximized, setIsDailyPdfMaximized] = useState(false);
   const dailySigCanvas = useRef({});
 
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
   const currentHOD = storedUser.username || "hod_user";
 
-  const DAILY_API_BASE = `${process.env.REACT_APP_API_URL}/api/daily-performance`; // 🔥 NEW API BASE
+  const DAILY_API_BASE = `${process.env.REACT_APP_API_URL}/api/daily-performance`;
 
   useEffect(() => {
     fetchReports();
     fetchFourMReports();
-    fetchDailyReports(); // 🔥 Fetch Daily Reports
+    fetchDailyReports(); 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -57,7 +54,7 @@ const Hod = () => {
   };
 
   const handleOpenSignModal = async (report) => {
-    setSelectedReport(report); setPdfUrl(null); setIsPdfLoading(true); setIsPdfMaximized(false); 
+    setSelectedReport(report); setPdfUrl(null); setIsPdfLoading(true);
 
     try {
       const selectedDate = new Date(report.reportDate);
@@ -184,7 +181,7 @@ const Hod = () => {
   };
 
   const handleOpenFourMModal = async (report) => {
-    setSelectedFourMReport(report); setFourMPdfUrl(null); setIsFourMPdfLoading(true); setIsFourMPdfMaximized(false);
+    setSelectedFourMReport(report); setFourMPdfUrl(null); setIsFourMPdfLoading(true);
 
     try {
       const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/4m-change/report`, { 
@@ -211,7 +208,7 @@ const Hod = () => {
   };
 
   // ===============================================
-  //  🔥 NEW: DAILY PRODUCTION PERFORMANCE LOGIC
+  //  DAILY PRODUCTION PERFORMANCE LOGIC
   // ===============================================
   const fetchDailyReports = async () => {
     try {
@@ -221,7 +218,7 @@ const Hod = () => {
   };
 
   const handleOpenDailyModal = async (report) => {
-    setSelectedDailyReport(report); setDailyPdfUrl(null); setIsDailyPdfLoading(true); setIsDailyPdfMaximized(false); 
+    setSelectedDailyReport(report); setDailyPdfUrl(null); setIsDailyPdfLoading(true);
     try {
       const dateStr = new Date(report.productionDate).toISOString().split('T')[0];
       const response = await axios.get(`${DAILY_API_BASE}/download-pdf`, { 
@@ -299,7 +296,7 @@ const Hod = () => {
           )}
         </div>
 
-        {/* 🔥 SECTION 3: DAILY PRODUCTION PERFORMANCE */}
+        {/* SECTION 3: DAILY PRODUCTION PERFORMANCE */}
         <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-2xl p-8 border-t-4 border-cyan-500">
           <div className="flex justify-between items-center mb-8 border-b pb-4">
             <h1 className="text-3xl font-bold text-gray-800">Daily Production Performance</h1>
@@ -330,97 +327,115 @@ const Hod = () => {
 
       </div>
 
-      {/* DISA CHECKLIST MODAL */}
+      {/* ========================================================================================= */}
+      {/* 🔥 FULL-SCREEN SPLIT UI PDF MODALS */}
+      {/* ========================================================================================= */}
+
+      {/* 1. DISA CHECKLIST MODAL */}
       {selectedReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 transition-all">
-          <div className={`bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ${isPdfMaximized ? 'w-[98vw] h-[96vh]' : 'w-full max-w-7xl h-[90vh]'}`}>
-            <div className="bg-gray-800 text-white px-6 py-4 flex justify-between items-center shrink-0"><h3 className="font-bold text-lg">Review & Approve Checklist</h3><button onClick={() => { setSelectedReport(null); setPdfUrl(null); }} className="text-gray-300 hover:text-white font-bold text-2xl leading-none">&times;</button></div>
-            <div className="p-6 flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
-              <div className="flex-1 bg-gray-100 rounded-lg border border-gray-300 overflow-hidden flex flex-col h-full relative"><div className="bg-gray-200 text-gray-700 text-xs font-bold px-4 py-2 uppercase tracking-wide border-b border-gray-300 flex justify-between items-center"><span>Document Preview</span><button onClick={() => setIsPdfMaximized(!isPdfMaximized)} className="hover:text-blue-600 transition-colors flex items-center gap-1">{isPdfMaximized ? <><Minimize2 size={16} /> Shrink</> : <><Maximize2 size={16} /> Expand</>}</button></div>{isPdfLoading ? <div className="flex-1 flex flex-col items-center justify-center bg-gray-50"><Loader className="animate-spin text-orange-500 w-12 h-12 mb-4" /><p className="text-gray-600 font-bold">Generating PDF Preview...</p></div> : pdfUrl ? <iframe src={`${pdfUrl}#toolbar=0`} title="PDF Report Preview" className="w-full flex-1 border-none" /> : <div className="flex-1 flex items-center justify-center text-red-500 font-bold">Could not load PDF</div>}</div>
-              {!isPdfMaximized && (
-                <div className="w-full md:w-80 shrink-0 flex flex-col h-full overflow-y-auto transition-all">
-                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200 mb-6 text-sm flex flex-col gap-2"><p><span className="font-bold text-gray-700">Date:</span> {formatDate(selectedReport.reportDate)}</p><p><span className="font-bold text-gray-700">Machine:</span> {selectedReport.disa}</p></div>
-                  <label className="block text-gray-800 font-bold mb-2 text-sm">Sign below to verify & approve:</label>
-                  <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg overflow-hidden mb-2"><SignatureCanvas ref={sigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-48 cursor-crosshair' }} /></div>
-                  <div className="flex justify-end items-center mb-auto"><button onClick={() => { if(sigCanvas.current) sigCanvas.current.clear() }} className="text-sm text-gray-500 hover:text-gray-800 font-bold underline">Clear Pad</button></div>
-                  <div className="flex flex-col gap-3 mt-6"><button onClick={submitSignature} className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded font-bold shadow-md transition-colors text-lg">Approve & Sign</button><button onClick={() => { setSelectedReport(null); setPdfUrl(null); }} className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded font-bold transition-colors">Cancel</button></div>
+        <div className="fixed inset-0 z-[9999] bg-white flex flex-col overflow-hidden animate-fade-in">
+          <div className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center shrink-0 shadow-md z-10">
+            <h3 className="font-bold text-xl uppercase tracking-wider">Review & Approve Checklist</h3>
+            <button onClick={() => { setSelectedReport(null); setPdfUrl(null); }} className="text-gray-400 hover:text-red-400 transition-colors">
+              <X size={28} />
+            </button>
+          </div>
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            <div className="flex-1 h-full bg-[#525659] relative flex items-center justify-center">
+              {isPdfLoading && <Loader className="animate-spin text-blue-500 w-12 h-12 absolute" />}
+              {pdfUrl && <iframe src={`${pdfUrl}#toolbar=0&view=FitH`} className="w-full h-full border-none relative z-10" title="PDF" />}
+            </div>
+            <div className="w-full lg:w-[400px] bg-gray-50 border-l border-gray-300 flex flex-col shrink-0 shadow-2xl z-10 overflow-y-auto">
+              <div className="p-6 flex-1 flex flex-col">
+                <div className="bg-blue-100 p-4 rounded-xl border border-blue-200 mb-6 text-sm flex flex-col gap-2 shadow-sm text-blue-900">
+                  <p><span className="font-bold">Date:</span> {formatDate(selectedReport.reportDate)}</p>
+                  <p><span className="font-bold">Machine:</span> {selectedReport.disa}</p>
                 </div>
-              )}
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 block">HOF Signature</label>
+                <div className="border-2 border-dashed border-gray-300 bg-white rounded-xl overflow-hidden mb-2 shadow-inner">
+                  <SignatureCanvas ref={sigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-64 cursor-crosshair' }} />
+                </div>
+                <button onClick={() => { if(sigCanvas.current) sigCanvas.current.clear() }} className="text-xs text-gray-500 hover:text-red-600 font-bold uppercase tracking-wider underline self-end mb-8">Clear Signature</button>
+                <div className="mt-auto">
+                  <button onClick={submitSignature} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">
+                    Approve & Sign
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* 4M CHANGE MODAL */}
+      {/* 2. 4M CHANGE MODAL */}
       {selectedFourMReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 transition-all">
-          <div className={`bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ${isFourMPdfMaximized ? 'w-[98vw] h-[96vh]' : 'w-full max-w-7xl h-[90vh]'}`}>
-            <div className="bg-gray-800 text-white px-6 py-4 flex justify-between items-center shrink-0">
-                <h3 className="font-bold text-lg">Review & Approve 4M Change Report</h3>
-                <button onClick={() => { setSelectedFourMReport(null); setFourMPdfUrl(null); }} className="text-gray-300 hover:text-white font-bold text-2xl leading-none">&times;</button>
+        <div className="fixed inset-0 z-[9999] bg-white flex flex-col overflow-hidden animate-fade-in">
+          <div className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center shrink-0 shadow-md z-10">
+            <h3 className="font-bold text-xl uppercase tracking-wider">Review & Approve 4M Change Report</h3>
+            <button onClick={() => { setSelectedFourMReport(null); setFourMPdfUrl(null); }} className="text-gray-400 hover:text-red-400 transition-colors">
+              <X size={28} />
+            </button>
+          </div>
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            <div className="flex-1 h-full bg-[#525659] relative flex items-center justify-center">
+              {isFourMPdfLoading && <Loader className="animate-spin text-green-500 w-12 h-12 absolute" />}
+              {fourMPdfUrl && <iframe src={`${fourMPdfUrl}#toolbar=0&view=FitH`} className="w-full h-full border-none relative z-10" title="PDF" />}
             </div>
-            <div className="p-6 flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
-              <div className="flex-1 bg-gray-100 rounded-lg border border-gray-300 overflow-hidden flex flex-col h-full relative">
-                <div className="bg-gray-200 text-gray-700 text-xs font-bold px-4 py-2 flex justify-between">
-                    <span>Document Preview</span>
-                    <button onClick={() => setIsFourMPdfMaximized(!isFourMPdfMaximized)} className="hover:text-green-600 flex items-center gap-1">{isFourMPdfMaximized ? <><Minimize2 size={16} /> Shrink</> : <><Maximize2 size={16} /> Expand</>}</button>
+            <div className="w-full lg:w-[400px] bg-gray-50 border-l border-gray-300 flex flex-col shrink-0 shadow-2xl z-10 overflow-y-auto">
+              <div className="p-6 flex-1 flex flex-col">
+                <div className="bg-green-100 p-4 rounded-xl border border-green-200 mb-6 text-sm flex flex-col gap-2 shadow-sm text-green-900">
+                  <p><span className="font-bold">Date:</span> {formatDate(selectedFourMReport.recordDate)}</p>
+                  <p><span className="font-bold">Machine:</span> {selectedFourMReport.disa}</p>
+                  <p><span className="font-bold">Part:</span> {selectedFourMReport.partName}</p>
+                  <p><span className="font-bold">Type:</span> {selectedFourMReport.type4M}</p>
                 </div>
-                {isFourMPdfLoading ? <div className="flex-1 flex justify-center items-center"><Loader className="animate-spin text-green-500" /></div> : <iframe src={`${fourMPdfUrl}#toolbar=0`} className="w-full flex-1 border-none" />}
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 block">HOF Signature</label>
+                <div className="border-2 border-dashed border-gray-300 bg-white rounded-xl overflow-hidden mb-2 shadow-inner">
+                  <SignatureCanvas ref={fourMSigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-64 cursor-crosshair' }} />
+                </div>
+                <button onClick={() => fourMSigCanvas.current.clear()} className="text-xs text-gray-500 hover:text-red-600 font-bold uppercase tracking-wider underline self-end mb-8">Clear Signature</button>
+                <div className="mt-auto">
+                  <button onClick={submitFourMSignature} className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">
+                    Approve & Sign
+                  </button>
+                </div>
               </div>
-              {!isFourMPdfMaximized && (
-                <div className="w-full md:w-80 shrink-0 flex flex-col h-full overflow-y-auto transition-all">
-                  <div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-6 text-sm flex flex-col gap-2">
-                      <p><span className="font-bold text-gray-700">Date:</span> {formatDate(selectedFourMReport.recordDate)}</p>
-                      <p><span className="font-bold text-gray-700">Machine:</span> {selectedFourMReport.disa}</p>
-                      <p><span className="font-bold text-gray-700">Part:</span> {selectedFourMReport.partName}</p>
-                      <p><span className="font-bold text-gray-700">Type:</span> {selectedFourMReport.type4M}</p>
-                  </div>
-                  <label className="block text-gray-800 font-bold mb-2 text-sm">Sign below to verify & approve:</label>
-                  <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg overflow-hidden mb-2">
-                      <SignatureCanvas ref={fourMSigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-48 cursor-crosshair' }} />
-                  </div>
-                  <button onClick={() => fourMSigCanvas.current.clear()} className="text-sm text-gray-500 hover:text-gray-800 font-bold underline mb-auto self-end">Clear Pad</button>
-                  <div className="flex flex-col gap-3 mt-6"><button onClick={submitFourMSignature} className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded font-bold shadow-md text-lg">Approve & Sign</button></div>
-                </div>
-              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* 🔥 NEW: DAILY PRODUCTION PERFORMANCE MODAL */}
+      {/* 3. DAILY PRODUCTION PERFORMANCE MODAL */}
       {selectedDailyReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 transition-all">
-          <div className={`bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ${isDailyPdfMaximized ? 'w-[98vw] h-[96vh]' : 'w-full max-w-7xl h-[90vh]'}`}>
-            <div className="bg-gray-800 text-white px-6 py-4 flex justify-between items-center shrink-0">
-              <h3 className="font-bold text-lg">Review & Approve Daily Performance</h3>
-              <button onClick={() => { setSelectedDailyReport(null); setDailyPdfUrl(null); }} className="text-gray-300 hover:text-white font-bold text-2xl leading-none">&times;</button>
+        <div className="fixed inset-0 z-[9999] bg-white flex flex-col overflow-hidden animate-fade-in">
+          <div className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center shrink-0 shadow-md z-10">
+            <h3 className="font-bold text-xl uppercase tracking-wider">Review & Approve Daily Performance</h3>
+            <button onClick={() => { setSelectedDailyReport(null); setDailyPdfUrl(null); }} className="text-gray-400 hover:text-red-400 transition-colors">
+              <X size={28} />
+            </button>
+          </div>
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            <div className="flex-1 h-full bg-[#525659] relative flex items-center justify-center">
+              {isDailyPdfLoading && <Loader className="animate-spin text-cyan-500 w-12 h-12 absolute" />}
+              {dailyPdfUrl && <iframe src={`${dailyPdfUrl}#toolbar=0&view=FitH`} className="w-full h-full border-none relative z-10" title="PDF" />}
             </div>
-            <div className="p-6 flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
-              <div className="flex-1 bg-gray-100 rounded-lg border border-gray-300 overflow-hidden flex flex-col h-full relative">
-                <div className="bg-gray-200 text-gray-700 text-xs font-bold px-4 py-2 flex justify-between">
-                  <span>Document Preview</span>
-                  <button onClick={() => setIsDailyPdfMaximized(!isDailyPdfMaximized)} className="hover:text-cyan-600 flex items-center gap-1">{isDailyPdfMaximized ? <><Minimize2 size={16} /> Shrink</> : <><Maximize2 size={16} /> Expand</>}</button>
+            <div className="w-full lg:w-[400px] bg-gray-50 border-l border-gray-300 flex flex-col shrink-0 shadow-2xl z-10 overflow-y-auto">
+              <div className="p-6 flex-1 flex flex-col">
+                <div className="bg-cyan-100 p-4 rounded-xl border border-cyan-200 mb-6 text-sm flex flex-col gap-2 shadow-sm text-cyan-900">
+                  <p><span className="font-bold">Date:</span> {formatDate(selectedDailyReport.productionDate)}</p>
+                  <p><span className="font-bold">Machine:</span> DISA - {selectedDailyReport.disa}</p>
                 </div>
-                {isDailyPdfLoading ? <div className="flex-1 flex justify-center items-center"><Loader className="animate-spin text-cyan-500 w-12 h-12 mb-4" /></div> : <iframe src={`${dailyPdfUrl}#toolbar=0`} className="w-full flex-1 border-none" />}
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 block">HOF / HOD Signature</label>
+                <div className="border-2 border-dashed border-gray-300 bg-white rounded-xl overflow-hidden mb-2 shadow-inner">
+                  <SignatureCanvas ref={dailySigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-64 cursor-crosshair' }} />
+                </div>
+                <button onClick={() => dailySigCanvas.current.clear()} className="text-xs text-gray-500 hover:text-red-600 font-bold uppercase tracking-wider underline self-end mb-8">Clear Signature</button>
+                <div className="mt-auto">
+                  <button onClick={submitDailySignature} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">
+                    Approve & Sign
+                  </button>
+                </div>
               </div>
-
-              {!isDailyPdfMaximized && (
-                <div className="w-full md:w-80 shrink-0 flex flex-col h-full overflow-y-auto transition-all">
-                  <div className="bg-cyan-50 p-4 rounded-lg border border-cyan-200 mb-6 text-sm flex flex-col gap-2">
-                    <p><span className="font-bold text-gray-700">Date:</span> {formatDate(selectedDailyReport.productionDate)}</p>
-                    <p><span className="font-bold text-gray-700">Machine:</span> DISA - {selectedDailyReport.disa}</p>
-                  </div>
-                  <label className="block text-gray-800 font-bold mb-2 text-sm">Sign below to verify & approve:</label>
-                  <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg overflow-hidden mb-2">
-                    <SignatureCanvas ref={dailySigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-48 cursor-crosshair' }} />
-                  </div>
-                  <button onClick={() => dailySigCanvas.current.clear()} className="text-sm text-gray-500 hover:text-gray-800 font-bold underline mb-auto self-end">Clear Pad</button>
-                  <div className="flex flex-col gap-3 mt-6">
-                    <button onClick={submitDailySignature} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-3 rounded font-bold shadow-md">Approve & Sign</button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

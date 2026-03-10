@@ -23,5 +23,7 @@ router.get("/forms/download-pdf", formController.downloadAllReports);
 // --- SUPERVISOR ROUTES ---
 router.get("/forms/supervisor/:name", formController.getReportsBySupervisor);
 router.post("/forms/sign", formController.signReport);
-
+// --- ADMIN EDIT ROUTE ---
+router.get("/forms/by-date", formController.getByDate);
+router.put("/forms/:id", formController.updateDisamaticReport);
 module.exports = router;

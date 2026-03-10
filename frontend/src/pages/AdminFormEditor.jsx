@@ -6,7 +6,7 @@ const API = process.env.REACT_APP_API_URL;
 const DISA_MACHINES = ['DISA - I', 'DISA - II', 'DISA - III', 'DISA - IV', 'DISA - V', 'DISA - VI'];
 
 // ─────────────────────────────────────────────────────────────────────────────
-//   Small helpers
+//  Small helpers
 // ─────────────────────────────────────────────────────────────────────────────
 const Toast = ({ msg, type, onClose }) => {
     useEffect(() => {
@@ -94,183 +94,28 @@ const SaveButton = ({ onClick }) => (
     </div>
 );
 
+// 🔥 NEW: Table UI Wrapper for Disamatic Arrays 🔥
+const SubTable = ({ headers, children }) => (
+    <div className="overflow-x-auto mt-2 mb-6 border border-white/10 rounded-lg bg-[#222]">
+        <table className="w-full min-w-max text-sm text-left text-white">
+            <thead className="bg-[#1a1a1a] border-b border-white/10">
+                <tr>
+                    {headers.map((h, i) => (
+                        <th key={i} className="p-3 text-[10px] uppercase tracking-widest text-white/50 font-bold">{h}</th>
+                    ))}
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+                {children}
+            </tbody>
+        </table>
+    </div>
+);
+
+
 // ─────────────────────────────────────────────────────────────────────────────
-//   FORM EDITORS
+//  FORM EDITORS
 // ─────────────────────────────────────────────────────────────────────────────
-
-/* 0. DAILY PERFORMANCE REPORT EDITOR */
-const PerformanceEditor = ({ date, disa, toast, setToast }) => {
-    const [report, setReport] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        setLoading(true);
-        axios.get(`${API}/api/daily-performance/by-date`, { params: { date, disa: disa.replace('DISA - ', '').trim() } })
-            .then(r => {
-                if (r.data && r.data.length > 0) {
-                    const rec = r.data[0];
-                    const sumObj = { I: {}, II: {}, III: {} };
-                    if (rec.summary) {
-                        rec.summary.forEach(s => sumObj[s.shiftName] = s);
-                    }
-                    setReport({ ...rec, summaryObj: sumObj, delays: rec.delays || [] });
-                } else {
-                    setReport(null);
-                }
-            })
-            .catch(() => setToast({ msg: 'Failed to load data', type: 'error' }))
-            .finally(() => setLoading(false));
-    }, [date, disa]);
-
-    const setSummaryField = (shift, field, value) => {
-        setReport(prev => ({
-            ...prev,
-            summaryObj: {
-                ...prev.summaryObj,
-                [shift]: { ...prev.summaryObj[shift], [field]: value }
-            }
-        }));
-    };
-
-    const setDetailField = (idx, field, value) => {
-        setReport(prev => {
-            const newDetails = [...prev.details];
-            newDetails[idx] = { ...newDetails[idx], [field]: value };
-            return { ...prev, details: newDetails };
-        });
-    };
-
-    const setDelayField = (idx, field, value) => {
-        setReport(prev => {
-            const newDelays = [...prev.delays];
-            newDelays[idx] = { ...newDelays[idx], [field]: value };
-            return { ...prev, delays: newDelays };
-        });
-    };
-
-    const handleSave = async () => {
-        setToast({ msg: 'Saving…', type: 'loading' });
-        try {
-            await axios.put(`${API}/api/daily-performance/${report.id}`, {
-                summary: report.summaryObj,
-                details: report.details,
-                delays: report.delays,
-                unplannedReasons: report.unplannedReasons,
-                incharge: report.incharge,
-                hof: report.hof,
-                hod: report.hod
-            });
-            setToast({ msg: 'Saved successfully!', type: 'success' });
-        } catch { setToast({ msg: 'Save failed', type: 'error' }); }
-    };
-
-    if (loading) return <CenteredLoader />;
-    if (!report) return <NoData msg={`No Performance Report found for ${disa} on ${date}.`} />;
-
-    return (
-        <div className="space-y-6">
-            <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 shadow-lg">
-                <SectionHeader title="Shift Summary Data" />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-                    {['I', 'II', 'III'].map(shift => {
-                        const s = report.summaryObj[shift] || {};
-                        return (
-                            <div key={shift} className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-3">
-                                <h4 className="text-white font-bold text-center border-b border-white/10 pb-2 mb-3">SHIFT {shift}</h4>
-                                <Field label="Poured Moulds" type="number" value={s.pouredMoulds} onChange={v => setSummaryField(shift, 'pouredMoulds', v)} />
-                                <Field label="Tonnage" type="number" value={s.tonnage} onChange={v => setSummaryField(shift, 'tonnage', v)} />
-                                <Field label="Casted" type="number" value={s.casted} onChange={v => setSummaryField(shift, 'casted', v)} />
-                                <Field label="Shift Value" type="number" value={s.shiftValue || s.value} onChange={v => setSummaryField(shift, 'shiftValue', v)} />
-                            </div>
-                        )
-                    })}
-                </div>
-            </div>
-
-            <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 shadow-lg overflow-hidden">
-                <SectionHeader title="Component Production Details" />
-                <div className="mt-4 overflow-x-auto">
-                    <table className="w-full text-left text-white text-sm min-w-[800px]">
-                        <thead className="bg-[#111] text-xs uppercase text-white/50">
-                            <tr>
-                                <th className="p-3">Pattern Code</th>
-                                <th className="p-3">Item Desc.</th>
-                                <th className="p-3 w-20">Planned</th>
-                                <th className="p-3 w-20">Unplanned</th>
-                                <th className="p-3 w-24">Prod. Moulds</th>
-                                <th className="p-3 w-24">Pour. Moulds</th>
-                                <th className="p-3 w-20">Cavity</th>
-                                <th className="p-3 w-24">Unit Wt.</th>
-                                <th className="p-3 w-24">Total Wt.</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                            {report.details.map((d, i) => (
-                                <tr key={d.id} className="hover:bg-white/5 transition-colors">
-                                    <td className="p-2"><input className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.patternCode || ''} onChange={e => setDetailField(i, 'patternCode', e.target.value)} /></td>
-                                    <td className="p-2"><input className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.itemDescription || ''} onChange={e => setDetailField(i, 'itemDescription', e.target.value)} /></td>
-                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.planned || ''} onChange={e => setDetailField(i, 'planned', e.target.value)} /></td>
-                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.unplanned || ''} onChange={e => setDetailField(i, 'unplanned', e.target.value)} /></td>
-                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.mouldsProd || ''} onChange={e => setDetailField(i, 'mouldsProd', e.target.value)} /></td>
-                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.mouldsPour || ''} onChange={e => setDetailField(i, 'mouldsPour', e.target.value)} /></td>
-                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.cavity || ''} onChange={e => setDetailField(i, 'cavity', e.target.value)} /></td>
-                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.unitWeight || ''} onChange={e => setDetailField(i, 'unitWeight', e.target.value)} /></td>
-                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm font-bold text-[#ff9100]" value={d.totalWeight || ''} onChange={e => setDetailField(i, 'totalWeight', e.target.value)} /></td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {report.delays && report.delays.length > 0 && (
-                <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 shadow-lg overflow-hidden">
-                    <SectionHeader title="Production Delays" />
-                    <div className="mt-4 overflow-x-auto">
-                        <table className="w-full text-left text-white text-sm">
-                            <thead className="bg-[#111] text-xs uppercase text-white/50">
-                                <tr>
-                                    <th className="p-3 w-32">Shift</th>
-                                    <th className="p-3 w-48">Duration (Mins)</th>
-                                    <th className="p-3">Reason</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {report.delays.map((d, i) => (
-                                    <tr key={d.id} className="hover:bg-white/5 transition-colors">
-                                        <td className="p-2">
-                                            <select className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.shift || ''} onChange={e => setDelayField(i, 'shift', e.target.value)}>
-                                                <option value="I">I</option>
-                                                <option value="II">II</option>
-                                                <option value="III">III</option>
-                                            </select>
-                                        </td>
-                                        <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.duration || ''} onChange={e => setDelayField(i, 'duration', e.target.value)} /></td>
-                                        <td className="p-2"><input className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.reason || ''} onChange={e => setDelayField(i, 'reason', e.target.value)} /></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
-
-            <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 shadow-lg">
-                <SectionHeader title="Report Details & Supervisors" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div className="col-span-2">
-                        <Field label="Reasons for Unplanned items" value={report.unplannedReasons} onChange={v => setReport({ ...report, unplannedReasons: v })} multiline />
-                    </div>
-                    <Field label="In-Charge" value={report.incharge} onChange={v => setReport({ ...report, incharge: v })} />
-                    <Field label="HOF" value={report.hof} onChange={v => setReport({ ...report, hof: v })} />
-                    <Field label="HOD" value={report.hod} onChange={v => setReport({ ...report, hod: v })} />
-                </div>
-            </div>
-
-            <SaveButton onClick={handleSave} />
-        </div>
-    );
-};
 
 /* 1. UNPOURED MOULD DETAILS */
 const UnpouredEditor = ({ date, disa, toast, setToast }) => {
@@ -641,14 +486,14 @@ const DisaChecklistEditor = ({ date, disa, toast, setToast }) => {
     );
 };
 
-/* 4. ERROR PROOF VERIFICATION & REACTION PLAN EDITOR */
+/* 4. ERROR PROOF VERIFICATION */
 const ErrorProofEditor = ({ date, disa, toast, setToast }) => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         setLoading(true);
-        // 🔥 FIXED: Changed from /api/error-proof/ to /api/error-proof2/
+        // Uses error-proof2 dynamically
         axios.get(`${API}/api/error-proof2/details`, { params: { date, machine: disa } })
             .then(r => {
                 const resData = r.data;
@@ -671,7 +516,6 @@ const ErrorProofEditor = ({ date, disa, toast, setToast }) => {
             .finally(() => setLoading(false));
     }, [date, disa]);
 
-    // Handle Verifications changes
     const setVer = (idx, field, val) =>
         setData(prev => {
             const v = [...prev.verifications];
@@ -679,7 +523,6 @@ const ErrorProofEditor = ({ date, disa, toast, setToast }) => {
             return { ...prev, verifications: v };
         });
 
-    // Handle Reaction Plans changes
     const setPlan = (idx, field, val) =>
         setData(prev => {
             const p = [...prev.reactionPlans];
@@ -687,7 +530,6 @@ const ErrorProofEditor = ({ date, disa, toast, setToast }) => {
             return { ...prev, reactionPlans: p };
         });
 
-    // Handle Header Details
     const setHeader = (field, val) =>
         setData(prev => ({
             ...prev,
@@ -697,14 +539,9 @@ const ErrorProofEditor = ({ date, disa, toast, setToast }) => {
     const handleSave = async () => {
         setToast({ msg: 'Saving…', type: 'loading' });
         try {
-            // 🔥 FIXED: Changed from /api/error-proof/ to /api/error-proof2/
-            await axios.post(`${API}/api/error-proof2/save`, {
-                machine: disa,
-                date: date,
+            await axios.post(`${API}/api/error-proof2/bulk-update`, {
                 verifications: data.verifications,
                 reactionPlans: data.reactionPlans,
-                headerDetails: data.headerDetails,
-                operatorSignature: data.operatorSignature
             });
             setToast({ msg: 'Saved successfully!', type: 'success' });
         } catch { setToast({ msg: 'Save failed', type: 'error' }); }
@@ -803,6 +640,7 @@ const ErrorProofEditor = ({ date, disa, toast, setToast }) => {
         </div>
     );
 };
+
 /* 5. DISA SETTING ADJUSTMENT */
 const DisaSettingEditor = ({ date, toast, setToast }) => {
     const [records, setRecords] = useState([]);
@@ -1172,13 +1010,206 @@ const LpaEditor = ({ date, disa, toast, setToast }) => {
     );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-//   NEEDS-MACHINE forms
-// ─────────────────────────────────────────────────────────────────────────────
-const NEEDS_MACHINE = ['performance', 'unpoured-mould-details', 'dmm-setting-parameters', 'disa-operator', 'error-proof', 'lpa'];
+/* 🔥 8. NEW: DISAMATIC PRODUCT REPORT EDITOR (GROUPED ARRAYS) 🔥 */
+/* 🔥 8. NEW: DISAMATIC PRODUCT REPORT EDITOR (GROUPED ARRAYS) 🔥 */
+const DisamaticEditor = ({ date, disa, toast, setToast }) => {
+    const [reports, setReports] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const pureDisa = disa.replace('DISA - ', '');
+
+    useEffect(() => {
+        setLoading(true);
+        axios.get(`${API}/api/forms/by-date`, { params: { date, disa: pureDisa } })
+            .then(r => {
+                const fetched = r.data || [];
+                const grouped = {};
+                
+                // Group multiple form submissions by Shift
+                fetched.forEach(rep => {
+                    if (!grouped[rep.shift]) {
+                        // Create deep copy for first occurrence of shift
+                        grouped[rep.shift] = { 
+                            ...rep,
+                            productions: [...(rep.productions || [])],
+                            nextShiftPlans: [...(rep.nextShiftPlans || [])],
+                            delays: [...(rep.delays || [])],
+                            mouldHardness: [...(rep.mouldHardness || [])],
+                            patternTemps: [...(rep.patternTemps || [])]
+                        };
+                    } else {
+                        // Merge array items to prevent duplicated table blocks
+                        grouped[rep.shift].productions.push(...(rep.productions || []));
+                        grouped[rep.shift].nextShiftPlans.push(...(rep.nextShiftPlans || []));
+                        grouped[rep.shift].delays.push(...(rep.delays || []));
+                        grouped[rep.shift].mouldHardness.push(...(rep.mouldHardness || []));
+                        grouped[rep.shift].patternTemps.push(...(rep.patternTemps || []));
+                        
+                        // Safely concatenate text fields
+                        if (rep.significantEvent && rep.significantEvent !== '-') {
+                            grouped[rep.shift].significantEvent = grouped[rep.shift].significantEvent && grouped[rep.shift].significantEvent !== '-' 
+                                ? grouped[rep.shift].significantEvent + ' | ' + rep.significantEvent 
+                                : rep.significantEvent;
+                        }
+                        if (rep.maintenance && rep.maintenance !== '-') {
+                            grouped[rep.shift].maintenance = grouped[rep.shift].maintenance && grouped[rep.shift].maintenance !== '-' 
+                                ? grouped[rep.shift].maintenance + ' | ' + rep.maintenance 
+                                : rep.maintenance;
+                        }
+                    }
+                });
+
+                // Sort strictly by Shift order I, II, III
+                const shiftOrder = { 'I': 1, 'II': 2, 'III': 3 };
+                const sorted = Object.values(grouped).sort((a, b) => (shiftOrder[a.shift] || 99) - (shiftOrder[b.shift] || 99));
+                
+                setReports(sorted);
+            })
+            .catch(() => setToast({ msg: 'Failed to load data', type: 'error' }))
+            .finally(() => setLoading(false));
+    }, [date, pureDisa]);
+
+    const updateReport = (rIdx, field, val) => {
+        setReports(prev => {
+            const next = [...prev];
+            next[rIdx] = { ...next[rIdx], [field]: val };
+            return next;
+        });
+    };
+
+    const updateSub = (rIdx, arrayName, subIdx, field, val) => {
+        setReports(prev => {
+            const next = [...prev];
+            const arr = [...next[rIdx][arrayName]];
+            arr[subIdx] = { ...arr[subIdx], [field]: val };
+            next[rIdx] = { ...next[rIdx], [arrayName]: arr };
+            return next;
+        });
+    };
+
+    const handleSave = async () => {
+        setToast({ msg: 'Saving...', type: 'loading' });
+        try {
+            // By passing the merged arrays to the primary report's ID, the backend correctly loops through and updates all individual rows via their SQL table ID.
+            for (const rep of reports) {
+                await axios.put(`${API}/api/forms/${rep.id}`, rep);
+            }
+            setToast({ msg: 'Saved successfully!', type: 'success' });
+        } catch (e) {
+            setToast({ msg: 'Save failed', type: 'error' });
+        }
+    };
+
+    if (loading) return <CenteredLoader />;
+    if (reports.length === 0) return <NoData msg={`No Disamatic reports found for DISA ${pureDisa} on ${date}.`} />;
+
+    return (
+        <div className="space-y-8">
+            {reports.map((report, rIdx) => (
+                <div key={report.id} className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 shadow-lg">
+                    
+                    <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                        <h3 className="text-xl font-black text-[#ff9100] uppercase tracking-wider">Shift {report.shift}</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <Field label="Incharge" value={report.incharge} onChange={v => updateReport(rIdx, 'incharge', v)} />
+                        <Field label="Member" value={report.member} onChange={v => updateReport(rIdx, 'member', v)} />
+                        <Field label="P/P Operator" value={report.ppOperator} onChange={v => updateReport(rIdx, 'ppOperator', v)} />
+                        <Field label="Supervisor" value={report.supervisorName} onChange={v => updateReport(rIdx, 'supervisorName', v)} />
+                    </div>
+                    
+                    {/* PRODUCTIONS TABLE */}
+                    <SectionHeader title="Productions" />
+                    <SubTable headers={['S.No', 'Component', 'Counter No', 'Produced', 'Poured', 'Cycle Time', 'Moulds/Hr', 'Remarks']}>
+                        {report.productions?.map((p, pIdx) => (
+                            <tr key={p.id || pIdx} className="hover:bg-white/5 transition-colors">
+                                <td className="p-2 text-white/50 text-center font-bold w-12">{pIdx + 1}</td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={p.componentName || ''} onChange={e => updateSub(rIdx, 'productions', pIdx, 'componentName', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={p.mouldCounterNo || ''} onChange={e => updateSub(rIdx, 'productions', pIdx, 'mouldCounterNo', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={p.produced || ''} onChange={e => updateSub(rIdx, 'productions', pIdx, 'produced', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={p.poured || ''} onChange={e => updateSub(rIdx, 'productions', pIdx, 'poured', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={p.cycleTime || ''} onChange={e => updateSub(rIdx, 'productions', pIdx, 'cycleTime', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={p.mouldsPerHour || ''} onChange={e => updateSub(rIdx, 'productions', pIdx, 'mouldsPerHour', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={p.remarks || ''} onChange={e => updateSub(rIdx, 'productions', pIdx, 'remarks', e.target.value)} /></td>
+                            </tr>
+                        ))}
+                    </SubTable>
+
+                    {/* NEXT SHIFT PLAN TABLE */}
+                    <SectionHeader title="Next Shift Plan" />
+                    <SubTable headers={['S.No', 'Component Name', 'Planned Moulds', 'Remarks']}>
+                        {report.nextShiftPlans?.map((p, pIdx) => (
+                            <tr key={p.id || pIdx} className="hover:bg-white/5 transition-colors">
+                                <td className="p-2 text-white/50 text-center font-bold w-12">{pIdx + 1}</td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={p.componentName || ''} onChange={e => updateSub(rIdx, 'nextShiftPlans', pIdx, 'componentName', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={p.plannedMoulds || ''} onChange={e => updateSub(rIdx, 'nextShiftPlans', pIdx, 'plannedMoulds', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={p.remarks || ''} onChange={e => updateSub(rIdx, 'nextShiftPlans', pIdx, 'remarks', e.target.value)} /></td>
+                            </tr>
+                        ))}
+                    </SubTable>
+
+                    {/* DELAYS TABLE */}
+                    <SectionHeader title="Delays" />
+                    <SubTable headers={['S.No', 'Delays (Reason)', 'Minutes', 'Time Range']}>
+                        {report.delays?.map((d, dIdx) => (
+                            <tr key={d.id || dIdx} className="hover:bg-white/5 transition-colors">
+                                <td className="p-2 text-white/50 text-center font-bold w-12">{dIdx + 1}</td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={d.delay || d.delayType || ''} onChange={e => updateSub(rIdx, 'delays', dIdx, 'delay', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={d.durationMinutes || d.duration || ''} onChange={e => updateSub(rIdx, 'delays', dIdx, 'durationMinutes', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={d.durationTime || d.startTime || ''} onChange={e => updateSub(rIdx, 'delays', dIdx, 'durationTime', e.target.value)} /></td>
+                            </tr>
+                        ))}
+                    </SubTable>
+
+                    {/* MOULD HARDNESS TABLE */}
+                    <SectionHeader title="Mould Hardness" />
+                    <SubTable headers={['S.No', 'Component Name', 'Penetration PP', 'Penetration SP', 'B-Scale PP', 'B-Scale SP', 'Remarks']}>
+                        {report.mouldHardness?.map((h, hIdx) => (
+                            <tr key={h.id || hIdx} className="hover:bg-white/5 transition-colors">
+                                <td className="p-2 text-white/50 text-center font-bold w-12">{hIdx + 1}</td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={h.componentName || ''} onChange={e => updateSub(rIdx, 'mouldHardness', hIdx, 'componentName', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={h.penetrationPP || ''} onChange={e => updateSub(rIdx, 'mouldHardness', hIdx, 'penetrationPP', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={h.penetrationSP || ''} onChange={e => updateSub(rIdx, 'mouldHardness', hIdx, 'penetrationSP', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={h.bScalePP || ''} onChange={e => updateSub(rIdx, 'mouldHardness', hIdx, 'bScalePP', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={h.bScaleSP || ''} onChange={e => updateSub(rIdx, 'mouldHardness', hIdx, 'bScaleSP', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={h.remarks || ''} onChange={e => updateSub(rIdx, 'mouldHardness', hIdx, 'remarks', e.target.value)} /></td>
+                            </tr>
+                        ))}
+                    </SubTable>
+
+                    {/* PATTERN TEMPS TABLE */}
+                    <SectionHeader title="Pattern Temps" />
+                    <SubTable headers={['S.No', 'Component Name', 'PP', 'SP', 'Remarks']}>
+                        {report.patternTemps?.map((pt, ptIdx) => (
+                            <tr key={pt.id || ptIdx} className="hover:bg-white/5 transition-colors">
+                                <td className="p-2 text-white/50 text-center font-bold w-12">{ptIdx + 1}</td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={pt.componentName || ''} onChange={e => updateSub(rIdx, 'patternTemps', ptIdx, 'componentName', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={pt.pp || ''} onChange={e => updateSub(rIdx, 'patternTemps', ptIdx, 'pp', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={pt.sp || ''} onChange={e => updateSub(rIdx, 'patternTemps', ptIdx, 'sp', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-white text-sm focus:border-[#ff9100] outline-none" value={pt.remarks || ''} onChange={e => updateSub(rIdx, 'patternTemps', ptIdx, 'remarks', e.target.value)} /></td>
+                            </tr>
+                        ))}
+                    </SubTable>
+
+                    <SectionHeader title="Other Details" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Field label="Significant Event" value={report.significantEvent} onChange={v => updateReport(rIdx, 'significantEvent', v)} multiline />
+                        <Field label="Maintenance" value={report.maintenance} onChange={v => updateReport(rIdx, 'maintenance', v)} multiline />
+                    </div>
+                </div>
+            ))}
+            <SaveButton onClick={handleSave} />
+        </div>
+    );
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
-//   MAIN EXPORT
+//  NEEDS-MACHINE forms
+// ─────────────────────────────────────────────────────────────────────────────
+const NEEDS_MACHINE = ['unpoured-mould-details', 'dmm-setting-parameters', 'disa-operator', 'error-proof', 'lpa', 'disamatic-report'];
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  MAIN EXPORT
 // ─────────────────────────────────────────────────────────────────────────────
 const AdminFormEditor = ({ form, date, onBack }) => {
     const [selectedMachine, setSelectedMachine] = useState('');
@@ -1191,7 +1222,6 @@ const AdminFormEditor = ({ form, date, onBack }) => {
     const renderEditor = () => {
         const props = { date, disa: selectedMachine, toast, setToast };
         switch (form.id) {
-            case 'performance': return <PerformanceEditor {...props} />;
             case 'unpoured-mould-details': return <UnpouredEditor {...props} />;
             case 'dmm-setting-parameters': return <DmmEditor {...props} />;
             case 'disa-operator': return <DisaChecklistEditor {...props} />;
@@ -1199,6 +1229,7 @@ const AdminFormEditor = ({ form, date, onBack }) => {
             case 'disa-setting-adjustment': return <DisaSettingEditor date={date} toast={toast} setToast={setToast} />;
             case '4m-change': return <FourMEditor date={date} toast={toast} setToast={setToast} />;
             case 'lpa': return <LpaEditor {...props} />;
+            case 'disamatic-report': return <DisamaticEditor {...props} />;
             default: return (
                 <div className="flex flex-col items-center justify-center py-20 text-white/30">
                     <AlertTriangle className="w-10 h-10 mb-3" />

@@ -8,7 +8,8 @@ import {
 
 import {
     generateUnPouredMouldPDF, generateDmmSettingPDF, generateChecklistPDF,
-    generateErrorProofPDF, generateDisaSettingAdjustmentPDF
+    generateErrorProofV1PDF, generateErrorProofV2PDF, generateDisaSettingAdjustmentPDF,
+    generateMouldQualityPDF
 } from '../utils/pdfGenerators';
 
 import { removeToken, getUser } from '../utils/auth';
@@ -89,8 +90,10 @@ const AdminDashboard = () => {
         { name: "DISA Operator Checklist", id: "disa-operator" },
         { name: "Layered Process Audit", id: "lpa" },
         { name: "Error Proof Verification", id: "error-proof" },
+        { name: "Error Proof 2", id: "error-proof2" },
         { name: "DISA Setting Adjustment Record", id: "disa-setting-adjustment" },
         { name: "4M Monitoring", id: "4m-change" },
+        { name: "Mould Quality Inspection", id: "mould-quality" },
         { name: "Add / Manage Users", id: "users", isSpecial: true }
     ];
 
@@ -173,7 +176,7 @@ const AdminDashboard = () => {
     };
 
     const handleManageForm = (form) => {
-        const configForms = ['disa-operator', 'lpa', 'error-proof', 'unpoured-mould-details', 'dmm-setting-parameters', 'disa-setting-adjustment', '4m-change'];
+        const configForms = ['disa-operator', 'lpa', 'error-proof2', 'unpoured-mould-details', 'dmm-setting-parameters', 'disa-setting-adjustment', '4m-change'];
         setActionModal({ show: false, selectedForm: null });
 
         if (configForms.includes(form.id)) {
@@ -181,7 +184,7 @@ const AdminDashboard = () => {
             else if (form.id === 'disa-setting-adjustment') setActiveView('disa-config');
             else if (form.id === 'unpoured-mould-details') setActiveView('unpoured-config');
             else if (form.id === 'dmm-setting-parameters') setActiveView('dmm-config');
-            else if (form.id === 'error-proof') setActiveView('ep-config');
+            else if (form.id === 'error-proof2') setActiveView('ep-config');
             else if (form.id === 'disa-operator') setActiveView('checklist-config');
             else if (form.id === 'lpa') setActiveView('lpa-config');
             else navigate(`/admin/config/${form.id}`);
@@ -227,7 +230,7 @@ const AdminDashboard = () => {
                 return;
             }
 
-            // 2. Other Server rendered PDFs
+            // 2. Other Server rendered PDFs (Including disamatic-report)
             const serverPdfForms = ['4m-change', 'disamatic-report'];
             if (serverPdfForms.includes(pdfModal.selectedForm.id)) {
                 let url = '';
@@ -236,6 +239,7 @@ const AdminDashboard = () => {
                 } else if (pdfModal.selectedForm.id === 'disamatic-report') {
                     url = `${process.env.REACT_APP_API_URL}/api/forms/download-pdf?fromDate=${dateRange.from}&toDate=${dateRange.to}`;
                 }
+                
                 if (url) {
                     window.open(url, '_blank');
                     setNotification({ show: true, type: 'success', message: 'Report generated in new tab!' });
@@ -248,16 +252,35 @@ const AdminDashboard = () => {
             // 3. Client rendered PDFs
             let apiRoute = `${process.env.REACT_APP_API_URL}/api/reports/${pdfModal.selectedForm.id}`;
             if (pdfModal.selectedForm.id === 'disa-setting-adjustment') apiRoute = `${process.env.REACT_APP_API_URL}/api/disa/records`;
-            
-            // 🔥 FIXED: Pointed 'error-proof' to the new 'error-proof2' backend route
-            else if (pdfModal.selectedForm.id === 'error-proof') apiRoute = `${process.env.REACT_APP_API_URL}/api/error-proof2/bulk-data`;
-            
+            else if (pdfModal.selectedForm.id === 'error-proof') apiRoute = `${process.env.REACT_APP_API_URL}/api/error-proof/bulk-data`;
+            else if (pdfModal.selectedForm.id === 'error-proof2') apiRoute = `${process.env.REACT_APP_API_URL}/api/error-proof2/bulk-data`;
             else if (pdfModal.selectedForm.id === 'unpoured-mould-details') apiRoute = `${process.env.REACT_APP_API_URL}/api/unpoured-moulds/bulk-data`;
             else if (pdfModal.selectedForm.id === 'dmm-setting-parameters') apiRoute = `${process.env.REACT_APP_API_URL}/api/dmm-settings/bulk-data`;
             else if (pdfModal.selectedForm.id === 'disa-operator') apiRoute = `${process.env.REACT_APP_API_URL}/api/disa-checklist/bulk-data`;
             else if (pdfModal.selectedForm.id === 'lpa') apiRoute = `${process.env.REACT_APP_API_URL}/api/bottom-level-audit/bulk-data`;
+            else if (pdfModal.selectedForm.id === 'mould-quality') apiRoute = `${process.env.REACT_APP_API_URL}/api/mould-quality/bulk-data`;
 
-            const res = await axios.get(apiRoute, { params: { fromDate: dateRange.from, toDate: dateRange.to } });
+            // 🔥 NEW FIX: Expand dates to full months for grid-based checklists
+            let fetchFromDate = dateRange.from;
+            let fetchToDate = dateRange.to;
+
+            if (['disa-operator', 'lpa'].includes(pdfModal.selectedForm.id)) {
+                const fromDateObj = new Date(dateRange.from);
+                const toDateObj = new Date(dateRange.to);
+                
+                // Get 1st day of starting month
+                const fromYear = fromDateObj.getFullYear();
+                const fromMonth = String(fromDateObj.getMonth() + 1).padStart(2, '0');
+                fetchFromDate = `${fromYear}-${fromMonth}-01`;
+
+                // Get Last day of ending month
+                const toYear = toDateObj.getFullYear();
+                const toMonth = String(toDateObj.getMonth() + 1).padStart(2, '0');
+                const lastDay = new Date(toYear, toDateObj.getMonth() + 1, 0).getDate();
+                fetchToDate = `${toYear}-${toMonth}-${String(lastDay).padStart(2, '0')}`;
+            }
+
+            const res = await axios.get(apiRoute, { params: { fromDate: fetchFromDate, toDate: fetchToDate } });
             let data = res.data;
 
             const sanitizeDates = (arr) => arr.map(row => ({
@@ -277,7 +300,7 @@ const AdminDashboard = () => {
             if (Array.isArray(data) && data.length === 0) isEmpty = true;
             else if (data && data.trans && data.trans.length === 0) isEmpty = true;
             else if (data && data.records && data.records.length === 0) isEmpty = true;
-            else if (data && data.verifications && data.verifications.length === 0) isEmpty = true; // Added check for Error Proof
+            else if (data && data.verifications && data.verifications.length === 0) isEmpty = true; 
 
             if (isEmpty) {
                 setNotification({ show: true, type: 'error', message: 'No data found for the selected date range.' });
@@ -285,12 +308,17 @@ const AdminDashboard = () => {
                 return;
             }
 
+            const effectiveDateRange = { from: fetchFromDate, to: fetchToDate };
+
+            // 🔥 INTEGRATED FIX: Using proper V1, V2 PDF generators, and Mould Quality
             switch (pdfModal.selectedForm.id) {
                 case 'unpoured-mould-details': generateUnPouredMouldPDF(data, dateRange); break;
                 case 'dmm-setting-parameters': generateDmmSettingPDF(data, dateRange); break;
-                case 'disa-operator': generateChecklistPDF(data, dateRange, "DISA MACHINE OPERATOR CHECK SHEET", "Non-Conformance Report"); break;
-                case 'lpa': generateChecklistPDF(data, dateRange, "LAYERED PROCESS AUDIT - BOTTOM LEVEL", "Non-Conformance Report"); break;
-                case 'error-proof': generateErrorProofPDF(data, dateRange); break;
+                case 'disa-operator': generateChecklistPDF(data, effectiveDateRange, "DISA MACHINE OPERATOR CHECK SHEET", "Non-Conformance Report"); break;
+                case 'lpa': generateChecklistPDF(data, effectiveDateRange, "LAYERED PROCESS AUDIT - BOTTOM LEVEL", "Non-Conformance Report"); break;
+                case 'error-proof': generateErrorProofV1PDF(data, dateRange); break;
+                case 'error-proof2': generateErrorProofV2PDF(data, dateRange); break;
+                case 'mould-quality': generateMouldQualityPDF(data, dateRange); break;
                 case 'disa-setting-adjustment': generateDisaSettingAdjustmentPDF(data, dateRange); break;
                 default:
                     setNotification({ show: true, type: 'error', message: 'Report format mapping not found.' });
@@ -482,9 +510,9 @@ const AdminDashboard = () => {
             <div className="h-1.5 bg-[#ff9100] flex-shrink-0 shadow-[0_0_15px_rgba(255,145,0,0.5)]" />
 
             <div className="w-full flex justify-between items-center px-10 pt-6 absolute top-0 left-0 z-10">
-                <Link to="/admin" className="flex items-center gap-2 text-[#ff9100] font-bold uppercase tracking-wider text-sm hover:text-white transition-colors bg-white/5 px-4 py-2 rounded-lg border border-white/10 hover:border-[#ff9100]/50 shadow-lg backdrop-blur-sm">
+                {/* <Link to="/admin" className="flex items-center gap-2 text-[#ff9100] font-bold uppercase tracking-wider text-sm hover:text-white transition-colors bg-white/5 px-4 py-2 rounded-lg border border-white/10 hover:border-[#ff9100]/50 shadow-lg backdrop-blur-sm">
                     ← Back to Dashboard
-                </Link>
+                </Link> */}
                 <div className="flex items-center gap-4">
                     <span className="text-white/30 text-xs font-mono uppercase tracking-wider">
                         {user ? `${user.username} · ${user.role}` : ''}

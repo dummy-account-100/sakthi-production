@@ -4,7 +4,7 @@ import Header from "../components/Header";
 import SignatureCanvas from "react-signature-canvas";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { Loader, Maximize2, Minimize2 } from "lucide-react";
+import { Loader, X } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -13,7 +13,6 @@ const Hof = () => {
   const [selectedReport, setSelectedReport] = useState(null);
   const [pdfUrl, setPdfUrl] = useState(null);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
-  const [isPdfMaximized, setIsPdfMaximized] = useState(false); 
   const sigCanvas = useRef({});
   
   // States for Error Proof Verification (V1)
@@ -21,7 +20,6 @@ const Hof = () => {
   const [selectedErrorReport, setSelectedErrorReport] = useState(null);
   const [errorPdfUrl, setErrorPdfUrl] = useState(null);
   const [isErrorPdfLoading, setIsErrorPdfLoading] = useState(false);
-  const [isErrorPdfMaximized, setIsErrorPdfMaximized] = useState(false);
   const errorSigCanvas = useRef({});
 
   // States for Error Proof Verification 2 (V2)
@@ -29,15 +27,13 @@ const Hof = () => {
   const [selectedErrorReportV2, setSelectedErrorReportV2] = useState(null);
   const [errorPdfUrlV2, setErrorPdfUrlV2] = useState(null);
   const [isErrorPdfLoadingV2, setIsErrorPdfLoadingV2] = useState(false);
-  const [isErrorPdfMaximizedV2, setIsErrorPdfMaximizedV2] = useState(false);
   const errorSigCanvasV2 = useRef({});
 
-  // 🔥 NEW: States for Daily Production Performance
+  // States for Daily Production Performance
   const [dailyReports, setDailyReports] = useState([]);
   const [selectedDailyReport, setSelectedDailyReport] = useState(null);
   const [dailyPdfUrl, setDailyPdfUrl] = useState(null);
   const [isDailyPdfLoading, setIsDailyPdfLoading] = useState(false);
-  const [isDailyPdfMaximized, setIsDailyPdfMaximized] = useState(false);
   const dailySigCanvas = useRef({});
 
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -46,13 +42,13 @@ const Hof = () => {
   const API_BASE = `${process.env.REACT_APP_API_URL}/api/bottom-level-audit`;
   const ERR_API_BASE = `${process.env.REACT_APP_API_URL}/api/error-proof`;
   const ERR_API_BASE_V2 = `${process.env.REACT_APP_API_URL}/api/error-proof2`; 
-  const DAILY_API_BASE = `${process.env.REACT_APP_API_URL}/api/daily-performance`; // 🔥 NEW API BASE
+  const DAILY_API_BASE = `${process.env.REACT_APP_API_URL}/api/daily-performance`; 
 
   useEffect(() => {
     fetchReports();
     fetchErrorReports();
     fetchErrorReportsV2(); 
-    fetchDailyReports(); // 🔥 Fetch Daily Reports
+    fetchDailyReports(); 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -79,7 +75,7 @@ const Hof = () => {
   };
 
   // ===============================================
-  //  🔥 NEW: DAILY PRODUCTION PERFORMANCE LOGIC
+  //  DAILY PRODUCTION PERFORMANCE LOGIC
   // ===============================================
   const fetchDailyReports = async () => {
     try {
@@ -89,7 +85,7 @@ const Hof = () => {
   };
 
   const handleOpenDailyModal = async (report) => {
-    setSelectedDailyReport(report); setDailyPdfUrl(null); setIsDailyPdfLoading(true); setIsDailyPdfMaximized(false); 
+    setSelectedDailyReport(report); setDailyPdfUrl(null); setIsDailyPdfLoading(true);
     try {
       const dateStr = new Date(report.productionDate).toISOString().split('T')[0];
       const response = await axios.get(`${DAILY_API_BASE}/download-pdf`, { 
@@ -115,8 +111,8 @@ const Hof = () => {
 
 
   // --- EXISTING MODAL LOGIC (Bottom Level, Error V1, Error V2) ---
-  const handleOpenSignModal = async (report) => { /* ...existing logic... */ 
-    setSelectedReport(report); setPdfUrl(null); setIsPdfLoading(true); setIsPdfMaximized(false); 
+  const handleOpenSignModal = async (report) => {
+    setSelectedReport(report); setPdfUrl(null); setIsPdfLoading(true);
     try {
       const month = report.month; const year = report.year; const disaMachine = report.disa;
       const monthlyRes = await axios.get(`${API_BASE}/monthly-report`, { params: { month, year, disaMachine } });
@@ -190,7 +186,7 @@ const Hof = () => {
         }
       });
 
-      doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.text("Legend:   3 - OK     X - NOT OK     CA - Corrected during Audit     NA - Not Applicable", 10, doc.lastAutoTable.finalY + 6);
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.text("Legend:   3 - OK    X - NOT OK    CA - Corrected during Audit    NA - Not Applicable", 10, doc.lastAutoTable.finalY + 6);
       doc.setFont('helvetica', 'normal'); doc.text("Remarks: If Nonconformity please write on NCR format (back-side)", 10, doc.lastAutoTable.finalY + 12); doc.text("QF/08/MRO - 18, Rev No: 02 dt 01.01.2022", 10, 200); doc.text("Page 1 of 2", 270, 200);
 
       const pdfBlobUrl = doc.output('bloburl'); setPdfUrl(pdfBlobUrl);
@@ -209,7 +205,7 @@ const Hof = () => {
   };
 
   const handleOpenErrorModal = async (report) => {
-    setSelectedErrorReport(report); setErrorPdfUrl(null); setIsErrorPdfLoading(true); setIsErrorPdfMaximized(false); 
+    setSelectedErrorReport(report); setErrorPdfUrl(null); setIsErrorPdfLoading(true);
     try {
       const response = await axios.get(`${ERR_API_BASE}/report`, { params: { line: report.disa }, responseType: 'blob' });
       const pdfBlobUrl = URL.createObjectURL(response.data);
@@ -231,7 +227,7 @@ const Hof = () => {
   };
 
   const handleOpenErrorModalV2 = async (report) => {
-    setSelectedErrorReportV2(report); setErrorPdfUrlV2(null); setIsErrorPdfLoadingV2(true); setIsErrorPdfMaximizedV2(false); 
+    setSelectedErrorReportV2(report); setErrorPdfUrlV2(null); setIsErrorPdfLoadingV2(true);
     try {
       const response = await axios.get(`${ERR_API_BASE_V2}/report`, { params: { line: report.disa }, responseType: 'blob' });
       const pdfBlobUrl = URL.createObjectURL(response.data);
@@ -349,7 +345,7 @@ const Hof = () => {
           )}
         </div>
 
-        {/* 🔥 SECTION 4: DAILY PRODUCTION PERFORMANCE */}
+        {/* SECTION 4: DAILY PRODUCTION PERFORMANCE */}
         <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-2xl p-8 border-t-4 border-cyan-500">
           <div className="flex justify-between items-center mb-8 border-b pb-4">
             <h1 className="text-3xl font-bold text-gray-800">Daily Production Performance</h1>
@@ -380,134 +376,149 @@ const Hof = () => {
 
       </div>
 
-      {/* MODALS */}
+      {/* ========================================================================================= */}
+      {/* 🔥 FULL-SCREEN SPLIT UI PDF MODALS */}
+      {/* ========================================================================================= */}
 
-      {/* BOTTOM LEVEL MODAL */}
+      {/* 1. BOTTOM LEVEL AUDIT MODAL */}
       {selectedReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 transition-all">
-          <div className={`bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ${isPdfMaximized ? 'w-[98vw] h-[96vh]' : 'w-full max-w-7xl h-[90vh]'}`}>
-            <div className="bg-gray-800 text-white px-6 py-4 flex justify-between items-center shrink-0">
-              <h3 className="font-bold text-lg">Review & Approve Monthly Audit</h3>
-              <button onClick={() => { setSelectedReport(null); setPdfUrl(null); }} className="text-gray-300 hover:text-white font-bold text-2xl leading-none">&times;</button>
+        <div className="fixed inset-0 z-[9999] bg-white flex flex-col overflow-hidden animate-fade-in">
+          <div className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center shrink-0 shadow-md z-10">
+            <h3 className="font-bold text-xl uppercase tracking-wider">Review & Approve Monthly Audit</h3>
+            <button onClick={() => { setSelectedReport(null); setPdfUrl(null); }} className="text-gray-400 hover:text-red-400 transition-colors">
+              <X size={28} />
+            </button>
+          </div>
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            <div className="flex-1 h-full bg-[#525659] relative flex items-center justify-center">
+              {isPdfLoading && <Loader className="animate-spin text-white w-12 h-12 absolute" />}
+              {pdfUrl && <iframe src={`${pdfUrl}#toolbar=0&view=FitH`} className="w-full h-full border-none relative z-10" title="PDF" />}
             </div>
-            <div className="p-6 flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
-              <div className="flex-1 bg-gray-100 rounded-lg border border-gray-300 overflow-hidden flex flex-col h-full relative">
-                <div className="bg-gray-200 text-gray-700 text-xs font-bold px-4 py-2 flex justify-between">
-                  <span>Document Preview</span>
-                  <button onClick={() => setIsPdfMaximized(!isPdfMaximized)} className="hover:text-blue-600 flex items-center gap-1">{isPdfMaximized ? <><Minimize2 size={16} /> Shrink</> : <><Maximize2 size={16} /> Expand</>}</button>
+            <div className="w-full lg:w-[400px] bg-gray-50 border-l border-gray-300 flex flex-col shrink-0 shadow-2xl z-10 overflow-y-auto">
+              <div className="p-6 flex-1 flex flex-col">
+                <div className="bg-blue-100 p-4 rounded-xl border border-blue-200 mb-6 text-sm flex flex-col gap-2 shadow-sm text-blue-900">
+                  <p><span className="font-bold">Month:</span> {new Date(selectedReport.year, selectedReport.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
+                  <p><span className="font-bold">Machine:</span> {selectedReport.disa}</p>
                 </div>
-                {isPdfLoading ? <div className="flex-1 flex justify-center items-center"><Loader className="animate-spin text-blue-500 w-12 h-12 mb-4" /></div> : <iframe src={`${pdfUrl}#toolbar=0`} className="w-full flex-1 border-none" />}
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 block">HOF Signature</label>
+                <div className="border-2 border-dashed border-gray-300 bg-white rounded-xl overflow-hidden mb-2 shadow-inner">
+                  <SignatureCanvas ref={sigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-64 cursor-crosshair' }} />
+                </div>
+                <button onClick={() => { if(sigCanvas.current) sigCanvas.current.clear() }} className="text-xs text-gray-500 hover:text-red-600 font-bold uppercase tracking-wider underline self-end mb-8">Clear Signature</button>
+                <div className="mt-auto">
+                  <button onClick={submitSignature} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">
+                    Approve & Sign
+                  </button>
+                </div>
               </div>
-
-              {!isPdfMaximized && (
-                <div className="w-full md:w-80 shrink-0 flex flex-col h-full overflow-y-auto transition-all">
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6 text-sm flex flex-col gap-2"><p><span className="font-bold text-gray-700">Month:</span> {new Date(selectedReport.year, selectedReport.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}</p><p><span className="font-bold text-gray-700">Machine:</span> {selectedReport.disa}</p></div>
-                  <label className="block text-gray-800 font-bold mb-2 text-sm">Sign below to verify & approve:</label>
-                  <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg overflow-hidden mb-2"><SignatureCanvas ref={sigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-48 cursor-crosshair' }} /></div>
-                  <button onClick={() => sigCanvas.current.clear()} className="text-sm text-gray-500 hover:text-gray-800 font-bold underline mb-auto self-end">Clear Pad</button>
-                  <div className="flex flex-col gap-3 mt-6"><button onClick={submitSignature} className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded font-bold">Approve & Sign</button></div>
-                </div>
-              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* ERROR PROOF MODAL (V1) */}
+      {/* 2. ERROR PROOF MODAL (V1) */}
       {selectedErrorReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 transition-all">
-          <div className={`bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ${isErrorPdfMaximized ? 'w-[98vw] h-[96vh]' : 'w-full max-w-7xl h-[90vh]'}`}>
-            <div className="bg-gray-800 text-white px-6 py-4 flex justify-between items-center shrink-0">
-              <h3 className="font-bold text-lg">Review & Approve Error Proof Verification (Daily)</h3>
-              <button onClick={() => { setSelectedErrorReport(null); setErrorPdfUrl(null); }} className="text-gray-300 hover:text-white font-bold text-2xl leading-none">&times;</button>
+        <div className="fixed inset-0 z-[9999] bg-white flex flex-col overflow-hidden animate-fade-in">
+          <div className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center shrink-0 shadow-md z-10">
+            <h3 className="font-bold text-xl uppercase tracking-wider">Review & Approve Error Proof (V1)</h3>
+            <button onClick={() => { setSelectedErrorReport(null); setErrorPdfUrl(null); }} className="text-gray-400 hover:text-red-400 transition-colors">
+              <X size={28} />
+            </button>
+          </div>
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            <div className="flex-1 h-full bg-[#525659] relative flex items-center justify-center">
+              {isErrorPdfLoading && <Loader className="animate-spin text-white w-12 h-12 absolute" />}
+              {errorPdfUrl && <iframe src={`${errorPdfUrl}#toolbar=0&view=FitH`} className="w-full h-full border-none relative z-10" title="PDF" />}
             </div>
-            <div className="p-6 flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
-              <div className="flex-1 bg-gray-100 rounded-lg border border-gray-300 overflow-hidden flex flex-col h-full relative">
-                <div className="bg-gray-200 text-gray-700 text-xs font-bold px-4 py-2 flex justify-between">
-                  <span>Document Preview</span>
-                  <button onClick={() => setIsErrorPdfMaximized(!isErrorPdfMaximized)} className="hover:text-indigo-600 flex items-center gap-1">{isErrorPdfMaximized ? <><Minimize2 size={16} /> Shrink</> : <><Maximize2 size={16} /> Expand</>}</button>
+            <div className="w-full lg:w-[400px] bg-gray-50 border-l border-gray-300 flex flex-col shrink-0 shadow-2xl z-10 overflow-y-auto">
+              <div className="p-6 flex-1 flex flex-col">
+                <div className="bg-indigo-100 p-4 rounded-xl border border-indigo-200 mb-6 text-sm flex flex-col gap-2 shadow-sm text-indigo-900">
+                  <p><span className="font-bold">Date:</span> {formatDate(selectedErrorReport.reportDate)}</p>
+                  <p><span className="font-bold">Machine:</span> {selectedErrorReport.disa}</p>
                 </div>
-                {isErrorPdfLoading ? <div className="flex-1 flex justify-center items-center"><Loader className="animate-spin text-indigo-500 w-12 h-12 mb-4" /></div> : <iframe src={`${errorPdfUrl}#toolbar=0`} className="w-full flex-1 border-none" />}
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 block">HOF Signature</label>
+                <div className="border-2 border-dashed border-gray-300 bg-white rounded-xl overflow-hidden mb-2 shadow-inner">
+                  <SignatureCanvas ref={errorSigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-64 cursor-crosshair' }} />
+                </div>
+                <button onClick={() => errorSigCanvas.current.clear()} className="text-xs text-gray-500 hover:text-red-600 font-bold uppercase tracking-wider underline self-end mb-8">Clear Signature</button>
+                <div className="mt-auto">
+                  <button onClick={submitErrorSignature} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">
+                    Approve & Sign
+                  </button>
+                </div>
               </div>
-
-              {!isErrorPdfMaximized && (
-                <div className="w-full md:w-80 shrink-0 flex flex-col h-full overflow-y-auto transition-all">
-                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200 mb-6 text-sm flex flex-col gap-2"><p><span className="font-bold text-gray-700">Date:</span> {formatDate(selectedErrorReport.reportDate)}</p><p><span className="font-bold text-gray-700">Machine:</span> {selectedErrorReport.disa}</p></div>
-                  <label className="block text-gray-800 font-bold mb-2 text-sm">Sign below to verify & approve:</label>
-                  <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg overflow-hidden mb-2"><SignatureCanvas ref={errorSigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-48 cursor-crosshair' }} /></div>
-                  <button onClick={() => errorSigCanvas.current.clear()} className="text-sm text-gray-500 hover:text-gray-800 font-bold underline mb-auto self-end">Clear Pad</button>
-                  <div className="flex flex-col gap-3 mt-6"><button onClick={submitErrorSignature} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded font-bold shadow-md">Approve & Sign</button></div>
-                </div>
-              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* ERROR PROOF V2 MODAL */}
+      {/* 3. ERROR PROOF V2 MODAL */}
       {selectedErrorReportV2 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 transition-all">
-          <div className={`bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ${isErrorPdfMaximizedV2 ? 'w-[98vw] h-[96vh]' : 'w-full max-w-7xl h-[90vh]'}`}>
-            <div className="bg-gray-800 text-white px-6 py-4 flex justify-between items-center shrink-0">
-              <h3 className="font-bold text-lg">Review & Approve Error Proof V2 (Shift Wise)</h3>
-              <button onClick={() => { setSelectedErrorReportV2(null); setErrorPdfUrlV2(null); }} className="text-gray-300 hover:text-white font-bold text-2xl leading-none">&times;</button>
+        <div className="fixed inset-0 z-[9999] bg-white flex flex-col overflow-hidden animate-fade-in">
+          <div className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center shrink-0 shadow-md z-10">
+            <h3 className="font-bold text-xl uppercase tracking-wider">Review & Approve Error Proof (V2)</h3>
+            <button onClick={() => { setSelectedErrorReportV2(null); setErrorPdfUrlV2(null); }} className="text-gray-400 hover:text-red-400 transition-colors">
+              <X size={28} />
+            </button>
+          </div>
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            <div className="flex-1 h-full bg-[#525659] relative flex items-center justify-center">
+              {isErrorPdfLoadingV2 && <Loader className="animate-spin text-white w-12 h-12 absolute" />}
+              {errorPdfUrlV2 && <iframe src={`${errorPdfUrlV2}#toolbar=0&view=FitH`} className="w-full h-full border-none relative z-10" title="PDF" />}
             </div>
-            <div className="p-6 flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
-              <div className="flex-1 bg-gray-100 rounded-lg border border-gray-300 overflow-hidden flex flex-col h-full relative">
-                <div className="bg-gray-200 text-gray-700 text-xs font-bold px-4 py-2 flex justify-between">
-                  <span>Document Preview</span>
-                  <button onClick={() => setIsErrorPdfMaximizedV2(!isErrorPdfMaximizedV2)} className="hover:text-purple-600 flex items-center gap-1">{isErrorPdfMaximizedV2 ? <><Minimize2 size={16} /> Shrink</> : <><Maximize2 size={16} /> Expand</>}</button>
+            <div className="w-full lg:w-[400px] bg-gray-50 border-l border-gray-300 flex flex-col shrink-0 shadow-2xl z-10 overflow-y-auto">
+              <div className="p-6 flex-1 flex flex-col">
+                <div className="bg-purple-100 p-4 rounded-xl border border-purple-200 mb-6 text-sm flex flex-col gap-2 shadow-sm text-purple-900">
+                  <p><span className="font-bold">Date:</span> {formatDate(selectedErrorReportV2.reportDate)}</p>
+                  <p><span className="font-bold">Machine:</span> {selectedErrorReportV2.disa}</p>
                 </div>
-                {isErrorPdfLoadingV2 ? <div className="flex-1 flex justify-center items-center"><Loader className="animate-spin text-purple-500 w-12 h-12 mb-4" /></div> : <iframe src={`${errorPdfUrlV2}#toolbar=0`} className="w-full flex-1 border-none" />}
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 block">HOF Signature</label>
+                <div className="border-2 border-dashed border-gray-300 bg-white rounded-xl overflow-hidden mb-2 shadow-inner">
+                  <SignatureCanvas ref={errorSigCanvasV2} penColor="blue" canvasProps={{ className: 'w-full h-64 cursor-crosshair' }} />
+                </div>
+                <button onClick={() => errorSigCanvasV2.current.clear()} className="text-xs text-gray-500 hover:text-red-600 font-bold uppercase tracking-wider underline self-end mb-8">Clear Signature</button>
+                <div className="mt-auto">
+                  <button onClick={submitErrorSignatureV2} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">
+                    Approve & Sign
+                  </button>
+                </div>
               </div>
-
-              {!isErrorPdfMaximizedV2 && (
-                <div className="w-full md:w-80 shrink-0 flex flex-col h-full overflow-y-auto transition-all">
-                  <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 mb-6 text-sm flex flex-col gap-2"><p><span className="font-bold text-gray-700">Date:</span> {formatDate(selectedErrorReportV2.reportDate)}</p><p><span className="font-bold text-gray-700">Machine:</span> {selectedErrorReportV2.disa}</p></div>
-                  <label className="block text-gray-800 font-bold mb-2 text-sm">Sign below to verify & approve:</label>
-                  <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg overflow-hidden mb-2"><SignatureCanvas ref={errorSigCanvasV2} penColor="blue" canvasProps={{ className: 'w-full h-48 cursor-crosshair' }} /></div>
-                  <button onClick={() => errorSigCanvasV2.current.clear()} className="text-sm text-gray-500 hover:text-gray-800 font-bold underline mb-auto self-end">Clear Pad</button>
-                  <div className="flex flex-col gap-3 mt-6"><button onClick={submitErrorSignatureV2} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded font-bold shadow-md">Approve & Sign</button></div>
-                </div>
-              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* 🔥 NEW: DAILY PRODUCTION PERFORMANCE MODAL */}
+      {/* 4. DAILY PRODUCTION PERFORMANCE MODAL */}
       {selectedDailyReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 transition-all">
-          <div className={`bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ${isDailyPdfMaximized ? 'w-[98vw] h-[96vh]' : 'w-full max-w-7xl h-[90vh]'}`}>
-            <div className="bg-gray-800 text-white px-6 py-4 flex justify-between items-center shrink-0">
-              <h3 className="font-bold text-lg">Review & Approve Daily Performance</h3>
-              <button onClick={() => { setSelectedDailyReport(null); setDailyPdfUrl(null); }} className="text-gray-300 hover:text-white font-bold text-2xl leading-none">&times;</button>
+        <div className="fixed inset-0 z-[9999] bg-white flex flex-col overflow-hidden animate-fade-in">
+          <div className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center shrink-0 shadow-md z-10">
+            <h3 className="font-bold text-xl uppercase tracking-wider">Review & Approve Daily Performance</h3>
+            <button onClick={() => { setSelectedDailyReport(null); setDailyPdfUrl(null); }} className="text-gray-400 hover:text-red-400 transition-colors">
+              <X size={28} />
+            </button>
+          </div>
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            <div className="flex-1 h-full bg-[#525659] relative flex items-center justify-center">
+              {isDailyPdfLoading && <Loader className="animate-spin text-white w-12 h-12 absolute" />}
+              {dailyPdfUrl && <iframe src={`${dailyPdfUrl}#toolbar=0&view=FitH`} className="w-full h-full border-none relative z-10" title="PDF" />}
             </div>
-            <div className="p-6 flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
-              <div className="flex-1 bg-gray-100 rounded-lg border border-gray-300 overflow-hidden flex flex-col h-full relative">
-                <div className="bg-gray-200 text-gray-700 text-xs font-bold px-4 py-2 flex justify-between">
-                  <span>Document Preview</span>
-                  <button onClick={() => setIsDailyPdfMaximized(!isDailyPdfMaximized)} className="hover:text-cyan-600 flex items-center gap-1">{isDailyPdfMaximized ? <><Minimize2 size={16} /> Shrink</> : <><Maximize2 size={16} /> Expand</>}</button>
+            <div className="w-full lg:w-[400px] bg-gray-50 border-l border-gray-300 flex flex-col shrink-0 shadow-2xl z-10 overflow-y-auto">
+              <div className="p-6 flex-1 flex flex-col">
+                <div className="bg-cyan-100 p-4 rounded-xl border border-cyan-200 mb-6 text-sm flex flex-col gap-2 shadow-sm text-cyan-900">
+                  <p><span className="font-bold">Date:</span> {formatDate(selectedDailyReport.productionDate)}</p>
+                  <p><span className="font-bold">Machine:</span> DISA - {selectedDailyReport.disa}</p>
                 </div>
-                {isDailyPdfLoading ? <div className="flex-1 flex justify-center items-center"><Loader className="animate-spin text-cyan-500 w-12 h-12 mb-4" /></div> : <iframe src={`${dailyPdfUrl}#toolbar=0`} className="w-full flex-1 border-none" />}
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 block">HOF Signature</label>
+                <div className="border-2 border-dashed border-gray-300 bg-white rounded-xl overflow-hidden mb-2 shadow-inner">
+                  <SignatureCanvas ref={dailySigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-64 cursor-crosshair' }} />
+                </div>
+                <button onClick={() => dailySigCanvas.current.clear()} className="text-xs text-gray-500 hover:text-red-600 font-bold uppercase tracking-wider underline self-end mb-8">Clear Signature</button>
+                <div className="mt-auto">
+                  <button onClick={submitDailySignature} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">
+                    Approve & Sign
+                  </button>
+                </div>
               </div>
-
-              {!isDailyPdfMaximized && (
-                <div className="w-full md:w-80 shrink-0 flex flex-col h-full overflow-y-auto transition-all">
-                  <div className="bg-cyan-50 p-4 rounded-lg border border-cyan-200 mb-6 text-sm flex flex-col gap-2">
-                    <p><span className="font-bold text-gray-700">Date:</span> {formatDate(selectedDailyReport.productionDate)}</p>
-                    <p><span className="font-bold text-gray-700">Machine:</span> DISA - {selectedDailyReport.disa}</p>
-                  </div>
-                  <label className="block text-gray-800 font-bold mb-2 text-sm">Sign below to verify & approve:</label>
-                  <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg overflow-hidden mb-2">
-                    <SignatureCanvas ref={dailySigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-48 cursor-crosshair' }} />
-                  </div>
-                  <button onClick={() => dailySigCanvas.current.clear()} className="text-sm text-gray-500 hover:text-gray-800 font-bold underline mb-auto self-end">Clear Pad</button>
-                  <div className="flex flex-col gap-3 mt-6">
-                    <button onClick={submitDailySignature} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-3 rounded font-bold shadow-md">Approve & Sign</button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

@@ -14,6 +14,17 @@ exports.getUsers = async (req, res) => {
   }
 };
 
+// --- GET COMPONENTS FOR PART NAME DROPDOWN ---
+exports.getComponents = async (req, res) => {
+  try {
+    const result = await sql.query`SELECT description FROM dbo.Component ORDER BY description ASC`;
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("Error fetching components:", err);
+    res.status(500).json({ message: "DB error" });
+  }
+};
+
 // --- SAVE REPORT ---
 exports.saveReport = async (req, res) => {
   const { recordDate, disaMachine, verifiedBy, operatorSignature, approvedBy, rows } = req.body;
@@ -83,7 +94,7 @@ exports.signSupervisor = async (req, res) => {
   }
 };
 
-// --- PDF GENERATOR (🔥 FIXED BOX ALIGNMENT & LOGO RENDERING) ---
+// --- PDF GENERATOR (WITH 3-BOX HEADER) ---
 exports.generateReport = async (req, res) => {
   try {
     const { reportId, date, disaMachine } = req.query;
@@ -120,22 +131,18 @@ exports.generateReport = async (req, res) => {
     let y = 30;
 
     // ==============================================================
-    // 🔥 3-BOX HEADER DESIGN (EXACT MATCH TO FRONTEND)
-    // Total Width = 720 points (Matches Table Width Perfectly)
+    // 🔥 3-BOX HEADER DESIGN 
     // ==============================================================
     doc.lineWidth(1);
     
     // BOX 1: LOGO (Width: 100)
     doc.rect(startX, y, 100, 40).stroke();
     
-    // Pointing directly to logo.jpg in the same directory as this controller
     const logoPath = path.join(__dirname, 'logo.jpg');
 
     if (fs.existsSync(logoPath)) {
-        // Embeds the actual JPG image centered in the box
         doc.image(logoPath, startX + 10, y + 5, { width: 80, height: 30, fit: [80, 30], align: 'center', valign: 'center' });
     } else {
-        // Fallback text if image file is still not found
         doc.font("Helvetica-Bold").fontSize(12).text("SAKTHI\nAUTO", startX, y + 10, { width: 100, align: "center" });
     }
 
@@ -148,20 +155,17 @@ exports.generateReport = async (req, res) => {
     const displayDate = new Date(header.reportDate).toLocaleDateString('en-GB');
     doc.rect(startX + 600, y, 120, 40).stroke();
     doc.font("Helvetica-Bold").fontSize(11).text(header.disaMachine || '-', startX + 600, y + 7, { width: 120, align: "center" });
-    doc.moveTo(startX + 600, y + 20).lineTo(startX + 720, y + 20).stroke(); // Split line
+    doc.moveTo(startX + 600, y + 20).lineTo(startX + 720, y + 20).stroke(); 
     doc.font("Helvetica").fontSize(10).text(`DATE: ${displayDate}`, startX + 600, y + 26, { width: 120, align: "center" });
 
-    y += 55; // Space below header before table starts
+    y += 55; 
     // ==============================================================
 
-    // Table settings
     const colWidths = [25, 30, 80, 45, 35, 35, 35, 35, 35, 35, 35, 35, 35, 45, 30, 25, 25, 25, 25, 25, 25];
     
-    // Header Drawing Function
     const drawTableHeaders = (startY) => {
         let cy = startY;
         
-        // Row 1 (Top Level)
         doc.fontSize(7).font("Helvetica-Bold");
         doc.rect(startX, cy, 25, 55).stroke(); doc.text("S.No", startX, cy + 25, { width: 25, align: "center" });
         doc.rect(startX + 25, cy, 30, 55).stroke(); doc.text("Shift", startX + 25, cy + 25, { width: 30, align: "center" });
@@ -173,7 +177,6 @@ exports.generateReport = async (req, res) => {
         doc.rect(startX + 180, cy, 210, 15).stroke(); doc.text("First Moulding", startX + 180, cy + 5, { width: 210, align: "center" });
         doc.rect(startX + 390, cy, 330, 15).stroke(); doc.text("During Running", startX + 390, cy + 5, { width: 330, align: "center" });
 
-        // Row 2 (Middle Level)
         let cy2 = cy + 15;
         let cx = startX + 180;
         
@@ -204,7 +207,6 @@ exports.generateReport = async (req, res) => {
             cx += h.w;
         });
 
-        // Row 3 (Bottom Level for PP/SP)
         let cy3 = cy2 + 25; 
         cx = startX + 570; 
         doc.fontSize(7);
@@ -218,7 +220,6 @@ exports.generateReport = async (req, res) => {
 
     let rowY = drawTableHeaders(y);
 
-    // --- Draw Rows ---
     doc.font("Helvetica").fontSize(7);
     rows.forEach(r => {
         if (rowY + 25 > doc.page.height - 60) {
@@ -243,7 +244,6 @@ exports.generateReport = async (req, res) => {
         rowY += 25;
     });
 
-    // --- Footer Signatures ---
     const sigY = rowY + 20;
     doc.font("Helvetica-Bold").fontSize(10);
     
@@ -264,4 +264,92 @@ exports.generateReport = async (req, res) => {
     console.error("PDF Error:", err);
     res.status(500).json({ message: "PDF generation failed" });
   }
+};
+
+// ==========================================
+//   ADMIN EDIT & BULK APIS
+// ==========================================
+
+// 1. Fetch by Date & Machine for Admin Edit
+exports.getByDate = async (req, res) => {
+  try {
+    const { date, disa } = req.query;
+    const headerRes = await sql.query`
+        SELECT * FROM MouldQualityReport 
+        WHERE CAST(reportDate AS DATE) = CAST(${date} AS DATE) AND disaMachine = ${disa} 
+        ORDER BY id DESC
+    `;
+    
+    if (headerRes.recordset.length === 0) return res.json(null);
+    
+    const report = headerRes.recordset[0];
+    const rowsRes = await sql.query`SELECT * FROM MouldQualityRows WHERE reportId = ${report.id} ORDER BY id ASC`;
+    
+    res.json({ ...report, rows: rowsRes.recordset });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "DB error" });
+  }
+};
+
+// 2. Update Report from Admin Edit
+exports.updateReport = async (req, res) => {
+  const { id } = req.params;
+  const { verifiedBy, approvedBy, rows } = req.body;
+  const transaction = new sql.Transaction();
+  await transaction.begin();
+
+  try {
+    await new sql.Request(transaction).query`
+      UPDATE MouldQualityReport 
+      SET verifiedBy = ${verifiedBy}, approvedBy = ${approvedBy}
+      WHERE id = ${id}
+    `;
+
+    await new sql.Request(transaction).query`DELETE FROM MouldQualityRows WHERE reportId = ${id}`;
+
+    for (const r of rows) {
+      await new sql.Request(transaction).query`
+        INSERT INTO MouldQualityRows (
+          reportId, sNo, shift, partName, dataCode, fmSoftRamming, fmMouldBreakage, fmMouldCrack, fmLooseSand, fmPatternSticking, fmCoreSetting,
+          drMouldCrush, drLooseSand, drPatternSticking, drDateHeatCode, drFilterSize, drSurfaceHardnessPP, drSurfaceHardnessSP,
+          drInsideMouldPP, drInsideMouldSP, drPatternTempPP, drPatternTempSP
+        ) VALUES (
+          ${id}, ${r.sNo}, ${r.shift}, ${r.partName}, ${r.dataCode}, ${r.fmSoftRamming}, ${r.fmMouldBreakage}, ${r.fmMouldCrack}, ${r.fmLooseSand}, ${r.fmPatternSticking}, ${r.fmCoreSetting},
+          ${r.drMouldCrush}, ${r.drLooseSand}, ${r.drPatternSticking}, ${r.drDateHeatCode}, ${r.drFilterSize}, ${r.drSurfaceHardnessPP}, ${r.drSurfaceHardnessSP},
+          ${r.drInsideMouldPP}, ${r.drInsideMouldSP}, ${r.drPatternTempPP}, ${r.drPatternTempSP}
+        )
+      `;
+    }
+
+    await transaction.commit();
+    res.json({ success: true, message: "Updated Successfully" });
+  } catch (err) {
+    await transaction.rollback();
+    console.error(err);
+    res.status(500).json({ message: "Update failed" });
+  }
+};
+
+// 3. Get Bulk Data for Admin PDF Export
+exports.getBulkData = async (req, res) => {
+    const { fromDate, toDate } = req.query;
+    try {
+        const reportsRes = await sql.query`
+            SELECT * FROM MouldQualityReport 
+            WHERE CAST(reportDate AS DATE) BETWEEN CAST(${fromDate} AS DATE) AND CAST(${toDate} AS DATE) 
+            ORDER BY reportDate ASC, disaMachine ASC
+        `;
+        const reports = reportsRes.recordset;
+        const result = [];
+        
+        for (let rep of reports) {
+            const rowsRes = await sql.query`SELECT * FROM MouldQualityRows WHERE reportId = ${rep.id} ORDER BY id ASC`;
+            result.push({ ...rep, rows: rowsRes.recordset });
+        }
+        res.json(result);
+    } catch(err) {
+        console.error(err);
+        res.status(500).json({ message: "Bulk data failed" });
+    }
 };

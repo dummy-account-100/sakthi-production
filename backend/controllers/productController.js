@@ -14,12 +14,12 @@ const safeNum = (val) => {
 };
 
 const safeStr = (val) => {
-  if (val === null || val === undefined || String(val).trim() === "" || String(val).trim() === "-") return null;
+  if (val === null || val === undefined || String(val).trim() === "" || String(val).trim() === "-") return "-"; // Set to default hyphen if empty
   return String(val).trim();
 };
 
 // ==========================================
-//              DROPDOWN DATA
+//               DROPDOWN DATA
 // ==========================================
 exports.getComponents = async (req, res) => {
   try {
@@ -85,7 +85,7 @@ exports.getMouldHardnessRemarks = async (req, res) => {
 };
 
 // ==========================================
-//        FETCH LAST PERSONNEL FOR SHIFT
+//         FETCH LAST PERSONNEL FOR SHIFT
 // ==========================================
 exports.getLastPersonnel = async (req, res) => {
   const { disa, date, shift } = req.query;
@@ -104,7 +104,7 @@ exports.getLastPersonnel = async (req, res) => {
 };
 
 // ==========================================
-//            LAST MOULD COUNTER
+//             LAST MOULD COUNTER
 // ==========================================
 exports.getLastMouldCounter = async (req, res) => {
   const { disa } = req.query;
@@ -125,7 +125,7 @@ exports.getLastMouldCounter = async (req, res) => {
 };
 
 // ==========================================
-//        SUPERVISOR DASHBOARD APIS
+//         SUPERVISOR DASHBOARD APIS
 // ==========================================
 exports.getReportsBySupervisor = async (req, res) => {
   try {
@@ -293,16 +293,22 @@ exports.createReport = async (req, res) => {
 };
 
 // ==========================================
-//           DOWNLOAD PDF REPORT 
+//          DOWNLOAD ALL REPORTS (PDF)
 // ==========================================
 exports.downloadAllReports = async (req, res) => {
   try {
-    const { reportId, date, disa } = req.query;
+    const { reportId, date, disa, fromDate, toDate } = req.query;
 
     let reportResult;
     
-    // ⬇️ UPDATED LOGIC to fetch based on Date and Disa strictly, in Descending Shift Order ⬇️
-    if (date && disa) {
+    // 🔥 UPDATED LOGIC TO HANDLE DATE RANGE (FROM/TO DATES) 🔥
+    if (fromDate && toDate) {
+      reportResult = await sql.query`
+        SELECT * FROM DisamaticProductReport 
+        WHERE CAST(reportDate AS DATE) BETWEEN CAST(${fromDate} AS DATE) AND CAST(${toDate} AS DATE)
+        ORDER BY reportDate ASC, shift ASC, disa ASC, id ASC
+      `;
+    } else if (date && disa) {
       reportResult = await sql.query`
         SELECT * FROM DisamaticProductReport 
         WHERE reportDate = ${date} AND disa = ${disa} 
@@ -311,7 +317,6 @@ exports.downloadAllReports = async (req, res) => {
     } else if (reportId) {
       reportResult = await sql.query`SELECT * FROM DisamaticProductReport WHERE id = ${reportId}`;
     } else {
-      // Fallback
       reportResult = await sql.query`SELECT * FROM DisamaticProductReport ORDER BY reportDate DESC, shift DESC, disa ASC, id ASC`;
     }
 
@@ -350,7 +355,12 @@ exports.downloadAllReports = async (req, res) => {
 
     const doc = new PDFDocument({ margin: 30, size: 'A4', bufferPages: true });
     res.setHeader("Content-Type", "application/pdf");
-    let fName = date && disa ? `Disamatic_Report_${date}_DISA-${disa}.pdf` : `Disamatic_Report.pdf`;
+    
+    // Dynamic naming depending on if it's bulk range or a single date
+    let fName = (fromDate && toDate) 
+        ? `Disamatic_Report_${fromDate}_to_${toDate}.pdf` 
+        : date && disa ? `Disamatic_Report_${date}_DISA-${disa}.pdf` : `Disamatic_Report.pdf`;
+        
     res.setHeader("Content-Disposition", `inline; filename="${fName}"`);
     doc.pipe(res);
 
@@ -735,7 +745,7 @@ exports.getBulkData = async (req, res) => {
 };
 
 // ==========================================
-//    ADMIN: FETCH REPORT BY EXACT DATE (RETAINED)
+//     ADMIN: FETCH REPORT BY EXACT DATE (RETAINED)
 // ==========================================
 exports.getByDate = async (req, res) => {
   const { date, disa, shift } = req.query;
@@ -778,7 +788,7 @@ exports.getByDate = async (req, res) => {
 };
 
 // ==========================================
-//    ADMIN: UPDATE DISAMATIC REPORT (RETAINED)
+//     ADMIN: UPDATE DISAMATIC REPORT
 // ==========================================
 exports.updateDisamaticReport = async (req, res) => {
   const { id } = req.params;
@@ -786,71 +796,85 @@ exports.updateDisamaticReport = async (req, res) => {
     productions, delays, nextShiftPlans, mouldHardness, patternTemps } = req.body;
 
   try {
+    // 1. Update the Main Report Table
     await sql.query`
       UPDATE DisamaticProductReport SET
-        incharge = ${incharge || null},
-        member = ${member || null},
-        ppOperator = ${ppOperator || null},
-        supervisorName = ${supervisorName || null},
-        significantEvent = ${significantEvent || null},
-        maintenance = ${maintenance || null}
+        incharge = ${safeStr(incharge)},
+        member = ${safeStr(member)},
+        ppOperator = ${safeStr(ppOperator)},
+        supervisorName = ${safeStr(supervisorName)},
+        significantEvent = ${safeStr(significantEvent)},
+        maintenance = ${safeStr(maintenance)}
       WHERE id = ${Number(id)}`;
 
-    // Update productions
-    if (productions) {
+    // 2. Update the Productions Array
+    if (productions && productions.length > 0) {
       for (const p of productions) {
         if (p.id) {
           await sql.query`UPDATE DisamaticProduction SET
-            componentName = ${p.componentName || ''},
-            mouldCounterNo = ${Number(p.mouldCounterNo) || 0},
-            produced = ${p.produced !== null && p.produced !== undefined ? Number(p.produced) : null},
-            poured = ${Number(p.poured) || 0},
-            cycleTime = ${Number(p.cycleTime) || 0},
-            mouldsPerHour = ${Number(p.mouldsPerHour) || 0},
-            remarks = ${p.remarks || null}
+            componentName = ${safeStr(p.componentName)},
+            mouldCounterNo = ${safeNum(p.mouldCounterNo)},
+            produced = ${safeNum(p.produced)},
+            poured = ${safeNum(p.poured)},
+            cycleTime = ${safeNum(p.cycleTime)},
+            mouldsPerHour = ${safeNum(p.mouldsPerHour)},
+            remarks = ${safeStr(p.remarks)}
             WHERE id = ${Number(p.id)}`;
         }
       }
     }
 
-    // Update delays
-    if (delays) {
+    // 3. Update the Next Shift Plans Array 
+    if (nextShiftPlans && nextShiftPlans.length > 0) {
+      for (const np of nextShiftPlans) {
+        if (np.id) {
+          await sql.query`UPDATE DisamaticNextShiftPlan SET
+            componentName = ${safeStr(np.componentName)},
+            plannedMoulds = ${safeNum(np.plannedMoulds)},
+            remarks = ${safeStr(np.remarks)}
+            WHERE id = ${Number(np.id)}`;
+        }
+      }
+    }
+
+    // 4. Update the Delays Array
+    if (delays && delays.length > 0) {
       for (const d of delays) {
         if (d.id) {
           await sql.query`UPDATE DisamaticDelays SET
-            delay = ${d.delay || d.delayType || ''},
-            durationMinutes = ${Number(d.durationMinutes || d.duration) || 0},
-            durationTime = ${d.durationTime || ''}
+            delay = ${safeStr(d.delay || d.delayType)},
+            durationMinutes = ${safeNum(d.durationMinutes || d.duration)},
+            durationTime = ${safeStr(d.durationTime)}
             WHERE id = ${Number(d.id)}`;
         }
       }
     }
 
-    // Update mould hardness
-    if (mouldHardness) {
+    // 5. Update Mould Hardness Array
+    if (mouldHardness && mouldHardness.length > 0) {
       for (const h of mouldHardness) {
         if (h.id) {
           await sql.query`UPDATE DisamaticMouldHardness SET
-            componentName = ${h.componentName || ''},
-            penetrationPP = ${Number(h.penetrationPP) || 0},
-            penetrationSP = ${Number(h.penetrationSP) || 0},
-            bScalePP = ${Number(h.bScalePP) || 0},
-            bScaleSP = ${Number(h.bScaleSP) || 0},
-            remarks = ${h.remarks || null}
+            componentName = ${safeStr(h.componentName)},
+            penetrationPP = ${safeStr(h.penetrationPP)},
+            penetrationSP = ${safeStr(h.penetrationSP)},
+            bScalePP = ${safeStr(h.bScalePP)},
+            bScaleSP = ${safeStr(h.bScaleSP)},
+            remarks = ${safeStr(h.remarks)}
             WHERE id = ${Number(h.id)}`;
         }
       }
     }
 
-    // Update pattern temps
-    if (patternTemps) {
+    // 6. Update Pattern Temps Array
+    if (patternTemps && patternTemps.length > 0) {
       for (const pt of patternTemps) {
         if (pt.id) {
           await sql.query`UPDATE DisamaticPatternTemp SET
-            componentName = ${pt.componentName || ''},
-            pp = ${Number(pt.pp) || 0},
-            sp = ${Number(pt.sp) || 0},
-            remarks = ${pt.remarks || null}
+            componentName = ${safeStr(pt.componentName)},
+            pp = ${safeStr(pt.pp)},
+            sp = ${safeStr(pt.sp)},
+            remarks = ${safeStr(pt.remarks)}
             WHERE id = ${Number(pt.id)}`;
         }
       }
