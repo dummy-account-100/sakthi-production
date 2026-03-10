@@ -97,6 +97,9 @@ const AdminDashboard = () => {
         { name: "Add / Manage Users", id: "users", isSpecial: true }
     ];
 
+    // Array of forms that should NOT show the "Manage Form" button
+    const hideManageFormIds = ['disamatic-report', 'performance', 'error-proof', 'mould-quality'];
+
     useEffect(() => {
         if (activeView === 'users') fetchUsers();
     }, [activeView]);
@@ -260,7 +263,7 @@ const AdminDashboard = () => {
             else if (pdfModal.selectedForm.id === 'lpa') apiRoute = `${process.env.REACT_APP_API_URL}/api/bottom-level-audit/bulk-data`;
             else if (pdfModal.selectedForm.id === 'mould-quality') apiRoute = `${process.env.REACT_APP_API_URL}/api/mould-quality/bulk-data`;
 
-            // 🔥 NEW FIX: Expand dates to full months for grid-based checklists
+            // 🔥 Expand dates to full months for grid-based checklists
             let fetchFromDate = dateRange.from;
             let fetchToDate = dateRange.to;
 
@@ -310,7 +313,7 @@ const AdminDashboard = () => {
 
             const effectiveDateRange = { from: fetchFromDate, to: fetchToDate };
 
-            // 🔥 INTEGRATED FIX: Using proper V1, V2 PDF generators, and Mould Quality
+            // 🔥 Using proper V1, V2 PDF generators, and Mould Quality
             switch (pdfModal.selectedForm.id) {
                 case 'unpoured-mould-details': generateUnPouredMouldPDF(data, dateRange); break;
                 case 'dmm-setting-parameters': generateDmmSettingPDF(data, dateRange); break;
@@ -510,9 +513,7 @@ const AdminDashboard = () => {
             <div className="h-1.5 bg-[#ff9100] flex-shrink-0 shadow-[0_0_15px_rgba(255,145,0,0.5)]" />
 
             <div className="w-full flex justify-between items-center px-10 pt-6 absolute top-0 left-0 z-10">
-                {/* <Link to="/admin" className="flex items-center gap-2 text-[#ff9100] font-bold uppercase tracking-wider text-sm hover:text-white transition-colors bg-white/5 px-4 py-2 rounded-lg border border-white/10 hover:border-[#ff9100]/50 shadow-lg backdrop-blur-sm">
-                    ← Back to Dashboard
-                </Link> */}
+                
                 <div className="flex items-center gap-4">
                     <span className="text-white/30 text-xs font-mono uppercase tracking-wider">
                         {user ? `${user.username} · ${user.role}` : ''}
@@ -581,7 +582,8 @@ const AdminDashboard = () => {
                                 <h2 className="text-2xl font-black text-white leading-tight">{actionModal.selectedForm.name}</h2>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                            {/* 🔥 DYNAMIC GRID TO KEEP BUTTONS CENTERED 🔥 */}
+                            <div className={`grid grid-cols-1 gap-4 w-full ${hideManageFormIds.includes(actionModal.selectedForm.id) ? 'md:grid-cols-2 max-w-sm mx-auto' : 'md:grid-cols-3'}`}>
                                 <button onClick={() => openPdfModal(actionModal.selectedForm)} className="group flex flex-col items-center justify-center gap-4 bg-[#2a2a2a] hover:bg-[#333] border-2 border-transparent hover:border-[#ff9100]/50 p-6 rounded-2xl transition-all duration-300 hover:-translate-y-1 shadow-lg">
                                     <div className="bg-[#ff9100]/10 p-4 rounded-full group-hover:scale-110 transition-transform group-hover:bg-[#ff9100]/20"><FileText className="w-8 h-8 text-[#ff9100]" /></div>
                                     <div className="text-center"><div className="text-white font-bold uppercase tracking-wide text-sm mb-1">Export Data</div><div className="text-white/40 text-[10px] uppercase font-bold">Generate Bulk PDF</div></div>
@@ -591,11 +593,15 @@ const AdminDashboard = () => {
                                     <div className="bg-[#ff9100]/10 p-4 rounded-full group-hover:scale-110 transition-transform group-hover:bg-[#ff9100]/20"><Calendar className="w-8 h-8 text-[#ff9100]" /></div>
                                     <div className="text-center"><div className="text-white font-bold uppercase tracking-wide text-sm mb-1">View by Date</div><div className="text-white/40 text-[10px] uppercase font-bold">Edit Form Data</div></div>
                                 </button>
-                                <button onClick={() => handleManageForm(actionModal.selectedForm)} className="group flex flex-col items-center justify-center gap-4 bg-[#2a2a2a] hover:bg-[#333] border-2 border-transparent hover:border-[#ff9100]/50 p-6 rounded-2xl transition-all duration-300 hover:-translate-y-1 shadow-lg relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 bg-[#ff9100] text-black text-[9px] font-black uppercase tracking-wider py-1 px-3 rounded-bl-lg flex items-center gap-1 shadow-md"><Settings size={10} /> Admin Setup</div>
-                                    <div className="bg-[#ff9100]/10 p-4 rounded-full group-hover:scale-110 transition-transform group-hover:bg-[#ff9100]/20"><Settings className="w-8 h-8 text-[#ff9100]" /></div>
-                                    <div className="text-center"><div className="text-white font-bold uppercase tracking-wide text-sm mb-1">Manage Form</div><div className="text-white/40 text-[10px] uppercase font-bold">Edit Structure & Parameters</div></div>
-                                </button>
+                                
+                                {/* 🔥 ONLY SHOW IF FORM IS NOT IN THE HIDDEN LIST 🔥 */}
+                                {!hideManageFormIds.includes(actionModal.selectedForm.id) && (
+                                    <button onClick={() => handleManageForm(actionModal.selectedForm)} className="group flex flex-col items-center justify-center gap-4 bg-[#2a2a2a] hover:bg-[#333] border-2 border-transparent hover:border-[#ff9100]/50 p-6 rounded-2xl transition-all duration-300 hover:-translate-y-1 shadow-lg relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 bg-[#ff9100] text-black text-[9px] font-black uppercase tracking-wider py-1 px-3 rounded-bl-lg flex items-center gap-1 shadow-md"><Settings size={10} /> Admin Setup</div>
+                                        <div className="bg-[#ff9100]/10 p-4 rounded-full group-hover:scale-110 transition-transform group-hover:bg-[#ff9100]/20"><Settings className="w-8 h-8 text-[#ff9100]" /></div>
+                                        <div className="text-center"><div className="text-white font-bold uppercase tracking-wide text-sm mb-1">Manage Form</div><div className="text-white/40 text-[10px] uppercase font-bold">Edit Structure & Parameters</div></div>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import logo from '../Assets/logo.png'; // Ensure this path matches your project structure
 
 // --- Utility for Formatting ---
 const formatDate = (dateStr) => {
@@ -11,6 +12,42 @@ const getReportMonthYear = (fromDate) => {
     const d = new Date(fromDate);
     return d.toLocaleString('default', { month: 'long', year: 'numeric' });
 };
+
+// ============================================================================
+// 🔥 STANDARDIZED PDF HEADER (3-BOX LAYOUT)
+// ============================================================================
+const drawStandardHeader = (doc, title, metaTop, metaBottom) => {
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.3);
+
+    // Box 1: SAKTHI AUTO (Logo Area)
+    doc.rect(10, 10, 40, 20);
+    try {
+        doc.addImage(logo, 'PNG', 12, 11, 36, 18);
+    } catch (err) {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text("SAKTHI", 30, 18, { align: 'center' });
+        doc.text("AUTO", 30, 26, { align: 'center' });
+    }
+
+    // Box 2: Title
+    doc.rect(50, 10, 180, 20);
+    doc.setFontSize(15);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title, 140, 22, { align: 'center' });
+
+    // Box 3: Meta Data (DISA / Date / Month)
+    doc.rect(230, 10, 57, 20);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text(metaTop || '-', 258.5, 17, { align: 'center' });
+    doc.line(230, 20, 287, 20);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(metaBottom || '', 258.5, 27, { align: 'center' });
+};
+
 
 // ============================================================================
 // 1. UNPOURED MOULD DETAILS
@@ -73,10 +110,7 @@ export const generateUnPouredMouldPDF = async (data, dateRange) => {
             const shiftsData = groupedData[dateKey][machine];
             const disa = machine;
 
-            doc.setFontSize(16); doc.setFont('helvetica', 'bold');
-            doc.text("UN POURED MOULD DETAILS", 148.5, 15, { align: 'center' });
-            doc.setFontSize(11); doc.text(` ${disa}`, 8, 25);
-            doc.text(`DATE: ${formatDate(dateKey)}`, 289 - doc.getTextWidth(`DATE: ${formatDate(dateKey)}`) - 8, 25);
+            drawStandardHeader(doc, "UN POURED MOULD DETAILS", disa, `Date: ${formatDate(dateKey)}`);
 
             const headRow1 = [
               { content: 'SHIFT', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
@@ -125,7 +159,7 @@ export const generateUnPouredMouldPDF = async (data, dateRange) => {
             bodyRows.push(totalRow);
 
             autoTable(doc, {
-                startY: 32, margin: { left: 5, right: 5 }, head: [headRow1, headRow2], body: bodyRows, theme: 'grid',
+                startY: 35, margin: { left: 5, right: 5 }, head: [headRow1, headRow2], body: bodyRows, theme: 'grid',
                 styles: { fontSize: 8, cellPadding: { top: 3.5, right: 1, bottom: 3.5, left: 1 }, lineColor: [0, 0, 0], lineWidth: 0.15, textColor: [0, 0, 0], halign: 'center', valign: 'middle' },
                 headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', minCellHeight: 12 }, bodyStyles: { minCellHeight: 10 },
                 didParseCell: function (data) { 
@@ -164,13 +198,14 @@ export const generateUnPouredMouldPDF = async (data, dateRange) => {
 // ============================================================================
 // 2. DMM SETTING PARAMETERS
 // ============================================================================
+
 export const generateDmmSettingPDF = async (data, dateRange) => {
     const doc = new jsPDF('l', 'mm', 'a4');
 
-    const metaRecords = data.meta || [];
+    const metaRecords = data.meta || data.records || [];
     const transRecords = data.trans || [];
     
-    if (metaRecords.length === 0) {
+    if (metaRecords.length === 0 && transRecords.length === 0) {
         doc.setFontSize(14); doc.text("No data found for the selected date range.", 148.5, 40, { align: 'center' });
         doc.save(`DMM_Setting_Bulk_${dateRange.from}_to_${dateRange.to}.pdf`);
         return;
@@ -200,33 +235,56 @@ export const generateDmmSettingPDF = async (data, dateRange) => {
     const allColumns = [...baseColumns, ...customCols];
 
     const groupedData = {};
-    metaRecords.forEach(m => {
-        const d = String(m.RecordDate).split('T')[0];
-        const machine = m.DisaMachine;
-        const shift = m.Shift;
 
+    // Helper to safely initialize groups regardless of where the data comes from
+    const initGroup = (d, machine, shift) => {
         if (!groupedData[d]) groupedData[d] = {};
         if (!groupedData[d][machine]) groupedData[d][machine] = { shiftsMeta: {}, shiftsData: {} };
-        
         if (!groupedData[d][machine].shiftsMeta[shift]) {
             groupedData[d][machine].shiftsMeta[shift] = {
-                operator: m.OperatorName || '',
-                supervisor: m.SupervisorName || '',
-                supervisorSignature: m.SupervisorSignature || '',
-                isIdle: m.IsIdle === true || m.IsIdle === 1
+                operator: '', supervisor: '', supervisorSignature: '', isIdle: false
             };
+        }
+        if (!groupedData[d][machine].shiftsData[shift]) {
             groupedData[d][machine].shiftsData[shift] = [];
         }
+    };
+
+    // 1. Process Meta Records safely
+    metaRecords.forEach(m => {
+        const d = String(m.RecordDate || m.recordDate || m.date || '').split('T')[0];
+        const machine = m.DisaMachine || m.disaMachine || 'DISA - I';
+        const shift = m.Shift || m.shift || 1;
+
+        initGroup(d, machine, shift);
+        
+        groupedData[d][machine].shiftsMeta[shift] = {
+            operator: m.OperatorName || m.operatorName || '',
+            supervisor: m.SupervisorName || m.supervisorName || '',
+            supervisorSignature: m.SupervisorSignature || m.supervisorSignature || '',
+            isIdle: m.IsIdle === true || m.IsIdle === 1 || m.isIdle === true || m.isIdle === 1
+        };
     });
 
+    // 2. Process Trans Records safely
     transRecords.forEach(t => {
-        const d = String(t.RecordDate).split('T')[0];
-        if (groupedData[d] && groupedData[d][t.DisaMachine]) {
-            groupedData[d][t.DisaMachine].shiftsData[t.Shift].push(t);
-        }
+        const dateRaw = t.RecordDate || t.recordDate || t.date || metaRecords[0]?.RecordDate || '';
+        const d = String(dateRaw).split('T')[0];
+        const machine = t.DisaMachine || t.disaMachine || 'DISA - I';
+        const shift = t.Shift || t.shift || 1;
+
+        initGroup(d, machine, shift);
+        groupedData[d][machine].shiftsData[shift].push(t);
     });
 
     let isFirstPage = true;
+
+    // Failsafe: if data formatting totally failed
+    if (Object.keys(groupedData).length === 0) {
+        doc.setFontSize(14); doc.text("No valid data groups found to generate the report.", 148.5, 40, { align: 'center' });
+        doc.save(`DMM_Setting_Bulk_${dateRange.from}_to_${dateRange.to}.pdf`);
+        return;
+    }
 
     Object.keys(groupedData).sort().forEach(dateKey => {
         Object.keys(groupedData[dateKey]).sort().forEach(machine => {
@@ -235,16 +293,10 @@ export const generateDmmSettingPDF = async (data, dateRange) => {
 
             const machineData = groupedData[dateKey][machine];
             
-            doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-            doc.text("SAKTHI AUTO COMPONENT LIMITED", 148.5, 10, { align: 'center' });
-            doc.setFontSize(16); doc.text("DMM SETTING PARAMETERS CHECK SHEET", 148.5, 18, { align: 'center' });
-
-            doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-            doc.text(` ${machine}`, 10, 28);
-            doc.text(`DATE: ${formatDate(dateKey)}`, 280, 28, { align: 'right' });
+            drawStandardHeader(doc, "DMM SETTING PARAMETERS CHECK SHEET", machine, `Date: ${formatDate(dateKey)}`);
 
             autoTable(doc, {
-                startY: 32, margin: { left: 10, right: 10 },
+                startY: 35, margin: { left: 10, right: 10 },
                 head: [['SHIFT', 'OPERATOR NAME', 'VERIFIED BY', 'SIGNATURE']],
                 body: [1, 2, 3].map(s => {
                     const m = machineData.shiftsMeta[s] || {};
@@ -281,8 +333,16 @@ export const generateDmmSettingPDF = async (data, dateRange) => {
                 } else {
                     const rowsObj = {};
                     t.forEach(record => {
-                        if (!rowsObj[record.RowUUID]) rowsObj[record.RowUUID] = {};
-                        rowsObj[record.RowUUID][record.MasterId] = record.Value;
+                        const rowId = record.RowUUID || record.rowUUID || record.Id || 'default';
+                        if (!rowsObj[rowId]) rowsObj[rowId] = {};
+                        
+                        const masterKey = record.MasterId || record.masterId;
+                        if (masterKey) {
+                            rowsObj[rowId][masterKey] = record.Value || record.value;
+                        } else {
+                            // Failsafe for flat objects mapping
+                            Object.assign(rowsObj[rowId], record);
+                        }
                     });
                     
                     const rowsArr = Object.values(rowsObj);
@@ -291,7 +351,8 @@ export const generateDmmSettingPDF = async (data, dateRange) => {
                     tableBody = rowsArr.map((row, idx) => {
                         const pdfRow = [(idx + 1).toString()];
                         allColumns.forEach(col => {
-                            const val = row[col.MasterId || col.id];
+                            // Fix applied here to check `col.key` first for base columns
+                            const val = row[col.key] || row[col.id] || row[col.MasterId]; 
                             pdfRow.push(val === '' || val === null || val === undefined ? '-' : val.toString());
                         });
                         return pdfRow;
@@ -413,16 +474,7 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
             }
         });
 
-        doc.setLineWidth(0.3);
-        doc.rect(10, 10, 40, 20); doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-        doc.text("SAKTHI", 30, 18, { align: 'center' }); doc.text("AUTO", 30, 26, { align: 'center' });
-        doc.rect(50, 10, 180, 20); doc.setFontSize(16);
-        doc.text(title1, 140, 22, { align: 'center' });
-        doc.rect(230, 10, 57, 20); doc.setFontSize(11);
-        doc.text(`${machine}`, 258, 18, { align: 'center' });
-        doc.line(230, 22, 287, 22);
-        
-        doc.setFontSize(10); doc.text(`Month: ${getReportMonthYear(reportMonthDate)}`, 235, 27);
+        drawStandardHeader(doc, title1, machine, `Month: ${getReportMonthYear(reportMonthDate)}`);
 
         const days = Array.from({ length: 31 }, (_, i) => (i + 1).toString());
 
@@ -507,12 +559,7 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
 
         if (machineNc.length > 0) {
             doc.addPage();
-            doc.setLineWidth(0.3);
-            doc.rect(10, 10, 40, 20); doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-            doc.text("SAKTHI", 30, 18, { align: 'center' }); doc.text("AUTO", 30, 26, { align: 'center' });
-            doc.rect(50, 10, 237, 20); doc.setFontSize(16);
-            doc.text(title2, 168, 18, { align: 'center' }); doc.setFontSize(14);
-            doc.text("Non-Conformance Report", 168, 26, { align: 'center' });
+            drawStandardHeader(doc, title2, machine, "NCR Log");
 
             const ncRows = machineNc.map((report, index) => [
                 index + 1, formatDate(report.ReportDate || report.RecordDate || report.date), report.NonConformityDetails || '', report.Correction || '',
@@ -553,105 +600,6 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
 };
 
 // ============================================================================
-// 5. ERROR PROOF VERIFICATION (Legacy / Fallback)
-// ============================================================================
-export const generateErrorProofPDF = (data, dateRange) => {
-    const doc = new jsPDF('l', 'mm', 'a4');
-    const { verifications, plans } = data;
-
-    if (!verifications || verifications.length === 0) {
-        doc.setFontSize(14); doc.text("No data found for the selected date range.", 148.5, 40, { align: 'center' });
-        doc.save(`ErrorProof_Bulk_${dateRange.from}_to_${dateRange.to}.pdf`);
-        return;
-    }
-
-    const groupedByDateAndMachine = {};
-    verifications.forEach(row => {
-        const dateKey = String(row.recordDate || row.RecordDate).split('T')[0];
-        const machine = row.line || row.DisaMachine;
-        if (!groupedByDateAndMachine[dateKey]) groupedByDateAndMachine[dateKey] = {};
-        if (!groupedByDateAndMachine[dateKey][machine]) groupedByDateAndMachine[dateKey][machine] = { v: [], r: [] };
-        groupedByDateAndMachine[dateKey][machine].v.push(row);
-    });
-
-    if (plans) {
-        plans.forEach(plan => {
-            const dateKey = String(plan.recordDate || plan.RecordDate).split('T')[0];
-            const machine = verifications.find(v => (v.errorProofName || v.ErrorProofName) === (plan.errorProofName || plan.ErrorProofName))?.line || verifications[0]?.line;
-            if (machine && groupedByDateAndMachine[dateKey] && groupedByDateAndMachine[dateKey][machine]) {
-                groupedByDateAndMachine[dateKey][machine].r.push(plan);
-            }
-        });
-    }
-
-    let isFirstPage = true;
-    const PAGE_HEIGHT = 210; 
-
-    Object.keys(groupedByDateAndMachine).sort().forEach(dateKey => {
-        Object.keys(groupedByDateAndMachine[dateKey]).sort().forEach(machine => {
-            if (!isFirstPage) doc.addPage();
-            isFirstPage = false;
-
-            const records = groupedByDateAndMachine[dateKey][machine];
-            const headerData = { date: dateKey, disaMachine: machine, reviewedBy: records.v[0]?.ReviewedByHOF || '', approvedBy: records.v[0]?.ApprovedBy || '' };
-
-            doc.setLineWidth(0.3);
-            doc.rect(10, 10, 40, 20); doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-            doc.text("SAKTHI", 30, 18, { align: 'center' }); doc.text("AUTO", 30, 26, { align: 'center' });
-            doc.rect(50, 10, 180, 20); doc.setFontSize(16);
-            doc.text("ERROR PROOF VERIFICATION REPORT", 140, 22, { align: 'center' });
-            doc.rect(230, 10, 57, 20); doc.setFontSize(11);
-            doc.text(`${machine}`, 258, 18, { align: 'center' });
-            doc.line(230, 22, 287, 22);
-            doc.setFontSize(10); doc.text(`DATE: ${formatDate(dateKey)}`, 235, 27);
-
-            const vRows = records.v.map((item, index) => [
-                index + 1, item.line || item.DisaMachine, item.errorProofName || item.ErrorProofName, item.natureOfErrorProof || item.NatureOfErrorProof, item.frequency || item.Frequency,
-                item.Date1_Shift1_Res === 'OK' ? 'OK' : item.Date1_Shift1_Res === 'NOT OK' ? 'NOT OK' : '-',
-                item.Date1_Shift2_Res === 'OK' ? 'OK' : item.Date1_Shift2_Res === 'NOT OK' ? 'NOT OK' : '-',
-                item.Date1_Shift3_Res === 'OK' ? 'OK' : item.Date1_Shift3_Res === 'NOT OK' ? 'NOT OK' : '-'
-            ]);
-
-            autoTable(doc, {
-                startY: 35,
-                head: [[{ content: 'S.No', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }, { content: 'Line', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }, { content: 'Error Proof Name', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }, { content: 'Nature of Error Proof', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }, { content: 'Frequency', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }, { content: 'Verification Result', colSpan: 3, styles: { halign: 'center' } }], ['I - Shift', 'II - Shift', 'III - Shift']],
-                body: vRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0], valign: 'middle' },
-                headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0], fontStyle: 'bold' }
-            });
-
-            let currentY = doc.lastAutoTable.finalY + 10;
-            
-            if (records.r && records.r.length > 0) {
-                doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-                doc.text("Reaction Plan", 148.5, currentY, { align: 'center' });
-                currentY += 5;
-
-                const rRows = records.r.map((item, index) => [index + 1, item.errorProofNo || '-', item.errorProofName || item.ErrorProofName, item.shift || '-', item.problem || item.Problem, item.rootCause || item.RootCause, item.correctiveAction || item.CorrectiveAction, item.status || item.Status, item.remarks || item.Remarks]);
-                autoTable(doc, {
-                    startY: currentY,
-                    head: [['S.No', 'Ep.No', 'Error Proof Name', 'Verification \n Date & Shift', 'Problem', 'Root Cause', 'Corrective action taken \n (Temporary)', 'Status', 'Remarks']],
-                    body: rRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
-                    headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
-                    columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 15 }, 2: { cellWidth: 35 }, 3: { cellWidth: 25 }, 4: { cellWidth: 35 }, 5: { cellWidth: 35 }, 6: { cellWidth: 40 }, 7: { cellWidth: 20 }, 8: { cellWidth: 20 } }
-                });
-                currentY = doc.lastAutoTable.finalY + 10;
-            }
-
-            if (currentY + 30 > PAGE_HEIGHT) { doc.addPage(); currentY = 20; }
-
-            autoTable(doc, {
-                startY: currentY, margin: { left: 10, right: 10 }, head: [['REVIEWED BY HOF', 'APPROVED BY']], body: [[headerData.reviewedBy || '', headerData.approvedBy || '']], theme: 'grid',
-                styles: { fontSize: 10, cellPadding: 4, lineColor: [0, 0, 0], lineWidth: 0.1, halign: 'center', minCellHeight: 15 }, headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' }
-            });
-
-            doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.text("QF/07/FBP-13, Rev.No:06 dt 08.10.2025", 10, 200);
-        });
-    });
-
-    doc.save(`ErrorProof_Verification_Bulk_${dateRange.from}_to_${dateRange.to}.pdf`);
-};
-
-// ============================================================================
 // 5a. ERROR PROOF VERIFICATION (V1)
 // ============================================================================
 export const generateErrorProofV1PDF = (data, dateRange) => {
@@ -688,14 +636,10 @@ export const generateErrorProofV1PDF = (data, dateRange) => {
         if (pageIndex > 0) doc.addPage();
         pageIndex++;
 
-        doc.setFontSize(14).setFont('helvetica', 'bold');
-        doc.text("ERROR PROOF VERIFICATION CHECK LIST (V1)", 148.5, 15, { align: 'center' });
-        doc.setFontSize(10);
-        doc.text(`Date: ${group.date}`, 14, 25);
-        doc.text(`Line: ${group.line}`, 280, 25, { align: 'right' });
+        drawStandardHeader(doc, "ERROR PROOF VERIFICATION CHECK LIST (V1)", group.line, `Date: ${formatDate(group.date)}`);
 
         autoTable(doc, {
-            startY: 30,
+            startY: 35,
             head: [['Line', 'Error Proof Name', 'Nature of Error Proof', 'Frequency', 'Observation']],
             body: group.verifications.map(v => [
                 v.line, v.errorProofName, v.natureOfErrorProof, v.frequency,
@@ -726,8 +670,11 @@ export const generateErrorProofV1PDF = (data, dateRange) => {
         finalY += 30;
 
         if (group.plans.length > 0) {
-            if (finalY > 150) { doc.addPage(); finalY = 20; }
-            doc.setFontSize(12).text("REACTION PLAN", 148.5, finalY, { align: 'center' });
+            if (finalY > 150) { doc.addPage(); finalY = 35; drawStandardHeader(doc, "REACTION PLAN", group.line, `Date: ${formatDate(group.date)}`); }
+            else {
+                doc.setFontSize(12).text("REACTION PLAN", 148.5, finalY, { align: 'center' });
+            }
+            
             autoTable(doc, {
                 startY: finalY + 5,
                 head: [['S.No', 'EP No', 'Error Proof Name', 'Problem', 'Root Cause', 'Corrective Action', 'Status', 'Op Sign', 'Sup Sign', 'Remarks']],
@@ -793,14 +740,10 @@ export const generateErrorProofV2PDF = (data, dateRange) => {
         if (pageIndex > 0) doc.addPage();
         pageIndex++;
 
-        doc.setFontSize(14).setFont('helvetica', 'bold');
-        doc.text("ERROR PROOF VERIFICATION CHECK LIST (V2)", 148.5, 15, { align: 'center' });
-        doc.setFontSize(10);
-        doc.text(`Date: ${group.date}`, 14, 25);
-        doc.text(`Line: ${group.line}`, 280, 25, { align: 'right' });
+        drawStandardHeader(doc, "ERROR PROOF VERIFICATION CHECK LIST (V2)", group.line, `Date: ${formatDate(group.date)}`);
 
         autoTable(doc, {
-            startY: 30,
+            startY: 35,
             head: [['Line', 'Error Proof Name', 'Nature', 'Freq', 'Shift 1', 'Shift 2', 'Shift 3']],
             body: group.verifications.map(v => [
                 v.Line, v.ErrorProofName, v.NatureOfErrorProof, v.Frequency,
@@ -831,8 +774,11 @@ export const generateErrorProofV2PDF = (data, dateRange) => {
         finalY += 30;
 
         if (group.plans.length > 0) {
-            if (finalY > 150) { doc.addPage(); finalY = 20; }
-            doc.setFontSize(12).text("REACTION PLAN", 148.5, finalY, { align: 'center' });
+            if (finalY > 150) { doc.addPage(); finalY = 35; drawStandardHeader(doc, "REACTION PLAN", group.line, `Date: ${formatDate(group.date)}`); }
+            else {
+                doc.setFontSize(12).text("REACTION PLAN", 148.5, finalY, { align: 'center' });
+            }
+
             autoTable(doc, {
                 startY: finalY + 5,
                 head: [['S.No', 'EP No', 'Error Proof Name', 'Shift', 'Problem', 'Root Cause', 'Corrective Action', 'Status', 'Op Sign', 'Sup Sign', 'Remarks']],
@@ -882,20 +828,7 @@ export const generateDisaSettingAdjustmentPDF = (data, dateRange) => {
         return text;
     };
 
-    doc.setLineWidth(0.3);
-    doc.rect(10, 10, 50, 20);
-    doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-    doc.text("SAKTHI", 35, 18, { align: 'center' });
-    doc.text("AUTO", 35, 26, { align: 'center' });
-
-    doc.rect(60, 10, 167, 20);
-    doc.setFontSize(15);
-    doc.text("DISA SETTING ADJUSTMENT RECORD", 143, 22, { align: 'center' });
-
-    doc.rect(227, 10, 60, 20);
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-    doc.text(`From: ${formatDate(dateRange.from)}`, 232, 18);
-    doc.text(`To:   ${formatDate(dateRange.to)}`, 232, 26);
+    drawStandardHeader(doc, "DISA SETTING ADJUSTMENT RECORD", `From: ${formatDate(dateRange.from)}`, `To: ${formatDate(dateRange.to)}`);
 
     const tableRows = data.map((row, index) => {
         const customValues = Object.values(row.customValues || {});
@@ -947,7 +880,7 @@ export const generateDisaSettingAdjustmentPDF = (data, dateRange) => {
 };
 
 // ============================================================================
-// 7. 4M CHANGE MONITORING
+// 7. 4M CHANGE MONITORING (Refactored to JS PDF AutoTable + Standard Header)
 // ============================================================================
 export const generateFourMChangePDF = (data, dateRange) => {
     const doc = new jsPDF('l', 'mm', 'a4');
@@ -960,45 +893,12 @@ export const generateFourMChangePDF = (data, dateRange) => {
         return;
     }
 
-    const startX = 10;
-    const pageWidth = doc.page.width - 20;
-
     const baseHeaders = ["Date /\nShift", "M/c.\nNo", "Type of\n4M", "Description", "First\nPart", "Last\nPart", "Insp.\nFreq", "Retro\nChecking", "Quarantine", "Part\nIdent.", "Internal\nComm.", "Supervisor\nSign"];
     
-    // Extract custom headers dynamically from the first record if they exist
     const customKeys = records[0] && records[0].customValues ? Object.keys(records[0].customValues) : [];
     const customHeaders = customKeys.map((_, i) => `Custom ${i+1}`);
     const headers = [...baseHeaders, ...customHeaders];
 
-    const baseWeights = [1.5, 1, 1, 3.5, 1, 1, 1, 1.2, 1.5, 1, 1.2, 2.5];
-    const customWeights = customHeaders.map(() => 1.5);
-    const allWeights = [...baseWeights, ...customWeights];
-    const totalWeight = allWeights.reduce((sum, w) => sum + w, 0);
-    const colWidths = allWeights.map(w => (w / totalWeight) * pageWidth);
-
-    const drawHeaders = (y, line, part) => {
-        doc.font("Helvetica-Bold").fontSize(16).text("4M CHANGE MONITORING CHECK SHEET", startX, y, { align: "center" });
-        doc.font("Helvetica-Bold").fontSize(12)
-            .text(`Line: ${line}`, startX, y + 25)
-            .text(`Part Name: ${part}`, startX, y + 25, { align: "right", width: pageWidth });
-
-        const tableHeaderY = y + 45;
-        let currentX = startX;
-        doc.font("Helvetica-Bold").fontSize(7);
-        headers.forEach((header, i) => {
-            doc.rect(currentX, tableHeaderY, colWidths[i], 25).stroke();
-            doc.text(header, currentX, tableHeaderY + 8, { width: colWidths[i], align: "center" });
-            currentX += colWidths[i];
-        });
-        return tableHeaderY + 25;
-    };
-
-    const drawFooter = () => {
-        const footerY = doc.page.height - 15;
-        doc.font("Helvetica").fontSize(8).text("QF/07/MPD-36, Rev. No: 01, 13.03.2019", startX, footerY, { align: "left" });
-    };
-
-    // Group by Line/Machine to create separate tables
     const groupedRecords = {};
     records.forEach(r => {
         const line = r.line || r.disa || 'DISA - I';
@@ -1015,54 +915,58 @@ export const generateFourMChangePDF = (data, dateRange) => {
         const lineRecords = groupedRecords[line];
         const uniquePartNames = [...new Set(lineRecords.map(r => r.partName).filter(Boolean))].join(', ');
         
-        let y = drawHeaders(20, line, uniquePartNames);
+        drawStandardHeader(doc, "4M CHANGE MONITORING CHECK SHEET", line, `Part: ${uniquePartNames.length > 25 ? uniquePartNames.substring(0, 22) + '...' : uniquePartNames}`);
 
-        lineRecords.forEach((row) => {
+        const tableRows = lineRecords.map(row => {
             const formattedDate = formatDate(row.recordDate);
             const customData = customKeys.map(k => row.customValues ? row.customValues[k] : "");
             const signatureCell = row.SupervisorSignature || row.inchargeSign || row.operatorSignature || "";
 
-            const rowData = [
+            return [
                 `${formattedDate}\nShift ${row.shift}`, row.mcNo || '-', row.type4M || '-', row.description || '-',
                 row.firstPart || '-', row.lastPart || '-', row.inspFreq || '-', row.retroChecking || '-',
                 row.quarantine || '-', row.partId || '-', row.internalComm || '-', signatureCell, ...customData
             ];
-
-            let maxRowHeight = 25;
-            doc.font("Helvetica").fontSize(7);
-
-            rowData.forEach((cell, i) => {
-                if (i !== 11) { // Skip image height calc
-                    const h = doc.heightOfString(String(cell || ""), { width: colWidths[i] - 4 });
-                    if (h + 10 > maxRowHeight) maxRowHeight = h + 10;
-                }
-            });
-
-            if (y + maxRowHeight > doc.page.height - 25) {
-                drawFooter();
-                doc.addPage();
-                y = drawHeaders(20, line, uniquePartNames);
-            }
-
-            let x = startX;
-            rowData.forEach((cell, i) => {
-                doc.rect(x, y, colWidths[i], maxRowHeight).stroke();
-                
-                if (i === 11 && cell && cell.startsWith('data:image')) {
-                    try { doc.addImage(cell, 'PNG', x + 2, y + 2, colWidths[i] - 4, maxRowHeight - 4); } catch (e) {}
-                } else if (cell === "OK") {
-                    doc.save().lineWidth(1).moveTo(x + colWidths[i]/2 - 3, y + maxRowHeight/2 + 1).lineTo(x + colWidths[i]/2 - 1, y + maxRowHeight/2 + 4).lineTo(x + colWidths[i]/2 + 4, y + maxRowHeight/2 - 3).stroke().restore();
-                } else if (cell === "Not OK") {
-                    doc.save().lineWidth(1).moveTo(x + colWidths[i]/2 - 3, y + maxRowHeight/2 - 3).lineTo(x + colWidths[i]/2 + 3, y + maxRowHeight/2 + 3).moveTo(x + colWidths[i]/2 + 3, y + maxRowHeight/2 - 3).lineTo(x + colWidths[i]/2 - 3, y + maxRowHeight/2 + 3).stroke().restore();
-                } else {
-                    doc.text(String(cell || ""), x + 2, y + 5, { width: colWidths[i] - 4, align: "center" });
-                }
-                x += colWidths[i];
-            });
-            y += maxRowHeight;
         });
 
-        drawFooter();
+        autoTable(doc, {
+            startY: 35,
+            head: [headers],
+            body: tableRows,
+            theme: 'grid',
+            styles: { fontSize: 7, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.15, textColor: [0, 0, 0], valign: 'middle', halign: 'center' },
+            headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+            didDrawCell: function (data) {
+                if (data.section === 'body' && data.column.index === 11) {
+                    const sigData = data.row.raw[11];
+                    if (sigData && sigData.startsWith('data:image')) {
+                        try { doc.addImage(sigData, 'PNG', data.cell.x + 2, data.cell.y + 2, data.cell.width - 4, data.cell.height - 4); } catch (e) {}
+                    }
+                }
+            },
+            didParseCell: function (data) {
+                if (data.section === 'body') {
+                    const idx = data.column.index;
+                    if ([7, 8, 9, 10].includes(idx)) {
+                        const text = data.cell.text?.[0] || '';
+                        if (text === 'OK') {
+                            data.cell.styles.font = 'ZapfDingbats';
+                            data.cell.text = ['3'];
+                            data.cell.styles.textColor = [0, 100, 0];
+                        } else if (text === 'Not OK') {
+                            data.cell.styles.textColor = [255, 0, 0];
+                            data.cell.text = ['X'];
+                            data.cell.styles.fontStyle = 'bold';
+                        }
+                    }
+                    if (idx === 11) data.cell.text = ''; // Clear text for signature image
+                }
+            }
+        });
+
+        const footerY = doc.internal.pageSize.getHeight() - 10;
+        doc.setFont("helvetica", "normal").setFontSize(8);
+        doc.text("QF/07/MPD-36, Rev. No: 01, 13.03.2019", 14, footerY);
     });
 
     doc.save(`4M_Change_Bulk_${dateRange.from}_to_${dateRange.to}.pdf`);
@@ -1092,23 +996,10 @@ export const generateMouldQualityPDF = (data, dateRange) => {
         const rows = report.rows || [];
 
         const startX = 14;
-        let y = 30;
         const pageWidth = doc.internal.pageSize.getWidth();
 
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
-        doc.text("SAKTHI AUTO COMPONENT LIMITED", pageWidth / 2, y, { align: "center" });
-        
-        doc.setFontSize(14);
-        doc.text("MOULDING QUALITY INSPECTION REPORT", pageWidth / 2, y + 8, { align: "center" });
-        
-        const displayDate = formatDate(header.reportDate);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.text(`Machine: ${header.disaMachine || '-'}`, startX, y + 22);
-        doc.text(`Date: ${displayDate}`, pageWidth - startX, y + 22, { align: "right" });
+        drawStandardHeader(doc, "MOULDING QUALITY INSPECTION REPORT", header.disaMachine || '-', `Date: ${formatDate(header.reportDate)}`);
 
-        // 🔥 FIXED: Removed all individual fillColors for a clean B&W look
         const headMatrix = [
             [
                 { content: 'S.No', rowSpan: 3, styles: { halign: 'center', valign: 'middle' } },
@@ -1149,13 +1040,12 @@ export const generateMouldQualityPDF = (data, dateRange) => {
         ]);
 
         autoTable(doc, {
-            startY: y + 25,
+            startY: 35,
             margin: { left: startX, right: startX },
             head: headMatrix,
             body: bodyData,
             theme: 'grid',
             styles: { fontSize: 6, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0], valign: 'middle', halign: 'center' },
-            // 🔥 Added a uniform light gray background for all headers instead of the rainbow colors
             headStyles: { textColor: [0, 0, 0], fillColor: [240, 240, 240], fontStyle: 'bold' },
             columnStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: 15 }, 2: { cellWidth: 35 }, 3: { cellWidth: 20 } }
         });
@@ -1174,7 +1064,6 @@ export const generateMouldQualityPDF = (data, dateRange) => {
         if (header.supervisorSignature && header.supervisorSignature.startsWith('data:image')) {
             try { doc.addImage(header.supervisorSignature, 'PNG', pageWidth - 100, sigY + 5, 60, 20); } catch(e){}
         } else {
-            // 🔥 Made "Pending" text black instead of red for a fully B&W report
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(0, 0, 0); 
             doc.text("Pending", pageWidth - 100, sigY + 15);
