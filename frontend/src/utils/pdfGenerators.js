@@ -78,19 +78,25 @@ export const generateUnPouredMouldPDF = async (data, dateRange) => {
             doc.setFontSize(11); doc.text(` ${disa}`, 8, 25);
             doc.text(`DATE: ${formatDate(dateKey)}`, 289 - doc.getTextWidth(`DATE: ${formatDate(dateKey)}`) - 8, 25);
 
-            const headRow1 = [{ content: 'SHIFT', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }];
-            let currentGroup = null; let groupSpan = 0;
-            allColumns.forEach((col) => {
-                if (!currentGroup) { currentGroup = col.group; groupSpan = 1; }
-                else if (currentGroup === col.group) { groupSpan++; }
-                else {
-                    headRow1.push({ content: currentGroup, colSpan: groupSpan, styles: { halign: 'center' } });
-                    currentGroup = col.group; groupSpan = 1;
-                }
-            });
-            if (currentGroup) headRow1.push({ content: currentGroup, colSpan: groupSpan, styles: { halign: 'center' } });
-            headRow1.push({ content: 'TOTAL', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [220, 220, 220] } });
-            headRow1.push({ content: 'SIGNATURE', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } });
+            // 🔥 REMOVED 'SIGNATURE' COLUMN FOR PDF HEADERS
+            const headRow1 = [
+              { content: 'SHIFT', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+              ...(() => {
+                const pdfGroups = [];
+                let currentGroup = null; let groupSpan = 0;
+                allColumns.forEach((col) => {
+                    if (!currentGroup) { currentGroup = col.group; groupSpan = 1; }
+                    else if (currentGroup === col.group) { groupSpan++; }
+                    else {
+                        pdfGroups.push({ content: currentGroup, colSpan: groupSpan, styles: { halign: 'center' } });
+                        currentGroup = col.group; groupSpan = 1;
+                    }
+                });
+                if (currentGroup) pdfGroups.push({ content: currentGroup, colSpan: groupSpan, styles: { halign: 'center' } });
+                return pdfGroups;
+              })(),
+              { content: 'TOTAL', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [220, 220, 220] } }
+            ];
 
             const headRow2 = allColumns.map(col => ({ content: col.label, styles: { halign: 'center', valign: 'middle', fontSize: 5.5 } }));
 
@@ -103,7 +109,6 @@ export const generateUnPouredMouldPDF = async (data, dateRange) => {
                     rowTotal += parseInt(val) || 0;
                 });
                 row.push(rowTotal === 0 ? '-' : rowTotal.toString());
-                row.push('SIG'); // Placeholder for image
                 return row;
             });
 
@@ -118,30 +123,38 @@ export const generateUnPouredMouldPDF = async (data, dateRange) => {
                 grandTotal += colTotal;
             });
             totalRow.push(grandTotal === 0 ? '-' : grandTotal.toString());
-            totalRow.push('-');
             bodyRows.push(totalRow);
 
             autoTable(doc, {
                 startY: 32, margin: { left: 5, right: 5 }, head: [headRow1, headRow2], body: bodyRows, theme: 'grid',
                 styles: { fontSize: 8, cellPadding: { top: 3.5, right: 1, bottom: 3.5, left: 1 }, lineColor: [0, 0, 0], lineWidth: 0.15, textColor: [0, 0, 0], halign: 'center', valign: 'middle' },
                 headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', minCellHeight: 12 }, bodyStyles: { minCellHeight: 10 },
-                columnStyles: { [allColumns.length + 2]: { cellWidth: 25 } },
-                didDrawCell: function(data) {
-                    if (data.section === 'body' && data.column.index === allColumns.length + 2 && data.row.index < 3) {
-                        const shift = data.row.index + 1;
-                        const sigData = shiftsData[shift]?.OperatorSignature;
-                        if (sigData && sigData.startsWith('data:image')) {
-                            try { doc.addImage(sigData, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch (e) {}
-                        }
-                    }
-                },
                 didParseCell: function (data) { 
                     if (data.section === 'body' && data.row.index === bodyRows.length - 1) { 
                         data.cell.styles.fontStyle = 'bold'; data.cell.styles.fillColor = [240, 240, 240]; 
                     } 
-                    if (data.section === 'body' && data.column.index === allColumns.length + 2 && data.row.index < 3) {
-                        if (data.cell.raw === 'SIG') data.cell.text = ''; 
-                    }
+                }
+            });
+
+            // 🔥 DRAW SIGNATURES HORIZONTALLY AT THE BOTTOM OF THE TABLE
+            let sigY = doc.lastAutoTable.finalY + 10;
+            if (sigY + 30 > 210) { 
+                doc.addPage();
+                sigY = 20;
+            }
+
+            const shiftLabels = ["1st shift", "2nd shift", "3rd shift"];
+            const xPositions = [50, 148.5, 247]; // Spaced evenly across A4 Landscape width (297mm)
+
+            doc.setFontSize(10).setFont('helvetica', 'bold');
+
+            [1, 2, 3].forEach((shift, index) => {
+                const x = xPositions[index];
+                doc.text(shiftLabels[index], x, sigY + 20, { align: 'center' });
+
+                const sigData = shiftsData[shift]?.OperatorSignature;
+                if (sigData && sigData.startsWith('data:image')) {
+                    try { doc.addImage(sigData, 'PNG', x - 20, sigY, 40, 15); } catch (e) {}
                 }
             });
         });

@@ -190,83 +190,76 @@ const AdminDashboard = () => {
         }
     };
 
-    // =========================================================================
-    // 🔥 FIXED BULK DOWNLOADER FOR PERFORMANCE REPORT
-    // =========================================================================
-  // =========================================================================
-    // 🔥 FIXED BULK DOWNLOADER FOR PERFORMANCE REPORT & PDF GENERATORS
-    // =========================================================================
-    const handleDownloadPDF = async () => {
-        if (!dateRange.from || !dateRange.to) {
-            setNotification({ show: true, type: 'error', message: 'Please select both From and To dates.' });
-            return;
-        }
+    const handleDownloadPDF = async () => {
+        if (!dateRange.from || !dateRange.to) {
+            setNotification({ show: true, type: 'error', message: 'Please select both From and To dates.' });
+            return;
+        }
 
-        setLoading(true);
-        setNotification({ show: true, type: 'loading', message: 'Generating PDF Report...' });
+        setLoading(true);
+        setNotification({ show: true, type: 'loading', message: 'Generating PDF Report...' });
 
-        try {
-            // 1. PERFECTED PERFORMANCE REPORT EXPORT
-            if (pdfModal.selectedForm.id === 'performance') {
-                const url = `${process.env.REACT_APP_API_URL}/api/daily-performance/download-pdf?fromDate=${dateRange.from}&toDate=${dateRange.to}`;
-                
-                const response = await axios.get(url, { responseType: 'blob' });
-                
-                // If it returned our custom JSON exists: false flag
-                if (response.data.type === 'application/json') {
-                    setNotification({ show: true, type: 'error', message: 'No records found for the selected date range.' });
-                    setLoading(false);
-                    return;
-                }
+        try {
+            // 1. PERFECTED PERFORMANCE REPORT EXPORT
+            if (pdfModal.selectedForm.id === 'performance') {
+                const url = `${process.env.REACT_APP_API_URL}/api/daily-performance/download-pdf?fromDate=${dateRange.from}&toDate=${dateRange.to}`;
+                
+                const response = await axios.get(url, { responseType: 'blob' });
+                
+                if (response.data.type === 'application/json') {
+                    setNotification({ show: true, type: 'error', message: 'No records found for the selected date range.' });
+                    setLoading(false);
+                    return;
+                }
 
-                // Download the combined PDF
-                const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.setAttribute('download', `Performance_Reports_${dateRange.from}_to_${dateRange.to}.pdf`);
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                window.URL.revokeObjectURL(blobUrl);
+                const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.setAttribute('download', `Performance_Reports_${dateRange.from}_to_${dateRange.to}.pdf`);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(blobUrl);
 
-                setNotification({ show: true, type: 'success', message: `Report Downloaded Successfully!` });
-                setPdfModal({ show: false, selectedForm: null });
-                setLoading(false);
-                return;
-            }
+                setNotification({ show: true, type: 'success', message: `Report Downloaded Successfully!` });
+                setPdfModal({ show: false, selectedForm: null });
+                setLoading(false);
+                return;
+            }
 
-            // 2. Other Server rendered PDFs
-            const serverPdfForms = ['4m-change', 'disamatic-report'];
-            if (serverPdfForms.includes(pdfModal.selectedForm.id)) {
-                let url = '';
-                if (pdfModal.selectedForm.id === '4m-change') {
-                    url = `${process.env.REACT_APP_API_URL}/api/4m-change/report?fromDate=${dateRange.from}&toDate=${dateRange.to}`;
-                } else if (pdfModal.selectedForm.id === 'disamatic-report') {
-                    url = `${process.env.REACT_APP_API_URL}/api/forms/download-pdf?fromDate=${dateRange.from}&toDate=${dateRange.to}`;
-                }
-                if (url) {
-                    window.open(url, '_blank');
-                    setNotification({ show: true, type: 'success', message: 'Report generated in new tab!' });
-                    setPdfModal({ show: false, selectedForm: null });
-                }
-                setLoading(false);
-                return;
-            }
+            // 2. Other Server rendered PDFs
+            const serverPdfForms = ['4m-change', 'disamatic-report'];
+            if (serverPdfForms.includes(pdfModal.selectedForm.id)) {
+                let url = '';
+                if (pdfModal.selectedForm.id === '4m-change') {
+                    url = `${process.env.REACT_APP_API_URL}/api/4m-change/report?fromDate=${dateRange.from}&toDate=${dateRange.to}`;
+                } else if (pdfModal.selectedForm.id === 'disamatic-report') {
+                    url = `${process.env.REACT_APP_API_URL}/api/forms/download-pdf?fromDate=${dateRange.from}&toDate=${dateRange.to}`;
+                }
+                if (url) {
+                    window.open(url, '_blank');
+                    setNotification({ show: true, type: 'success', message: 'Report generated in new tab!' });
+                    setPdfModal({ show: false, selectedForm: null });
+                }
+                setLoading(false);
+                return;
+            }
 
-            // 3. Client rendered PDFs
-            let apiRoute = `${process.env.REACT_APP_API_URL}/api/reports/${pdfModal.selectedForm.id}`;
-            if (pdfModal.selectedForm.id === 'disa-setting-adjustment') apiRoute = `${process.env.REACT_APP_API_URL}/api/disa/records`;
-            else if (pdfModal.selectedForm.id === 'error-proof') apiRoute = `${process.env.REACT_APP_API_URL}/api/error-proof/bulk-data`;
-            else if (pdfModal.selectedForm.id === 'unpoured-mould-details') apiRoute = `${process.env.REACT_APP_API_URL}/api/unpoured-moulds/bulk-data`;
-            else if (pdfModal.selectedForm.id === 'dmm-setting-parameters') apiRoute = `${process.env.REACT_APP_API_URL}/api/dmm-settings/bulk-data`;
-            else if (pdfModal.selectedForm.id === 'disa-operator') apiRoute = `${process.env.REACT_APP_API_URL}/api/disa-checklist/bulk-data`;
-            else if (pdfModal.selectedForm.id === 'lpa') apiRoute = `${process.env.REACT_APP_API_URL}/api/bottom-level-audit/bulk-data`;
+            // 3. Client rendered PDFs
+            let apiRoute = `${process.env.REACT_APP_API_URL}/api/reports/${pdfModal.selectedForm.id}`;
+            if (pdfModal.selectedForm.id === 'disa-setting-adjustment') apiRoute = `${process.env.REACT_APP_API_URL}/api/disa/records`;
+            
+            // 🔥 FIXED: Pointed 'error-proof' to the new 'error-proof2' backend route
+            else if (pdfModal.selectedForm.id === 'error-proof') apiRoute = `${process.env.REACT_APP_API_URL}/api/error-proof2/bulk-data`;
+            
+            else if (pdfModal.selectedForm.id === 'unpoured-mould-details') apiRoute = `${process.env.REACT_APP_API_URL}/api/unpoured-moulds/bulk-data`;
+            else if (pdfModal.selectedForm.id === 'dmm-setting-parameters') apiRoute = `${process.env.REACT_APP_API_URL}/api/dmm-settings/bulk-data`;
+            else if (pdfModal.selectedForm.id === 'disa-operator') apiRoute = `${process.env.REACT_APP_API_URL}/api/disa-checklist/bulk-data`;
+            else if (pdfModal.selectedForm.id === 'lpa') apiRoute = `${process.env.REACT_APP_API_URL}/api/bottom-level-audit/bulk-data`;
 
-            const res = await axios.get(apiRoute, { params: { fromDate: dateRange.from, toDate: dateRange.to } });
-            let data = res.data;
+            const res = await axios.get(apiRoute, { params: { fromDate: dateRange.from, toDate: dateRange.to } });
+            let data = res.data;
 
-            // 🔥 FIX: Sanitize SQL Server Dates!
-            // This strips 'T00:00:00.000Z' off the dates so the PDF generator's exact match filters succeed.
             const sanitizeDates = (arr) => arr.map(row => ({
                 ...row,
                 RecordDate: row.RecordDate ? row.RecordDate.split('T')[0] : row.RecordDate,
@@ -280,11 +273,11 @@ const AdminDashboard = () => {
                 if (data.records) data.records = sanitizeDates(data.records);
             }
 
-            // 🔥 PREVENT CRASH: Check if data is truly empty before passing to PDF Generator
             let isEmpty = false;
             if (Array.isArray(data) && data.length === 0) isEmpty = true;
             else if (data && data.trans && data.trans.length === 0) isEmpty = true;
             else if (data && data.records && data.records.length === 0) isEmpty = true;
+            else if (data && data.verifications && data.verifications.length === 0) isEmpty = true; // Added check for Error Proof
 
             if (isEmpty) {
                 setNotification({ show: true, type: 'error', message: 'No data found for the selected date range.' });
@@ -292,29 +285,29 @@ const AdminDashboard = () => {
                 return;
             }
 
-            switch (pdfModal.selectedForm.id) {
-                case 'unpoured-mould-details': generateUnPouredMouldPDF(data, dateRange); break;
-                case 'dmm-setting-parameters': generateDmmSettingPDF(data, dateRange); break;
-                case 'disa-operator': generateChecklistPDF(data, dateRange, "DISA MACHINE OPERATOR CHECK SHEET", "Non-Conformance Report"); break;
-                case 'lpa': generateChecklistPDF(data, dateRange, "LAYERED PROCESS AUDIT - BOTTOM LEVEL", "Non-Conformance Report"); break;
-                case 'error-proof': generateErrorProofPDF(data, dateRange); break;
-                case 'disa-setting-adjustment': generateDisaSettingAdjustmentPDF(data, dateRange); break;
-                default:
-                    setNotification({ show: true, type: 'error', message: 'Report format mapping not found.' });
-                    setLoading(false);
-                    return;
-            }
+            switch (pdfModal.selectedForm.id) {
+                case 'unpoured-mould-details': generateUnPouredMouldPDF(data, dateRange); break;
+                case 'dmm-setting-parameters': generateDmmSettingPDF(data, dateRange); break;
+                case 'disa-operator': generateChecklistPDF(data, dateRange, "DISA MACHINE OPERATOR CHECK SHEET", "Non-Conformance Report"); break;
+                case 'lpa': generateChecklistPDF(data, dateRange, "LAYERED PROCESS AUDIT - BOTTOM LEVEL", "Non-Conformance Report"); break;
+                case 'error-proof': generateErrorProofPDF(data, dateRange); break;
+                case 'disa-setting-adjustment': generateDisaSettingAdjustmentPDF(data, dateRange); break;
+                default:
+                    setNotification({ show: true, type: 'error', message: 'Report format mapping not found.' });
+                    setLoading(false);
+                    return;
+            }
 
-            setNotification({ show: true, type: 'success', message: 'Bulk Export Downloaded Successfully!' });
-            setPdfModal({ show: false, selectedForm: null });
+            setNotification({ show: true, type: 'success', message: 'Bulk Export Downloaded Successfully!' });
+            setPdfModal({ show: false, selectedForm: null });
 
-        } catch (error) {
-            console.error("PDF Generation Error: ", error);
-            setNotification({ show: true, type: 'error', message: 'Failed to generate PDF.' });
-        }
+        } catch (error) {
+            console.error("PDF Generation Error: ", error);
+            setNotification({ show: true, type: 'error', message: 'Failed to generate PDF.' });
+        }
 
-        setLoading(false);
-    };
+        setLoading(false);
+    };
 
     if (adminEditView) {
         return (

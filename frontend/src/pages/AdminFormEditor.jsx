@@ -6,7 +6,7 @@ const API = process.env.REACT_APP_API_URL;
 const DISA_MACHINES = ['DISA - I', 'DISA - II', 'DISA - III', 'DISA - IV', 'DISA - V', 'DISA - VI'];
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Small helpers
+//   Small helpers
 // ─────────────────────────────────────────────────────────────────────────────
 const Toast = ({ msg, type, onClose }) => {
     useEffect(() => {
@@ -95,8 +95,182 @@ const SaveButton = ({ onClick }) => (
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  FORM EDITORS
+//   FORM EDITORS
 // ─────────────────────────────────────────────────────────────────────────────
+
+/* 0. DAILY PERFORMANCE REPORT EDITOR */
+const PerformanceEditor = ({ date, disa, toast, setToast }) => {
+    const [report, setReport] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        setLoading(true);
+        axios.get(`${API}/api/daily-performance/by-date`, { params: { date, disa: disa.replace('DISA - ', '').trim() } })
+            .then(r => {
+                if (r.data && r.data.length > 0) {
+                    const rec = r.data[0];
+                    const sumObj = { I: {}, II: {}, III: {} };
+                    if (rec.summary) {
+                        rec.summary.forEach(s => sumObj[s.shiftName] = s);
+                    }
+                    setReport({ ...rec, summaryObj: sumObj, delays: rec.delays || [] });
+                } else {
+                    setReport(null);
+                }
+            })
+            .catch(() => setToast({ msg: 'Failed to load data', type: 'error' }))
+            .finally(() => setLoading(false));
+    }, [date, disa]);
+
+    const setSummaryField = (shift, field, value) => {
+        setReport(prev => ({
+            ...prev,
+            summaryObj: {
+                ...prev.summaryObj,
+                [shift]: { ...prev.summaryObj[shift], [field]: value }
+            }
+        }));
+    };
+
+    const setDetailField = (idx, field, value) => {
+        setReport(prev => {
+            const newDetails = [...prev.details];
+            newDetails[idx] = { ...newDetails[idx], [field]: value };
+            return { ...prev, details: newDetails };
+        });
+    };
+
+    const setDelayField = (idx, field, value) => {
+        setReport(prev => {
+            const newDelays = [...prev.delays];
+            newDelays[idx] = { ...newDelays[idx], [field]: value };
+            return { ...prev, delays: newDelays };
+        });
+    };
+
+    const handleSave = async () => {
+        setToast({ msg: 'Saving…', type: 'loading' });
+        try {
+            await axios.put(`${API}/api/daily-performance/${report.id}`, {
+                summary: report.summaryObj,
+                details: report.details,
+                delays: report.delays,
+                unplannedReasons: report.unplannedReasons,
+                incharge: report.incharge,
+                hof: report.hof,
+                hod: report.hod
+            });
+            setToast({ msg: 'Saved successfully!', type: 'success' });
+        } catch { setToast({ msg: 'Save failed', type: 'error' }); }
+    };
+
+    if (loading) return <CenteredLoader />;
+    if (!report) return <NoData msg={`No Performance Report found for ${disa} on ${date}.`} />;
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 shadow-lg">
+                <SectionHeader title="Shift Summary Data" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                    {['I', 'II', 'III'].map(shift => {
+                        const s = report.summaryObj[shift] || {};
+                        return (
+                            <div key={shift} className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-3">
+                                <h4 className="text-white font-bold text-center border-b border-white/10 pb-2 mb-3">SHIFT {shift}</h4>
+                                <Field label="Poured Moulds" type="number" value={s.pouredMoulds} onChange={v => setSummaryField(shift, 'pouredMoulds', v)} />
+                                <Field label="Tonnage" type="number" value={s.tonnage} onChange={v => setSummaryField(shift, 'tonnage', v)} />
+                                <Field label="Casted" type="number" value={s.casted} onChange={v => setSummaryField(shift, 'casted', v)} />
+                                <Field label="Shift Value" type="number" value={s.shiftValue || s.value} onChange={v => setSummaryField(shift, 'shiftValue', v)} />
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+
+            <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 shadow-lg overflow-hidden">
+                <SectionHeader title="Component Production Details" />
+                <div className="mt-4 overflow-x-auto">
+                    <table className="w-full text-left text-white text-sm min-w-[800px]">
+                        <thead className="bg-[#111] text-xs uppercase text-white/50">
+                            <tr>
+                                <th className="p-3">Pattern Code</th>
+                                <th className="p-3">Item Desc.</th>
+                                <th className="p-3 w-20">Planned</th>
+                                <th className="p-3 w-20">Unplanned</th>
+                                <th className="p-3 w-24">Prod. Moulds</th>
+                                <th className="p-3 w-24">Pour. Moulds</th>
+                                <th className="p-3 w-20">Cavity</th>
+                                <th className="p-3 w-24">Unit Wt.</th>
+                                <th className="p-3 w-24">Total Wt.</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                            {report.details.map((d, i) => (
+                                <tr key={d.id} className="hover:bg-white/5 transition-colors">
+                                    <td className="p-2"><input className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.patternCode || ''} onChange={e => setDetailField(i, 'patternCode', e.target.value)} /></td>
+                                    <td className="p-2"><input className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.itemDescription || ''} onChange={e => setDetailField(i, 'itemDescription', e.target.value)} /></td>
+                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.planned || ''} onChange={e => setDetailField(i, 'planned', e.target.value)} /></td>
+                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.unplanned || ''} onChange={e => setDetailField(i, 'unplanned', e.target.value)} /></td>
+                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.mouldsProd || ''} onChange={e => setDetailField(i, 'mouldsProd', e.target.value)} /></td>
+                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.mouldsPour || ''} onChange={e => setDetailField(i, 'mouldsPour', e.target.value)} /></td>
+                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.cavity || ''} onChange={e => setDetailField(i, 'cavity', e.target.value)} /></td>
+                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.unitWeight || ''} onChange={e => setDetailField(i, 'unitWeight', e.target.value)} /></td>
+                                    <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm font-bold text-[#ff9100]" value={d.totalWeight || ''} onChange={e => setDetailField(i, 'totalWeight', e.target.value)} /></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {report.delays && report.delays.length > 0 && (
+                <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 shadow-lg overflow-hidden">
+                    <SectionHeader title="Production Delays" />
+                    <div className="mt-4 overflow-x-auto">
+                        <table className="w-full text-left text-white text-sm">
+                            <thead className="bg-[#111] text-xs uppercase text-white/50">
+                                <tr>
+                                    <th className="p-3 w-32">Shift</th>
+                                    <th className="p-3 w-48">Duration (Mins)</th>
+                                    <th className="p-3">Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {report.delays.map((d, i) => (
+                                    <tr key={d.id} className="hover:bg-white/5 transition-colors">
+                                        <td className="p-2">
+                                            <select className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.shift || ''} onChange={e => setDelayField(i, 'shift', e.target.value)}>
+                                                <option value="I">I</option>
+                                                <option value="II">II</option>
+                                                <option value="III">III</option>
+                                            </select>
+                                        </td>
+                                        <td className="p-2"><input type="number" className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.duration || ''} onChange={e => setDelayField(i, 'duration', e.target.value)} /></td>
+                                        <td className="p-2"><input className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-sm text-white" value={d.reason || ''} onChange={e => setDelayField(i, 'reason', e.target.value)} /></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 shadow-lg">
+                <SectionHeader title="Report Details & Supervisors" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div className="col-span-2">
+                        <Field label="Reasons for Unplanned items" value={report.unplannedReasons} onChange={v => setReport({ ...report, unplannedReasons: v })} multiline />
+                    </div>
+                    <Field label="In-Charge" value={report.incharge} onChange={v => setReport({ ...report, incharge: v })} />
+                    <Field label="HOF" value={report.hof} onChange={v => setReport({ ...report, hof: v })} />
+                    <Field label="HOD" value={report.hod} onChange={v => setReport({ ...report, hod: v })} />
+                </div>
+            </div>
+
+            <SaveButton onClick={handleSave} />
+        </div>
+    );
+};
 
 /* 1. UNPOURED MOULD DETAILS */
 const UnpouredEditor = ({ date, disa, toast, setToast }) => {
@@ -254,7 +428,7 @@ const DmmEditor = ({ date, disa, toast, setToast }) => {
     );
 };
 
-/* 3. DISA OPERATOR CHECKLIST (🔥 COMPLETELY RESTORED FULL GRID + NC LOGIC) */
+/* 3. DISA OPERATOR CHECKLIST */
 const DisaChecklistEditor = ({ date, disa, toast, setToast }) => {
     const [data, setData] = useState(null);
     const [reportsMap, setReportsMap] = useState({});
@@ -330,7 +504,6 @@ const DisaChecklistEditor = ({ date, disa, toast, setToast }) => {
             setIsModalOpen(false);
             setReportsMap(prev => ({ ...prev, [modalItem.MasterId]: { ...ncForm, MasterId: modalItem.MasterId, Status: 'Pending', Name: ncForm.sign } }));
 
-            // Mark checklist item as NOT done
             const idx = data.checklist.findIndex(c => c.MasterId === modalItem.MasterId);
             if (idx !== -1) {
                 setItem(idx, 'IsDone', false);
@@ -396,7 +569,7 @@ const DisaChecklistEditor = ({ date, disa, toast, setToast }) => {
                         {data.checklist.map((item, i) => {
                             const hasReport = !!reportsMap[item.MasterId];
                             const isDisabled = item.IsHoliday || item.IsVatCleaning;
-                            const isDecimalRow = item.SlNo === 1 || item.SlNo === 2 || item.SlNo === 17; // Adjust mapping if necessary based on your actual data
+                            const isDecimalRow = item.SlNo === 1 || item.SlNo === 2 || item.SlNo === 17;
 
                             return (
                                 <tr key={item.MasterId} className={`border-b border-white/5 transition-colors ${hasReport ? 'bg-red-900/20' : isDisabled ? 'bg-black/20 opacity-60' : 'hover:bg-white/5'}`}>
@@ -468,19 +641,37 @@ const DisaChecklistEditor = ({ date, disa, toast, setToast }) => {
     );
 };
 
-/* 4. ERROR PROOF VERIFICATION */
+/* 4. ERROR PROOF VERIFICATION & REACTION PLAN EDITOR */
 const ErrorProofEditor = ({ date, disa, toast, setToast }) => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         setLoading(true);
-        axios.get(`${API}/api/error-proof/details-by-date`, { params: { date, machine: disa } })
-            .then(r => setData(r.data))
+        // 🔥 FIXED: Changed from /api/error-proof/ to /api/error-proof2/
+        axios.get(`${API}/api/error-proof2/details`, { params: { date, machine: disa } })
+            .then(r => {
+                const resData = r.data;
+                const verifications = resData.verifications || [];
+                const reactionPlans = resData.reactionPlans || [];
+                const first = verifications[0] || {};
+                
+                setData({
+                    verifications,
+                    reactionPlans,
+                    headerDetails: {
+                        reviewedBy: first.ReviewedByHOF || '',
+                        approvedBy: first.ApprovedBy || '',
+                        assignedHOF: first.AssignedHOF || ''
+                    },
+                    operatorSignature: first.OperatorSignature || ''
+                });
+            })
             .catch(() => setToast({ msg: 'Failed to load data', type: 'error' }))
             .finally(() => setLoading(false));
     }, [date, disa]);
 
+    // Handle Verifications changes
     const setVer = (idx, field, val) =>
         setData(prev => {
             const v = [...prev.verifications];
@@ -488,50 +679,69 @@ const ErrorProofEditor = ({ date, disa, toast, setToast }) => {
             return { ...prev, verifications: v };
         });
 
+    // Handle Reaction Plans changes
+    const setPlan = (idx, field, val) =>
+        setData(prev => {
+            const p = [...prev.reactionPlans];
+            p[idx] = { ...p[idx], [field]: val };
+            return { ...prev, reactionPlans: p };
+        });
+
+    // Handle Header Details
+    const setHeader = (field, val) =>
+        setData(prev => ({
+            ...prev,
+            headerDetails: { ...prev.headerDetails, [field]: val }
+        }));
+
     const handleSave = async () => {
         setToast({ msg: 'Saving…', type: 'loading' });
         try {
-            const first = data.verifications[0] || {};
-            await axios.post(`${API}/api/error-proof/save`, {
+            // 🔥 FIXED: Changed from /api/error-proof/ to /api/error-proof2/
+            await axios.post(`${API}/api/error-proof2/save`, {
                 machine: disa,
+                date: date,
                 verifications: data.verifications,
-                reactionPlans: data.reactionPlans || [],
-                headerDetails: { reviewedBy: first.ReviewedByHOF || '', approvedBy: first.ApprovedBy || '', assignedHOF: first.AssignedHOF || '' },
-                operatorSignature: first.OperatorSignature || ''
+                reactionPlans: data.reactionPlans,
+                headerDetails: data.headerDetails,
+                operatorSignature: data.operatorSignature
             });
             setToast({ msg: 'Saved successfully!', type: 'success' });
         } catch { setToast({ msg: 'Save failed', type: 'error' }); }
     };
 
     if (loading) return <CenteredLoader />;
-    if (!data || data.verifications?.length === 0) return <NoData msg="No error proof records for this date and machine." />;
+    if (!data || data.verifications.length === 0) return <NoData msg={`No error proof records for ${disa} on ${date}.`} />;
 
     const RESULTS = ['', 'OK', 'NOT OK'];
+    const STATUSES = ['Pending', 'Completed'];
 
     return (
-        <div className="space-y-4">
-            <div className="overflow-x-auto rounded-xl border border-white/10">
-                <table className="w-full text-sm text-white">
-                    <thead className="bg-[#222]">
+        <div className="space-y-6">
+            {/* 1. Verifications Table */}
+            <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 shadow-lg overflow-x-auto">
+                <SectionHeader title="Verification Checklist" />
+                <table className="w-full text-sm text-white mt-4 min-w-[600px]">
+                    <thead className="bg-[#111] text-xs uppercase text-white/50">
                         <tr>
-                            <th className="p-3 text-left text-[10px] uppercase tracking-widest text-white/50">Error Proof Name</th>
-                            <th className="p-3 text-[10px] uppercase tracking-widest text-white/50">Nature</th>
-                            <th className="p-3 text-[10px] uppercase tracking-widest text-white/50">Freq</th>
-                            <th className="p-3 text-[10px] uppercase tracking-widest text-white/50">Shift 1</th>
-                            <th className="p-3 text-[10px] uppercase tracking-widest text-white/50">Shift 2</th>
-                            <th className="p-3 text-[10px] uppercase tracking-widest text-white/50">Shift 3</th>
+                            <th className="p-3 text-left">Error Proof Name</th>
+                            <th className="p-3 text-left">Nature</th>
+                            <th className="p-3 text-center">Freq</th>
+                            <th className="p-3 text-center w-24">Shift 1</th>
+                            <th className="p-3 text-center w-24">Shift 2</th>
+                            <th className="p-3 text-center w-24">Shift 3</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-white/5">
                         {data.verifications.map((v, i) => (
-                            <tr key={v.Id} className="border-t border-white/5 hover:bg-white/5">
-                                <td className="p-3">{v.ErrorProofName}</td>
-                                <td className="p-3">{v.NatureOfErrorProof}</td>
+                            <tr key={v.Id || i} className="hover:bg-white/5 transition-colors">
+                                <td className="p-3 font-bold">{v.ErrorProofName}</td>
+                                <td className="p-3 text-white/70">{v.NatureOfErrorProof}</td>
                                 <td className="p-3 text-center">{v.Frequency}</td>
                                 {['Date1_Shift1_Res', 'Date1_Shift2_Res', 'Date1_Shift3_Res'].map(field => (
-                                    <td key={field} className="p-3">
+                                    <td key={field} className="p-2">
                                         <select value={v[field] || ''} onChange={e => setVer(i, field, e.target.value)}
-                                            className="bg-[#333] border border-white/10 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-[#ff9100]">
+                                            className="w-full bg-[#333] border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-[#ff9100]">
                                             {RESULTS.map(r => <option key={r} value={r}>{r || '—'}</option>)}
                                         </select>
                                     </td>
@@ -541,11 +751,58 @@ const ErrorProofEditor = ({ date, disa, toast, setToast }) => {
                     </tbody>
                 </table>
             </div>
+
+            {/* 2. Reaction Plans Table */}
+            {data.reactionPlans.length > 0 && (
+                <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 shadow-lg overflow-x-auto">
+                    <SectionHeader title="Reaction Plans (Not OK Issues)" />
+                    <table className="w-full text-sm text-white mt-4 min-w-[900px]">
+                        <thead className="bg-[#111] text-xs uppercase text-white/50">
+                            <tr>
+                                <th className="p-3">Error Proof Name</th>
+                                <th className="p-3 w-20">Shift</th>
+                                <th className="p-3">Problem</th>
+                                <th className="p-3">Root Cause</th>
+                                <th className="p-3">Corrective Action</th>
+                                <th className="p-3 w-32">Status</th>
+                                <th className="p-3">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                            {data.reactionPlans.map((rp, i) => (
+                                <tr key={rp.Id || i} className="hover:bg-white/5 transition-colors">
+                                    <td className="p-2 text-white/70 font-bold">{rp.ErrorProofName}</td>
+                                    <td className="p-2 text-center text-orange-400 font-bold">{rp.VerificationDateShift}</td>
+                                    <td className="p-2"><input value={rp.Problem || ''} onChange={e => setPlan(i, 'Problem', e.target.value)} className="w-full bg-[#333] border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-[#ff9100]" /></td>
+                                    <td className="p-2"><input value={rp.RootCause || ''} onChange={e => setPlan(i, 'RootCause', e.target.value)} className="w-full bg-[#333] border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-[#ff9100]" /></td>
+                                    <td className="p-2"><input value={rp.CorrectiveAction || ''} onChange={e => setPlan(i, 'CorrectiveAction', e.target.value)} className="w-full bg-[#333] border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-[#ff9100]" /></td>
+                                    <td className="p-2">
+                                        <select value={rp.Status || 'Pending'} onChange={e => setPlan(i, 'Status', e.target.value)} className="w-full bg-[#333] border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-[#ff9100]">
+                                            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                    </td>
+                                    <td className="p-2"><input value={rp.Remarks || ''} onChange={e => setPlan(i, 'Remarks', e.target.value)} className="w-full bg-[#333] border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-[#ff9100]" /></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* 3. Header Details & Supervisors */}
+            <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 shadow-lg">
+                <SectionHeader title="Supervisor Details & HOF Assignment" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                    <Field label="Assigned HOF" value={data.headerDetails.assignedHOF} onChange={v => setHeader('assignedHOF', v)} />
+                    <Field label="Reviewed By (HOF)" value={data.headerDetails.reviewedBy} onChange={v => setHeader('reviewedBy', v)} />
+                    <Field label="Approved By (Supervisor)" value={data.headerDetails.approvedBy} onChange={v => setHeader('approvedBy', v)} />
+                </div>
+            </div>
+
             <SaveButton onClick={handleSave} />
         </div>
     );
 };
-
 /* 5. DISA SETTING ADJUSTMENT */
 const DisaSettingEditor = ({ date, toast, setToast }) => {
     const [records, setRecords] = useState([]);
@@ -702,7 +959,7 @@ const FourMEditor = ({ date, toast, setToast }) => {
     );
 };
 
-/* 7. LPA – Bottom Level Audit (🔥 UPDATED TO MATCH CHECKLIST NC LOGIC) */
+/* 7. LPA – Bottom Level Audit */
 const LpaEditor = ({ date, disa, toast, setToast }) => {
     const [data, setData] = useState(null);
     const [reportsMap, setReportsMap] = useState({});
@@ -916,12 +1173,12 @@ const LpaEditor = ({ date, disa, toast, setToast }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  NEEDS-MACHINE forms
+//   NEEDS-MACHINE forms
 // ─────────────────────────────────────────────────────────────────────────────
-const NEEDS_MACHINE = ['unpoured-mould-details', 'dmm-setting-parameters', 'disa-operator', 'error-proof', 'lpa'];
+const NEEDS_MACHINE = ['performance', 'unpoured-mould-details', 'dmm-setting-parameters', 'disa-operator', 'error-proof', 'lpa'];
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  MAIN EXPORT
+//   MAIN EXPORT
 // ─────────────────────────────────────────────────────────────────────────────
 const AdminFormEditor = ({ form, date, onBack }) => {
     const [selectedMachine, setSelectedMachine] = useState('');
@@ -934,6 +1191,7 @@ const AdminFormEditor = ({ form, date, onBack }) => {
     const renderEditor = () => {
         const props = { date, disa: selectedMachine, toast, setToast };
         switch (form.id) {
+            case 'performance': return <PerformanceEditor {...props} />;
             case 'unpoured-mould-details': return <UnpouredEditor {...props} />;
             case 'dmm-setting-parameters': return <DmmEditor {...props} />;
             case 'disa-operator': return <DisaChecklistEditor {...props} />;

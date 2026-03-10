@@ -6,7 +6,6 @@ const path = require("path");
 // ==========================================
 //           BULLETPROOF HELPERS
 // ==========================================
-// Prevents SQL crashes by ensuring numbers are numbers and strings are strings
 const safeNum = (val) => {
   if (val === null || val === undefined || String(val).trim() === "" || String(val).trim() === "-") return 0;
   const n = Number(val);
@@ -25,7 +24,6 @@ exports.createDailyPerformance = async (req, res) => {
   const { productionDate, disa, summary, details, unplannedReasons, signatures, delays, operatorSignature } = req.body;
 
   try {
-    // 1. Insert Main Report
     const reportResult = await sql.query`
             INSERT INTO DailyPerformanceReport (productionDate, disa, unplannedReasons, incharge, hof, hod, operatorSignature)
             OUTPUT INSERTED.id
@@ -34,7 +32,6 @@ exports.createDailyPerformance = async (req, res) => {
 
     const reportId = reportResult.recordset[0].id;
 
-    // 2. Insert Summary Data
     const shifts = ["I", "II", "III"];
     for (let shift of shifts) {
       const sData = summary[shift] || {};
@@ -44,7 +41,6 @@ exports.createDailyPerformance = async (req, res) => {
                         ${safeNum(sData.tonnage)}, ${safeNum(sData.casted)}, ${safeNum(sData.value)})`;
     }
 
-    // 3. Insert Details Data
     if (details && details.length > 0) {
       for (let d of details) {
         if (d.patternCode) {
@@ -59,7 +55,6 @@ exports.createDailyPerformance = async (req, res) => {
       }
     }
 
-    // 4. Insert Delays Data
     if (delays && delays.length > 0) {
       for (let delay of delays) {
         await sql.query`
@@ -80,10 +75,7 @@ exports.createDailyPerformance = async (req, res) => {
 // ==========================================
 exports.getSummaryByDate = async (req, res) => {
   const { date, disa } = req.query;
-
   try {
-    // Uses logic from Code 2 (Calculated from Production Report) but tailored for Performance view
-    // Note: This assumes we are fetching data *from* the DisamaticProductReport tables to calculate the Performance Summary
     const result = await sql.query`
       SELECT 
         r.shift,
@@ -97,7 +89,6 @@ exports.getSummaryByDate = async (req, res) => {
         AND r.disa = ${disa}
       GROUP BY r.shift
     `;
-
     res.status(200).json(result.recordset);
   } catch (error) {
     console.error("Error fetching summary:", error);
@@ -110,7 +101,6 @@ exports.getSummaryByDate = async (req, res) => {
 // ==========================================
 exports.getDelaysByDateAndDisa = async (req, res) => {
   const { date, disa } = req.query;
-
   try {
     const result = await sql.query`
       SELECT 
@@ -123,7 +113,6 @@ exports.getDelaysByDateAndDisa = async (req, res) => {
         AND r.disa = ${disa}
       ORDER BY r.shift, d.id
     `;
-
     res.status(200).json(result.recordset);
   } catch (error) {
     console.error("Error fetching delays:", error);
@@ -244,9 +233,7 @@ exports.downloadPDF = async (req, res) => {
   try {
     let reports = [];
 
-    // 1. Determine Report Source (Single Date vs Date Range)
     if (fromDate && toDate) {
-      // Bulk Export
       const reportQuery = await sql.query`
         SELECT * FROM DailyPerformanceReport 
         WHERE CAST(productionDate AS DATE) BETWEEN CAST(${fromDate} AS DATE) AND CAST(${toDate} AS DATE)
@@ -254,7 +241,6 @@ exports.downloadPDF = async (req, res) => {
       `;
       reports = reportQuery.recordset;
     } else if (date && disa) {
-      // Single Export
       const safeDisa = disa.replace('DISA - ', '').trim();
       const reportQuery = await sql.query`
         SELECT * FROM DailyPerformanceReport 
@@ -317,7 +303,6 @@ exports.downloadPDF = async (req, res) => {
       doc.fillColor('black').text(content, x + 2, y + topPad, { width: innerWidth, align: align });
     };
 
-    // --- LOOP THROUGH REPORTS TO GENERATE PDF PAGES ---
     for (let rIndex = 0; rIndex < reports.length; rIndex++) {
       const report = reports[rIndex];
       const reportId = report.id;
@@ -333,7 +318,6 @@ exports.downloadPDF = async (req, res) => {
         currentY = 30;
       }
 
-      // --- HEADER ---
       doc.rect(startX, currentY, tableWidth, 40).stroke();
       const logoPath = path.join(__dirname, 'logo.jpg');
       if (fs.existsSync(logoPath)) {
@@ -346,12 +330,10 @@ exports.downloadPDF = async (req, res) => {
       doc.font('Helvetica-Bold').fontSize(14).text("DAILY PRODUCTION PERFORMANCE (FOUNDRY - B)", startX + 120, currentY + 15, { width: 415, align: 'center' });
       currentY += 40;
 
-      // DATE ROW
       doc.rect(startX, currentY, tableWidth, 20).stroke();
       doc.font('Helvetica-Bold').fontSize(10).text(`DATE OF PRODUCTION : ${reportDateStr.split('-').reverse().join('-')}           DISA: ${report.disa}`, startX + 5, currentY + 6);
       currentY += 20;
 
-      // --- SUMMARY TABLE ---
       const sumCols = [{ w: 60, l: 'SHIFT' }, { w: 115, l: 'POURED MOULDS' }, { w: 120, l: 'TONNAGE' }, { w: 120, l: 'CASTED' }, { w: 120, l: 'VALUE' }];
       let xHeaderPos = startX;
       sumCols.forEach(col => {
@@ -385,7 +367,6 @@ exports.downloadPDF = async (req, res) => {
       drawCell(tValue > 0 ? tValue.toFixed(2) : "-", xPos, currentY, sumCols[4].w, 20, 'center', 'Helvetica', 9, true);
       currentY += 30;
 
-      // --- DETAILS TABLE ---
       const detCols = [{ w: 25 }, { w: 90 }, { w: 100 }, { w: 35 }, { w: 35 }, { w: 45 }, { w: 45 }, { w: 25 }, { w: 135 }];
 
       const drawDetailsHeader = () => {
@@ -521,7 +502,6 @@ exports.downloadPDF = async (req, res) => {
       doc.font('Helvetica').fontSize(8).fillColor('black');
       doc.text("QF/07/FBP-15, Rev.No:01 dt 10.06.2019", startX, currentY);
 
-      // --- PAGE 2: GROUPED DELAYS (Using Input 2 Logic) ---
       doc.addPage();
       currentY = 30;
 
@@ -600,7 +580,6 @@ exports.downloadPDF = async (req, res) => {
           currentY += maxH;
         });
 
-        // Delays Total Row
         if (checkPageBreak(20)) drawDelaysHeader();
         let tX = startX;
         doc.rect(tX, currentY, delayCols[0].w + delayCols[1].w, 20).stroke();
@@ -663,9 +642,11 @@ exports.getByDate = async (req, res) => {
   try {
     let reportsRes;
     if (disa) {
+      const safeDisa = disa.replace('DISA - ', '').trim();
       reportsRes = await sql.query`
                 SELECT * FROM DailyPerformanceReport 
-                WHERE CAST(productionDate AS DATE) = CAST(${date} AS DATE) AND disa = ${disa}
+                WHERE CAST(productionDate AS DATE) = CAST(${date} AS DATE) 
+                AND (disa = ${safeDisa} OR disa = 'DISA - ' + ${safeDisa} OR disa = ${disa})
                 ORDER BY id ASC`;
     } else {
       reportsRes = await sql.query`
@@ -694,7 +675,7 @@ exports.getByDate = async (req, res) => {
 // ==========================================
 exports.updateReport = async (req, res) => {
   const { id } = req.params;
-  const { summary, details, unplannedReasons, incharge, hof, hod } = req.body;
+  const { summary, details, delays, unplannedReasons, incharge, hof, hod } = req.body;
 
   try {
     await sql.query`
@@ -733,6 +714,18 @@ exports.updateReport = async (req, res) => {
                         cavity = ${safeNum(d.cavity)},
                         unitWeight = ${safeNum(d.unitWeight)},
                         totalWeight = ${safeNum(d.totalWeight)}
+                        WHERE id = ${Number(d.id)}`;
+        }
+      }
+    }
+
+    if (delays && delays.length > 0) {
+      for (const d of delays) {
+        if (d.id) {
+          await sql.query`UPDATE Productiondelays SET
+                        shift = ${safeStr(d.shift)},
+                        duration = ${safeNum(d.duration)},
+                        reason = ${safeStr(d.reason)}
                         WHERE id = ${Number(d.id)}`;
         }
       }

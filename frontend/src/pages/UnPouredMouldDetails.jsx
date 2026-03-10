@@ -5,7 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import SignatureCanvas from 'react-signature-canvas';
 import Header from '../components/Header';
-import logo from '../Assets/logo.png'; // Make sure this path is correct
+import logo from '../Assets/logo.png'; // Make sure the path is correct
 
 const NotificationModal = ({ data, onClose }) => {
   if (!data.show) return null;
@@ -82,7 +82,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
 
   const sigRefs = { 1: useRef(null), 2: useRef(null), 3: useRef(null) };
 
-  // Sync props if accessed from Admin Panel
   useEffect(() => {
     if (isAdminMode && adminDate && adminDisa) {
       setHeaderData({ date: adminDate, disaMachine: adminDisa });
@@ -96,7 +95,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
   const loadSchemaAndData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Dynamic Admin Columns
       const configRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/config/unpoured-mould-details/master`);
       const customCols = (configRes.data.config || []).map(c => ({
         key: `custom_${c.id}`,
@@ -108,7 +106,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
 
       const mergedColumns = [...baseColumns, ...customCols];
 
-      // Calculate last item in group for UI styling
       let currentGroup = mergedColumns[0]?.group;
       for (let i = 1; i < mergedColumns.length; i++) {
         if (mergedColumns[i].group !== currentGroup) {
@@ -119,7 +116,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
       if (mergedColumns.length > 0) mergedColumns[mergedColumns.length - 1].isLastInGroup = true;
       setColumns(mergedColumns);
 
-      // 2. Fetch Daily Data
       const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/unpoured-moulds/details`, {
         params: { date: headerData.date, disa: headerData.disaMachine }
       });
@@ -155,7 +151,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
       setNotification({ show: true, type: 'error', message: "Failed to load shift data." });
     }
 
-    // 3. Isolated Fetch for Bottom Summary Table
     try {
       const summaryRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/unpoured-moulds/summary`, {
         params: { date: headerData.date }
@@ -235,20 +230,18 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
     try {
       const doc = new jsPDF('l', 'mm', 'a4');
 
-      // --- STANDARDIZED HEADER WITH IMAGE LOGO ---
+      // ==============================================================
+      // 🔥 STANDARDIZED HEADER WITH IMAGE LOGO 
+      // ==============================================================
       doc.setLineWidth(0.3);
       
       // Box 1: SAKTHI AUTO (Logo Area)
       doc.rect(10, 10, 40, 20);
       try {
-        // Embed the actual image logo inside the 40x20 box
-        // x: 12, y: 11, width: 36, height: 18 (leaves small padding inside the box)
         doc.addImage(logo, 'PNG', 12, 11, 36, 18);
       } catch (err) {
-        // Fallback to text if image fails to load/process
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text("SAKTHI", 30, 18, { align: 'center' });
+        doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+        doc.text("SAKTHI", 30, 18, { align: 'center' }); 
         doc.text("AUTO", 30, 26, { align: 'center' });
       }
 
@@ -266,7 +259,7 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
       doc.setFontSize(10);
       const formattedDate = new Date(headerData.date).toLocaleDateString('en-GB');
       doc.text(`DATE: ${formattedDate}`, 267, 26, { align: 'center' });
-      // ------------------------------------------
+      // ==============================================================
 
       const pdfGroups = [];
       columns.forEach(col => {
@@ -278,8 +271,7 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
       const headRow1 = [
         { content: 'SHIFT', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
         ...pdfGroups.map(g => ({ content: g.name, colSpan: g.count, styles: { halign: 'center' } })),
-        { content: 'TOTAL', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [220, 220, 220] } },
-        { content: 'SIGNATURE', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }
+        { content: 'TOTAL', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [220, 220, 220] } }
       ];
 
       const headRow2 = columns.map(col => ({ content: col.label.replace(' ', '\n'), styles: { halign: 'center', valign: 'middle', fontSize: 5.5 } }));
@@ -291,7 +283,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
           row.push(val === '' || val === null || val === undefined ? '-' : val.toString());
         });
         row.push(getRowTotal(shift) === 0 ? '-' : getRowTotal(shift).toString());
-        row.push('SIG'); // Placeholder for image
         return row;
       });
 
@@ -301,40 +292,45 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
         totalRow.push(colTotal === 0 ? '-' : colTotal.toString());
       });
       totalRow.push(getGrandTotal() === 0 ? '-' : getGrandTotal().toString());
-      totalRow.push('-');
       bodyRows.push(totalRow);
 
       autoTable(doc, {
-        startY: 35, // Below the header
-        margin: { left: 5, right: 5 }, head: [headRow1, headRow2], body: bodyRows, theme: 'grid',
+        startY: 35, margin: { left: 5, right: 5 }, head: [headRow1, headRow2], body: bodyRows, theme: 'grid',
         styles: { fontSize: 8, cellPadding: { top: 3.5, right: 1, bottom: 3.5, left: 1 }, lineColor: [0, 0, 0], lineWidth: 0.15, textColor: [0, 0, 0], halign: 'center', valign: 'middle' },
         headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', minCellHeight: 12 }, bodyStyles: { minCellHeight: 10 },
-        columnStyles: { [columns.length + 2]: { cellWidth: 25 } },
-        didDrawCell: function (data) {
-          if (data.section === 'body' && data.column.index === columns.length + 2 && data.row.index < 3) {
-            const shift = data.row.index + 1;
-            let sig = '';
-            if (sigRefs[shift].current && !sigRefs[shift].current.isEmpty()) sig = sigRefs[shift].current.getCanvas().toDataURL('image/png');
-            else if (shiftsData[shift].operatorSignature) sig = shiftsData[shift].operatorSignature;
-
-            if (sig && sig.startsWith('data:image')) {
-              try { doc.addImage(sig, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch (e) { }
-            }
-          }
-        },
         didParseCell: function (data) {
           if (data.section === 'body' && data.row.index === bodyRows.length - 1) {
             data.cell.styles.fontStyle = 'bold'; data.cell.styles.fillColor = [240, 240, 240];
           }
-          if (data.section === 'body' && data.column.index === columns.length + 2 && data.row.index < 3) {
-            if (data.cell.raw === 'SIG') data.cell.text = ''; // Clear placeholder
-          }
         }
       });
 
-      const tableEnd = doc.lastAutoTable.finalY;
+      let sigY = doc.lastAutoTable.finalY + 10;
+      if (sigY + 30 > 210) { 
+          doc.addPage();
+          sigY = 20;
+      }
 
-      // Bottom Summaries
+      const shiftLabels = ["1st shift", "2nd shift", "3rd shift"];
+      const xPositions = [50, 148.5, 247]; 
+
+      doc.setFontSize(10).setFont('helvetica', 'bold');
+
+      [1, 2, 3].forEach((shift, index) => {
+          const x = xPositions[index];
+          doc.text(shiftLabels[index], x, sigY + 20, { align: 'center' });
+
+          let sig = '';
+          if (sigRefs[shift].current && !sigRefs[shift].current.isEmpty()) sig = sigRefs[shift].current.getCanvas().toDataURL('image/png');
+          else if (shiftsData[shift].operatorSignature) sig = shiftsData[shift].operatorSignature;
+
+          if (sig && sig.startsWith('data:image')) {
+              try { doc.addImage(sig, 'PNG', x - 20, sigY, 40, 15); } catch (e) { }
+          }
+      });
+
+      const summaryStartY = sigY + 30; 
+
       const summaryBodyRows = ['I', 'II', 'III', 'IV'].map(disa => {
         const row = getDisaData(disa);
         return [
@@ -346,7 +342,7 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
       summaryBodyRows.push(['TOTAL', '-', '-', totalProduced, totalPoured, totalUnpoured, `${totalPercentage}%`, totalDelays, '-', '-', totalRunningHours]);
 
       autoTable(doc, {
-        startY: tableEnd + 8, margin: { right: 80, left: 5 },
+        startY: summaryStartY, margin: { right: 80, left: 5 },
         head: [['DISA', 'MOULD\nCLOSE', 'MOULD\nOPEN', 'PRODUCED', 'POURED', 'UNPOURED', '%', 'DELAYS', 'PROD\nM/HR', 'POURED\nM/HR', 'RUN HRS']],
         body: summaryBodyRows, theme: 'grid',
         styles: { fontSize: 6, lineColor: [0, 0, 0], lineWidth: 0.15, textColor: [0, 0, 0], halign: 'center', valign: 'middle' },
@@ -355,7 +351,7 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
       });
 
       autoTable(doc, {
-        startY: tableEnd + 8, margin: { left: 220, right: 5 },
+        startY: summaryStartY, margin: { left: 220, right: 5 },
         head: [[{ content: 'NO. OF MOULDS/DAY', colSpan: 5, styles: { halign: 'left' } }], ['', 'DISA 1', 'DISA 2', 'DISA 3', 'DISA 4']],
         body: [
           ['MOULD / DAY', getDisaData('I').producedMould ?? '0', getDisaData('II').producedMould ?? '0', getDisaData('III').producedMould ?? '0', getDisaData('IV').producedMould ?? '0'],
@@ -418,7 +414,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
         
         <div className="bg-white w-full max-w-[100rem] shadow-xl rounded-xl flex flex-col border-4 border-gray-100">
 
-          {/* --- Main Container Header & Inputs (Hidden in Admin Mode) --- */}
           {!isAdminMode && (
             <div className="p-8 pb-4">
               <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 uppercase tracking-wide flex items-center justify-center gap-2">
@@ -453,7 +448,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
             </div>
           )}
 
-          {/* --- Shift Breakdown Table --- */}
           <div className="p-6 overflow-x-auto min-h-[300px] custom-scrollbar">
             <table className="w-full text-center border-collapse table-fixed min-w-[2450px]">
               <thead className="bg-gray-100">
@@ -461,7 +455,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
                   <th className="border border-gray-300 p-3 w-20 bg-gray-100 z-10" rowSpan="2">SHIFT</th>
                   {renderGroupHeaders()}
                   <th className="border border-gray-300 p-3 w-24 bg-gray-200 z-10 border-l-2 border-l-orange-300" rowSpan="2">TOTAL</th>
-                  <th className="border border-gray-300 p-3 w-48 bg-gray-200 z-10" rowSpan="2">OPERATOR SIGNATURE</th>
                 </tr>
                 <tr className="text-[10px] text-gray-500 uppercase tracking-wide bg-gray-50">
                   {columns.map((col, idx) => (
@@ -473,7 +466,7 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
               </thead>
               <tbody>
                 {[1, 2, 3].map(shift => (
-                  <tr key={shift} className="hover:bg-orange-50/30 transition-colors group h-16">
+                  <tr key={shift} className="hover:bg-orange-50/30 transition-colors group h-12">
                     <td className="border border-gray-300 font-black text-gray-700 bg-gray-50 left-0 z-10 group-hover:bg-orange-50/80">{shift}</td>
                     {columns.map(col => {
                       const val = col.isCustom ? shiftsData[shift]?.customValues?.[col.id] : shiftsData[shift]?.[col.key];
@@ -491,15 +484,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
                       );
                     })}
                     <td className="border border-gray-300 font-bold text-gray-800 bg-gray-100 right-0 z-10 border-l-2 border-l-orange-300">{getRowTotal(shift) || '0'}</td>
-
-                    {/* Signature Pad directly inside the table row */}
-                    <td className="border border-gray-300 p-1 bg-white relative group">
-                      <div className="w-full h-12 relative overflow-hidden rounded bg-gray-50 border border-gray-200">
-                        <SignatureCanvas ref={sigRefs[shift]} penColor="blue" canvasProps={{ className: 'absolute inset-0 w-full h-full cursor-crosshair' }} />
-                      </div>
-                      <button onClick={() => clearSignature(shift)} className="absolute top-1 right-2 text-[9px] font-bold text-red-500 opacity-0 group-hover:opacity-100 transition-opacity bg-white px-1 rounded shadow">Clear</button>
-                    </td>
-
                   </tr>
                 ))}
                 <tr className="bg-gray-200 h-14 font-black">
@@ -508,15 +492,30 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
                     <td key={col.key} className={`border border-gray-400 text-gray-800 ${col.isLastInGroup ? 'border-r-2 border-r-gray-500' : ''}`}>{getColTotal(col) || '0'}</td>
                   ))}
                   <td className="border border-gray-400 text-xl text-orange-800 bg-orange-200 right-0 z-10 border-l-2 border-l-orange-400 shadow-inner">{getGrandTotal() || '0'}</td>
-                  <td className="border border-gray-400 bg-gray-200"></td>
                 </tr>
               </tbody>
             </table>
           </div>
 
+          <div className="px-6 pb-6">
+            <h3 className="text-gray-800 font-black uppercase tracking-widest text-sm mb-4 border-b-2 border-gray-200 pb-2">Operator Signatures</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((shift) => (
+                <div key={shift} className="flex flex-col bg-gray-50 rounded-xl p-4 border border-gray-300 shadow-sm relative group">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-bold text-gray-600 text-sm tracking-wider">SHIFT {shift}</span>
+                    <button onClick={() => clearSignature(shift)} className="text-xs text-red-500 hover:text-red-700 font-bold uppercase underline">Clear</button>
+                  </div>
+                  <div className="w-full h-24 relative overflow-hidden rounded bg-white border-2 border-dashed border-gray-300 shadow-inner">
+                    <SignatureCanvas ref={sigRefs[shift]} penColor="blue" canvasProps={{ className: 'absolute inset-0 w-full h-full cursor-crosshair' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="w-full border-t border-dashed border-gray-300 my-4"></div>
 
-          {/* --- Unpoured Details Summaries --- */}
           <div className="p-6">
             <div className="overflow-x-auto mb-8 shadow-sm rounded-lg border border-gray-300">
               <table className="w-full border-collapse border border-gray-300 text-center text-sm">
