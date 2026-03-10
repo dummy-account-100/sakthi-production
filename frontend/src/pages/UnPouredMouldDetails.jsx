@@ -4,7 +4,7 @@ import { CheckCircle, AlertTriangle, Save, Loader, FileDown } from 'lucide-react
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import SignatureCanvas from 'react-signature-canvas';
-import logo from '../Assets/logo.png';
+import Header from '../components/Header';
 
 const NotificationModal = ({ data, onClose }) => {
   if (!data.show) return null;
@@ -382,175 +382,195 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-10 px-4 flex justify-center pb-24">
-      <NotificationModal data={notification} onClose={() => setNotification({ ...notification, show: false })} />
-      <div className="w-full max-w-[98%] bg-white shadow-xl rounded-2xl flex flex-col overflow-hidden">
+    <>
+      <Header />
+      <div className="min-h-screen bg-[#2d2d2d] flex flex-col items-center justify-center p-6 pb-20">
+        <NotificationModal data={notification} onClose={() => setNotification({ ...notification, show: false })} />
+        
+        <div className="bg-white w-full max-w-[100rem] shadow-xl rounded-xl flex flex-col border-4 border-gray-100">
 
-        {/* --- Header Bar (Hidden in Admin Mode) --- */}
-        {!isAdminMode && (
-          <div className="bg-gray-900 py-6 px-8 flex justify-between items-center rounded-t-2xl">
-            <div className="flex items-center gap-4">
-              <img src={logo} alt="Sakthi Auto" className="h-10 w-auto object-contain bg-white p-1 rounded" />
-              <h2 className="text-xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
+          {/* --- Main Container Header & Inputs (Hidden in Admin Mode) --- */}
+          {!isAdminMode && (
+            <div className="p-8 pb-4">
+              <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 uppercase tracking-wide flex items-center justify-center gap-2">
                 <span className="text-orange-500 text-2xl">📉</span> Un Poured Mould Details
               </h2>
-            </div>
-            <div className="flex items-center gap-3">
-              <select value={headerData.disaMachine} onChange={(e) => setHeaderData({ ...headerData, disaMachine: e.target.value })} className="bg-gray-800 text-white font-bold border-2 border-orange-500 rounded-md p-2 text-lg focus:outline-none focus:ring-2 focus:ring-orange-500">
-                <option value="DISA - I">DISA - I</option><option value="DISA - II">DISA - II</option><option value="DISA - III">DISA - III</option><option value="DISA - IV">DISA - IV</option>
-              </select>
-              <span className="text-orange-400 text-lg font-black uppercase tracking-wider">Date:</span>
-              <input type="date" value={headerData.date} onChange={(e) => setHeaderData({ ...headerData, date: e.target.value })} className="bg-white text-gray-700 font-bold border-2 border-orange-500 rounded-md p-1.5 text-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 shadow-sm" />
-            </div>
-          </div>
-        )}
 
-        {/* --- Shift Breakdown Table --- */}
-        <div className="p-6 overflow-x-auto min-h-[300px] custom-scrollbar">
-          <table className="w-full text-center border-collapse table-fixed min-w-[2450px]">
-            <thead className="bg-gray-100">
-              <tr className="text-xs text-gray-600 uppercase border-y-2 border-orange-200">
-                <th className="border border-gray-300 p-3 w-20 bg-gray-100 z-10" rowSpan="2">SHIFT</th>
-                {renderGroupHeaders()}
-                <th className="border border-gray-300 p-3 w-24 bg-gray-200 z-10 border-l-2 border-l-orange-300" rowSpan="2">TOTAL</th>
-                <th className="border border-gray-300 p-3 w-48 bg-gray-200 z-10" rowSpan="2">OPERATOR SIGNATURE</th>
-              </tr>
-              <tr className="text-[10px] text-gray-500 uppercase tracking-wide bg-gray-50">
-                {columns.map((col, idx) => (
-                  <th key={col.key} className={`border border-gray-300 p-2 align-bottom whitespace-pre-wrap leading-snug w-20 ${col.isLastInGroup ? 'border-r-2 border-r-gray-400' : ''}`}>
-                    {col.label}
-                  </th>
+              <div className="flex justify-end items-center gap-6 border-b-2 border-gray-200 pb-4">
+                <div className="w-40">
+                  <label className="font-bold text-gray-700 block mb-1 text-sm">DISA-</label>
+                  <select 
+                    value={headerData.disaMachine} 
+                    onChange={(e) => setHeaderData({ ...headerData, disaMachine: e.target.value })} 
+                    className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm font-semibold bg-white text-gray-800"
+                  >
+                    <option value="DISA - I">DISA - I</option>
+                    <option value="DISA - II">DISA - II</option>
+                    <option value="DISA - III">DISA - III</option>
+                    <option value="DISA - IV">DISA - IV</option>
+                  </select>
+                </div>
+                
+                <div className="w-48">
+                  <label className="font-bold text-gray-700 block mb-1 text-sm">DATE :</label>
+                  <input 
+                    type="date" 
+                    value={headerData.date} 
+                    onChange={(e) => setHeaderData({ ...headerData, date: e.target.value })} 
+                    className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm font-semibold text-gray-800 bg-white" 
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- Shift Breakdown Table --- */}
+          <div className="p-6 overflow-x-auto min-h-[300px] custom-scrollbar">
+            <table className="w-full text-center border-collapse table-fixed min-w-[2450px]">
+              <thead className="bg-gray-100">
+                <tr className="text-xs text-gray-600 uppercase border-y-2 border-orange-200">
+                  <th className="border border-gray-300 p-3 w-20 bg-gray-100 z-10" rowSpan="2">SHIFT</th>
+                  {renderGroupHeaders()}
+                  <th className="border border-gray-300 p-3 w-24 bg-gray-200 z-10 border-l-2 border-l-orange-300" rowSpan="2">TOTAL</th>
+                  <th className="border border-gray-300 p-3 w-48 bg-gray-200 z-10" rowSpan="2">OPERATOR SIGNATURE</th>
+                </tr>
+                <tr className="text-[10px] text-gray-500 uppercase tracking-wide bg-gray-50">
+                  {columns.map((col, idx) => (
+                    <th key={col.key} className={`border border-gray-300 p-2 align-bottom whitespace-pre-wrap leading-snug w-20 ${col.isLastInGroup ? 'border-r-2 border-r-gray-400' : ''}`}>
+                      {col.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[1, 2, 3].map(shift => (
+                  <tr key={shift} className="hover:bg-orange-50/30 transition-colors group h-16">
+                    <td className="border border-gray-300 font-black text-gray-700 bg-gray-50 left-0 z-10 group-hover:bg-orange-50/80">{shift}</td>
+                    {columns.map(col => {
+                      const val = col.isCustom ? shiftsData[shift]?.customValues?.[col.id] : shiftsData[shift]?.[col.key];
+                      return (
+                        <td key={col.key} className={`border border-gray-300 p-0 relative ${col.isLastInGroup ? 'border-r-2 border-r-gray-400' : ''}`}>
+                          <input
+                            type="number"
+                            min="0"
+                            value={val || ''}
+                            onChange={(e) => handleInputChange(shift, col.key, e.target.value, col.isCustom, col.id)}
+                            onFocus={(e) => e.target.select()}
+                            className="absolute inset-0 w-full h-full text-center text-sm font-bold text-gray-800 bg-transparent outline-none focus:bg-orange-100 focus:ring-inset focus:ring-2 focus:ring-orange-500 [&::-webkit-inner-spin-button]:appearance-none transition-colors"
+                          />
+                        </td>
+                      );
+                    })}
+                    <td className="border border-gray-300 font-bold text-gray-800 bg-gray-100 right-0 z-10 border-l-2 border-l-orange-300">{getRowTotal(shift) || '0'}</td>
+
+                    {/* Signature Pad directly inside the table row */}
+                    <td className="border border-gray-300 p-1 bg-white relative group">
+                      <div className="w-full h-12 relative overflow-hidden rounded bg-gray-50 border border-gray-200">
+                        <SignatureCanvas ref={sigRefs[shift]} penColor="blue" canvasProps={{ className: 'absolute inset-0 w-full h-full cursor-crosshair' }} />
+                      </div>
+                      <button onClick={() => clearSignature(shift)} className="absolute top-1 right-2 text-[9px] font-bold text-red-500 opacity-0 group-hover:opacity-100 transition-opacity bg-white px-1 rounded shadow">Clear</button>
+                    </td>
+
+                  </tr>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[1, 2, 3].map(shift => (
-                <tr key={shift} className="hover:bg-orange-50/30 transition-colors group h-16">
-                  <td className="border border-gray-300 font-black text-gray-700 bg-gray-50 left-0 z-10 group-hover:bg-orange-50/80">{shift}</td>
-                  {columns.map(col => {
-                    const val = col.isCustom ? shiftsData[shift]?.customValues?.[col.id] : shiftsData[shift]?.[col.key];
+                <tr className="bg-gray-200 h-14 font-black">
+                  <td className="border border-gray-400 text-gray-800 left-0 z-10 bg-gray-200">TOTAL</td>
+                  {columns.map(col => (
+                    <td key={col.key} className={`border border-gray-400 text-gray-800 ${col.isLastInGroup ? 'border-r-2 border-r-gray-500' : ''}`}>{getColTotal(col) || '0'}</td>
+                  ))}
+                  <td className="border border-gray-400 text-xl text-orange-800 bg-orange-200 right-0 z-10 border-l-2 border-l-orange-400 shadow-inner">{getGrandTotal() || '0'}</td>
+                  <td className="border border-gray-400 bg-gray-200"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="w-full border-t border-dashed border-gray-300 my-4"></div>
+
+          {/* --- Unpoured Details Summaries --- */}
+          <div className="p-6">
+            <div className="overflow-x-auto mb-8 shadow-sm rounded-lg border border-gray-300">
+              <table className="w-full border-collapse border border-gray-300 text-center text-sm">
+                <thead className="bg-gray-100 font-bold text-gray-700 uppercase">
+                  <tr>
+                    <th className="border border-gray-300 p-3 w-16">DISA</th>
+                    <th className="border border-gray-300 p-3">MOULD COUNTER<br />CLOSE</th>
+                    <th className="border border-gray-300 p-3">MOULD COUNTER<br />OPEN</th>
+                    <th className="border border-gray-300 p-3">PRODUCED<br />MOULD</th>
+                    <th className="border border-gray-300 p-3">POURED<br />MOULD</th>
+                    <th className="border border-gray-300 p-3">UNPOURED<br />MOULD</th>
+                    <th className="border border-gray-300 p-3 w-16">%</th>
+                    <th className="border border-gray-300 p-3">DELAYS</th>
+                    <th className="border border-gray-300 p-3">PRODUCED<br />M/HR</th>
+                    <th className="border border-gray-300 p-3">POURED<br />M/HR</th>
+                    <th className="border border-gray-300 p-3">RUNNING<br />HOURS</th>
+                  </tr>
+                </thead>
+                <tbody className="text-gray-800">
+                  {['I', 'II', 'III', 'IV'].map((disaName) => {
+                    const row = getDisaData(disaName);
                     return (
-                      <td key={col.key} className={`border border-gray-300 p-0 relative ${col.isLastInGroup ? 'border-r-2 border-r-gray-400' : ''}`}>
-                        <input
-                          type="number"
-                          min="0"
-                          value={val || ''}
-                          onChange={(e) => handleInputChange(shift, col.key, e.target.value, col.isCustom, col.id)}
-                          onFocus={(e) => e.target.select()}
-                          className="absolute inset-0 w-full h-full text-center text-sm font-bold text-gray-800 bg-transparent outline-none focus:bg-orange-100 focus:ring-inset focus:ring-2 focus:ring-orange-500 [&::-webkit-inner-spin-button]:appearance-none transition-colors"
-                        />
-                      </td>
+                      <tr key={disaName} className="hover:bg-gray-50 transition-colors">
+                        <td className="border border-gray-300 p-3 font-bold bg-gray-50">{disaName}</td>
+                        <td className="border border-gray-300 p-3">{row.mouldCounterClose ?? "-"}</td>
+                        <td className="border border-gray-300 p-3">{row.mouldCounterOpen ?? "-"}</td>
+                        <td className="border border-gray-300 p-3">{row.producedMould ?? "-"}</td>
+                        <td className="border border-gray-300 p-3">{row.pouredMould ?? "-"}</td>
+                        <td className="border border-gray-300 p-3">{row.unpouredMould ?? "-"}</td>
+                        <td className="border border-gray-300 p-3 font-medium text-blue-600">{row.percentage !== undefined && row.percentage !== "" ? `${row.percentage}%` : "-"}</td>
+                        <td className="border border-gray-300 p-3 text-red-500">{row.delays ?? "-"}</td>
+                        <td className="border border-gray-300 p-3">{row.producedMhr ?? "-"}</td>
+                        <td className="border border-gray-300 p-3">{row.pouredMhr ?? "-"}</td>
+                        <td className="border border-gray-300 p-3 font-medium text-green-600">{row.runningHours ?? "-"}</td>
+                      </tr>
                     );
                   })}
-                  <td className="border border-gray-300 font-bold text-gray-800 bg-gray-100 right-0 z-10 border-l-2 border-l-orange-300">{getRowTotal(shift) || '0'}</td>
+                  <tr className="font-black bg-gray-200 text-gray-900">
+                    <td className="border border-gray-400 p-3 text-left">TOTAL</td>
+                    <td className="border border-gray-400 p-3"></td><td className="border border-gray-400 p-3"></td>
+                    <td className="border border-gray-400 p-3">{totalProduced}</td><td className="border border-gray-400 p-3">{totalPoured}</td>
+                    <td className="border border-gray-400 p-3 text-orange-600">{totalUnpoured}</td><td className="border border-gray-400 p-3">{totalPercentage}%</td>
+                    <td className="border border-gray-400 p-3 text-red-600">{totalDelays}</td><td className="border border-gray-400 p-3"></td><td className="border border-gray-400 p-3"></td>
+                    <td className="border border-gray-400 p-3 text-green-700">{totalRunningHours}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
-                  {/* Signature Pad directly inside the table row */}
-                  <td className="border border-gray-300 p-1 bg-white relative group">
-                    <div className="w-full h-12 relative overflow-hidden rounded bg-gray-50 border border-gray-200">
-                      <SignatureCanvas ref={sigRefs[shift]} penColor="blue" canvasProps={{ className: 'absolute inset-0 w-full h-full cursor-crosshair' }} />
-                    </div>
-                    <button onClick={() => clearSignature(shift)} className="absolute top-1 right-2 text-[9px] font-bold text-red-500 opacity-0 group-hover:opacity-100 transition-opacity bg-white px-1 rounded shadow">Clear</button>
-                  </td>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <table className="w-full border-collapse border border-gray-300 text-center text-sm shadow-sm rounded-lg overflow-hidden">
+                <thead className="bg-gray-100 font-bold text-gray-700">
+                  <tr><th colSpan="5" className="border border-gray-300 p-3 text-left">NO. OF MOULDS/DAY</th></tr>
+                  <tr><th className="border border-gray-300 p-2 bg-gray-50 w-32"></th><th className="border border-gray-300 p-2">DISA 1</th><th className="border border-gray-300 p-2">DISA 2</th><th className="border border-gray-300 p-2">DISA 3</th><th className="border border-gray-300 p-2">DISA 4</th></tr>
+                </thead>
+                <tbody className="text-gray-800">
+                  <tr><td className="border border-gray-300 p-3 font-bold bg-gray-50 text-left text-xs uppercase tracking-wider">MOULD / DAY</td><td className="border border-gray-300 p-3">{getDisaData('I').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('II').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('III').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('IV').producedMould ?? "0"}</td></tr>
+                  <tr className="font-black bg-gray-200"><td className="border border-gray-400 p-3 text-left">TOTAL</td><td className="border border-gray-400 p-3 text-center text-lg text-orange-700" colSpan="4">{totalProduced}</td></tr>
+                </tbody>
+              </table>
 
-                </tr>
-              ))}
-              <tr className="bg-gray-200 h-14 font-black">
-                <td className="border border-gray-400 text-gray-800 left-0 z-10 bg-gray-200">TOTAL</td>
-                {columns.map(col => (
-                  <td key={col.key} className={`border border-gray-400 text-gray-800 ${col.isLastInGroup ? 'border-r-2 border-r-gray-500' : ''}`}>{getColTotal(col) || '0'}</td>
-                ))}
-                <td className="border border-gray-400 text-xl text-orange-800 bg-orange-200 right-0 z-10 border-l-2 border-l-orange-400 shadow-inner">{getGrandTotal() || '0'}</td>
-                <td className="border border-gray-400 bg-gray-200"></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="w-full border-t border-dashed border-gray-300 my-4"></div>
-
-        {/* --- Unpoured Details Summaries --- */}
-        <div className="p-6">
-          <div className="overflow-x-auto mb-8 shadow-sm rounded-lg border border-gray-300">
-            <table className="w-full border-collapse border border-gray-300 text-center text-sm">
-              <thead className="bg-gray-100 font-bold text-gray-700 uppercase">
-                <tr>
-                  <th className="border border-gray-300 p-3 w-16">DISA</th>
-                  <th className="border border-gray-300 p-3">MOULD COUNTER<br />CLOSE</th>
-                  <th className="border border-gray-300 p-3">MOULD COUNTER<br />OPEN</th>
-                  <th className="border border-gray-300 p-3">PRODUCED<br />MOULD</th>
-                  <th className="border border-gray-300 p-3">POURED<br />MOULD</th>
-                  <th className="border border-gray-300 p-3">UNPOURED<br />MOULD</th>
-                  <th className="border border-gray-300 p-3 w-16">%</th>
-                  <th className="border border-gray-300 p-3">DELAYS</th>
-                  <th className="border border-gray-300 p-3">PRODUCED<br />M/HR</th>
-                  <th className="border border-gray-300 p-3">POURED<br />M/HR</th>
-                  <th className="border border-gray-300 p-3">RUNNING<br />HOURS</th>
-                </tr>
-              </thead>
-              <tbody className="text-gray-800">
-                {['I', 'II', 'III', 'IV'].map((disaName) => {
-                  const row = getDisaData(disaName);
-                  return (
-                    <tr key={disaName} className="hover:bg-gray-50 transition-colors">
-                      <td className="border border-gray-300 p-3 font-bold bg-gray-50">{disaName}</td>
-                      <td className="border border-gray-300 p-3">{row.mouldCounterClose ?? "-"}</td>
-                      <td className="border border-gray-300 p-3">{row.mouldCounterOpen ?? "-"}</td>
-                      <td className="border border-gray-300 p-3">{row.producedMould ?? "-"}</td>
-                      <td className="border border-gray-300 p-3">{row.pouredMould ?? "-"}</td>
-                      <td className="border border-gray-300 p-3">{row.unpouredMould ?? "-"}</td>
-                      <td className="border border-gray-300 p-3 font-medium text-blue-600">{row.percentage !== undefined && row.percentage !== "" ? `${row.percentage}%` : "-"}</td>
-                      <td className="border border-gray-300 p-3 text-red-500">{row.delays ?? "-"}</td>
-                      <td className="border border-gray-300 p-3">{row.producedMhr ?? "-"}</td>
-                      <td className="border border-gray-300 p-3">{row.pouredMhr ?? "-"}</td>
-                      <td className="border border-gray-300 p-3 font-medium text-green-600">{row.runningHours ?? "-"}</td>
-                    </tr>
-                  );
-                })}
-                <tr className="font-black bg-gray-200 text-gray-900">
-                  <td className="border border-gray-400 p-3 text-left">TOTAL</td>
-                  <td className="border border-gray-400 p-3"></td><td className="border border-gray-400 p-3"></td>
-                  <td className="border border-gray-400 p-3">{totalProduced}</td><td className="border border-gray-400 p-3">{totalPoured}</td>
-                  <td className="border border-gray-400 p-3 text-orange-600">{totalUnpoured}</td><td className="border border-gray-400 p-3">{totalPercentage}%</td>
-                  <td className="border border-gray-400 p-3 text-red-600">{totalDelays}</td><td className="border border-gray-400 p-3"></td><td className="border border-gray-400 p-3"></td>
-                  <td className="border border-gray-400 p-3 text-green-700">{totalRunningHours}</td>
-                </tr>
-              </tbody>
-            </table>
+              <table className="w-full border-collapse border border-gray-300 text-center text-sm shadow-sm rounded-lg overflow-hidden">
+                <thead className="bg-gray-100 font-bold text-gray-700">
+                  <tr><th colSpan="5" className="border border-gray-300 p-3 text-left">NO. OF QUANTITY/DAY</th></tr>
+                  <tr><th className="border border-gray-300 p-2 bg-gray-50 w-32"></th><th className="border border-gray-300 p-2">DISA 1</th><th className="border border-gray-300 p-2">DISA 2</th><th className="border border-gray-300 p-2">DISA 3</th><th className="border border-gray-300 p-2">DISA 4</th></tr>
+                </thead>
+                <tbody className="text-gray-800">
+                  <tr><td className="border border-gray-300 p-3 font-bold bg-gray-50 text-left text-xs uppercase tracking-wider">QTY / DAY</td><td className="border border-gray-300 p-3">{getDisaData('I').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('II').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('III').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('IV').pouredMould ?? "0"}</td></tr>
+                  <tr className="font-black bg-gray-200"><td className="border border-gray-400 p-3 text-left">TOTAL</td><td className="border border-gray-400 p-3 text-center text-lg text-orange-700" colSpan="4">{totalPoured}</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <table className="w-full border-collapse border border-gray-300 text-center text-sm shadow-sm rounded-lg overflow-hidden">
-              <thead className="bg-gray-100 font-bold text-gray-700">
-                <tr><th colSpan="5" className="border border-gray-300 p-3 text-left">NO. OF MOULDS/DAY</th></tr>
-                <tr><th className="border border-gray-300 p-2 bg-gray-50 w-32"></th><th className="border border-gray-300 p-2">DISA 1</th><th className="border border-gray-300 p-2">DISA 2</th><th className="border border-gray-300 p-2">DISA 3</th><th className="border border-gray-300 p-2">DISA 4</th></tr>
-              </thead>
-              <tbody className="text-gray-800">
-                <tr><td className="border border-gray-300 p-3 font-bold bg-gray-50 text-left text-xs uppercase tracking-wider">MOULD / DAY</td><td className="border border-gray-300 p-3">{getDisaData('I').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('II').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('III').producedMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('IV').producedMould ?? "0"}</td></tr>
-                <tr className="font-black bg-gray-200"><td className="border border-gray-400 p-3 text-left">TOTAL</td><td className="border border-gray-400 p-3 text-center text-lg text-orange-700" colSpan="4">{totalProduced}</td></tr>
-              </tbody>
-            </table>
-
-            <table className="w-full border-collapse border border-gray-300 text-center text-sm shadow-sm rounded-lg overflow-hidden">
-              <thead className="bg-gray-100 font-bold text-gray-700">
-                <tr><th colSpan="5" className="border border-gray-300 p-3 text-left">NO. OF QUANTITY/DAY</th></tr>
-                <tr><th className="border border-gray-300 p-2 bg-gray-50 w-32"></th><th className="border border-gray-300 p-2">DISA 1</th><th className="border border-gray-300 p-2">DISA 2</th><th className="border border-gray-300 p-2">DISA 3</th><th className="border border-gray-300 p-2">DISA 4</th></tr>
-              </thead>
-              <tbody className="text-gray-800">
-                <tr><td className="border border-gray-300 p-3 font-bold bg-gray-50 text-left text-xs uppercase tracking-wider">QTY / DAY</td><td className="border border-gray-300 p-3">{getDisaData('I').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('II').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('III').pouredMould ?? "0"}</td><td className="border border-gray-300 p-3">{getDisaData('IV').pouredMould ?? "0"}</td></tr>
-                <tr className="font-black bg-gray-200"><td className="border border-gray-400 p-3 text-left">TOTAL</td><td className="border border-gray-400 p-3 text-center text-lg text-orange-700" colSpan="4">{totalPoured}</td></tr>
-              </tbody>
-            </table>
+          <div id="checklist-footer" className="bg-slate-100 p-8 border-t border-gray-200 bottom-0 z-20 flex justify-end gap-6 rounded-b-xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <button onClick={generatePDF} className="bg-white border-2 border-gray-900 text-gray-900 hover:bg-gray-200 font-bold py-3 px-6 rounded-lg shadow-md uppercase flex items-center gap-2 mt-auto transition-colors"><FileDown size={20} /> PDF</button>
+            <button onClick={handleSave} disabled={loading} className="bg-gray-900 hover:bg-orange-600 text-white font-bold py-3 px-12 rounded-lg shadow-lg uppercase mt-auto transition-colors flex items-center gap-3">{loading ? <Loader className="animate-spin w-5 h-5" /> : <Save className="w-5 h-5" />}{loading ? 'Saving...' : 'Save All Shifts'}</button>
           </div>
-        </div>
 
-        <div id="checklist-footer" className="bg-slate-100 p-8 border-t border-gray-200 bottom-0 z-20 flex justify-end gap-6 rounded-b-2xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-          <button onClick={generatePDF} className="bg-white border-2 border-gray-900 text-gray-900 hover:bg-gray-200 font-bold py-3 px-6 rounded-lg shadow-md uppercase flex items-center gap-2 mt-auto transition-colors"><FileDown size={20} /> PDF</button>
-          <button onClick={handleSave} disabled={loading} className="bg-gray-900 hover:bg-orange-600 text-white font-bold py-3 px-12 rounded-lg shadow-lg uppercase mt-auto transition-colors flex items-center gap-3">{loading ? <Loader className="animate-spin w-5 h-5" /> : <Save className="w-5 h-5" />}{loading ? 'Saving...' : 'Save All Shifts'}</button>
         </div>
-
+        <style dangerouslySetInnerHTML={{ __html: ` .custom-scrollbar::-webkit-scrollbar { height: 12px; } .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; } ` }} />
       </div>
-      <style dangerouslySetInnerHTML={{ __html: ` .custom-scrollbar::-webkit-scrollbar { height: 12px; } .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; } ` }} />
-    </div>
+    </>
   );
 };
 

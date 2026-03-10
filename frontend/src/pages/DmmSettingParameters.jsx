@@ -4,7 +4,7 @@ import { CheckCircle, AlertTriangle, Save, Loader, FileDown, PlusCircle, Trash2 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import SignatureCanvas from 'react-signature-canvas';
-import logo from '../Assets/logo.png';
+import Header from '../components/Header';
 
 const NotificationModal = ({ data, onClose }) => {
   if (!data.show) return null;
@@ -64,7 +64,7 @@ const createEmptyRow = () => {
 
 const DmmSettingParameters = () => {
   const [headerData, setHeaderData] = useState({ date: getShiftDate(), disaMachine: 'DISA - I' });
-  const [allColumns, setAllColumns] = useState([...baseColumns]); // Holds Base + Custom columns
+  const [allColumns, setAllColumns] = useState([...baseColumns]);
 
   const [shiftsMeta, setShiftsMeta] = useState({
     1: { operator: '', supervisor: '', supervisorSignature: '', isIdle: false },
@@ -111,7 +111,6 @@ const DmmSettingParameters = () => {
       const loadedData = { 1: [], 2: [], 3: [] };
       [1, 2, 3].forEach(shift => {
         if (res.data.shiftsData[shift] && res.data.shiftsData[shift].length > 0) {
-          // Map DB rows to UI rows mapping base + custom fields
           loadedData[shift] = res.data.shiftsData[shift].map(dbRow => {
             const uiRow = { id: crypto.randomUUID(), customValues: dbRow.customValues || {} };
             baseColumns.forEach(c => uiRow[c.key] = dbRow[c.key] || '');
@@ -242,117 +241,139 @@ const DmmSettingParameters = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-10 px-4 flex justify-center pb-24">
-      <NotificationModal data={notification} onClose={() => setNotification({ ...notification, show: false })} />
-      <div className="w-full max-w-[1700px] bg-white shadow-xl rounded-2xl flex flex-col overflow-hidden">
+    <>
+      <Header />
+      <div className="min-h-screen bg-[#2d2d2d] flex flex-col items-center justify-center p-6 pb-20">
+        <NotificationModal data={notification} onClose={() => setNotification({ ...notification, show: false })} />
+        
+        <div className="bg-white w-full max-w-[100rem] rounded-xl p-8 shadow-2xl flex flex-col border-4 border-gray-100">
+          
+          <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 uppercase tracking-wide flex items-center justify-center gap-2">
+            <span className="text-orange-500 text-2xl">⚙️</span> DMM Setting Parameters
+          </h2>
 
-        <div className="bg-gray-900 py-6 px-8 flex justify-between items-center rounded-t-2xl">
-          <div className="flex items-center gap-4">
-            <img src={logo} alt="Sakthi Auto" className="h-10 w-auto object-contain bg-white p-1 rounded" />
-            <h2 className="text-xl font-bold text-white uppercase tracking-wider flex items-center gap-2"><span className="text-orange-500 text-2xl">⚙️</span> DMM Setting Parameters</h2>
+          <div className="flex justify-end items-center gap-6 mb-8 border-b-2 border-gray-200 pb-4">
+            <div className="w-40">
+              <label className="font-bold text-gray-700 block mb-1 text-sm">DISA-</label>
+              <select 
+                value={headerData.disaMachine} 
+                onChange={(e) => setHeaderData({ ...headerData, disaMachine: e.target.value })} 
+                className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm font-semibold bg-white text-gray-800"
+              >
+                <option value="DISA - I">DISA - I</option>
+                <option value="DISA - II">DISA - II</option>
+                <option value="DISA - III">DISA - III</option>
+                <option value="DISA - IV">DISA - IV</option>
+                <option value="DISA - V">DISA - V</option>
+                <option value="DISA - VI">DISA - VI</option>
+              </select>
+            </div>
+            
+            <div className="w-48">
+              <label className="font-bold text-gray-700 block mb-1 text-sm">DATE :</label>
+              <input 
+                type="date" 
+                value={headerData.date} 
+                onChange={(e) => setHeaderData({ ...headerData, date: e.target.value })} 
+                className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm font-semibold text-gray-800 bg-white" 
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <select value={headerData.disaMachine} onChange={(e) => setHeaderData({ ...headerData, disaMachine: e.target.value })} className="bg-gray-800 text-white font-bold border-2 border-orange-500 rounded-md p-2 text-lg focus:outline-none focus:ring-2 focus:ring-orange-500">
-              <option value="DISA - I">DISA - I</option><option value="DISA - II">DISA - II</option><option value="DISA - III">DISA - III</option><option value="DISA - IV">DISA - IV</option><option value="DISA - V">DISA - V</option><option value="DISA - VI">DISA - VI</option>
-            </select>
-            <span className="text-orange-400 text-lg font-black uppercase tracking-wider">Date:</span>
-            <input type="date" value={headerData.date} onChange={(e) => setHeaderData({ ...headerData, date: e.target.value })} className="bg-white text-gray-700 font-bold border-2 border-orange-500 rounded-md p-1.5 text-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 shadow-sm" />
-          </div>
-        </div>
 
-        <div className="p-6 overflow-x-auto min-h-[400px] custom-scrollbar">
-          <table className="w-full min-w-max border-collapse text-xs text-center table-fixed">
-            <thead className="bg-gray-100">
-              <tr className="text-[10px] text-gray-600 uppercase tracking-wide border-y-2 border-orange-200">
-                <th className="border border-gray-300 p-2 w-10 sticky left-0 bg-gray-100 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]">S.No</th>
-                {allColumns.map((col, idx) => (
-                  <th key={idx} className={`border border-gray-300 p-2 align-middle whitespace-pre-wrap ${col.width}`}>{col.label}</th>
-                ))}
-                <th className="border border-gray-300 p-2 w-12 sticky right-0 bg-gray-200 z-10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.3)]">DEL</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm font-semibold text-slate-800">
-              {[1, 2, 3].map(shift => {
-                const isIdle = shiftsMeta[shift].isIdle;
-                return (
-                  <React.Fragment key={`shift-${shift}`}>
-                    <tr className="bg-orange-50/50 border-y-2 border-orange-200">
-                      <td colSpan={allColumns.length + 2} className="p-3 text-left sticky left-0 z-0">
-                        <div className="flex items-center justify-between w-[850px]">
-                          <div className="flex items-center gap-6">
-                            <span className="font-black text-gray-800 text-lg">SHIFT {shift}</span>
-                            <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded border-2 border-gray-300 hover:border-orange-500 transition-colors shadow-sm">
-                              <input type="checkbox" checked={isIdle} onChange={(e) => handleMetaChange(shift, 'isIdle', e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer" />
-                              <span className="text-xs font-bold text-gray-700 uppercase">Line Idle</span>
-                            </label>
-                            <div className={`flex items-center gap-2 transition-opacity ${isIdle ? 'opacity-40 pointer-events-none' : ''}`}>
-                              <span className="text-xs font-bold text-gray-600 uppercase">Operator:</span>
-                              <select value={shiftsMeta[shift].operator} onChange={(e) => handleMetaChange(shift, 'operator', e.target.value)} className="p-1.5 rounded border-2 border-gray-300 bg-white text-xs font-bold outline-none focus:border-orange-500">
-                                <option value="">Select...</option>{dropdowns.operators.map((o, i) => <option key={i} value={o.OperatorName}>{o.OperatorName}</option>)}
-                              </select>
+          <div className="overflow-x-auto min-h-[400px] custom-scrollbar">
+            <table className="w-full min-w-max border-collapse text-xs text-center table-fixed">
+              <thead className="bg-gray-100">
+                <tr className="text-[10px] text-gray-600 uppercase tracking-wide border-y-2 border-orange-200">
+                  <th className="border border-gray-300 p-2 w-10 sticky left-0 bg-gray-100 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]">S.No</th>
+                  {allColumns.map((col, idx) => (
+                    <th key={idx} className={`border border-gray-300 p-2 align-middle whitespace-pre-wrap ${col.width}`}>{col.label}</th>
+                  ))}
+                  <th className="border border-gray-300 p-2 w-12 sticky right-0 bg-gray-200 z-10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.3)]">DEL</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm font-semibold text-slate-800">
+                {[1, 2, 3].map(shift => {
+                  const isIdle = shiftsMeta[shift].isIdle;
+                  return (
+                    <React.Fragment key={`shift-${shift}`}>
+                      <tr className="bg-orange-50/50 border-y-2 border-orange-200">
+                        <td colSpan={allColumns.length + 2} className="p-3 text-left sticky left-0 z-0">
+                          <div className="flex items-center justify-between w-[850px]">
+                            <div className="flex items-center gap-6">
+                              <span className="font-black text-gray-800 text-lg">SHIFT {shift}</span>
+                              <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded border-2 border-gray-300 hover:border-orange-500 transition-colors shadow-sm">
+                                <input type="checkbox" checked={isIdle} onChange={(e) => handleMetaChange(shift, 'isIdle', e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer" />
+                                <span className="text-xs font-bold text-gray-700 uppercase">Line Idle</span>
+                              </label>
+                              <div className={`flex items-center gap-2 transition-opacity ${isIdle ? 'opacity-40 pointer-events-none' : ''}`}>
+                                <span className="text-xs font-bold text-gray-600 uppercase">Operator:</span>
+                                <select value={shiftsMeta[shift].operator} onChange={(e) => handleMetaChange(shift, 'operator', e.target.value)} className="p-1.5 rounded border-2 border-gray-300 bg-white text-xs font-bold outline-none focus:border-orange-500">
+                                  <option value="">Select...</option>{dropdowns.operators.map((o, i) => <option key={i} value={o.OperatorName}>{o.OperatorName}</option>)}
+                                </select>
+                              </div>
+                              <div className={`flex items-center gap-2 transition-opacity ${isIdle ? 'opacity-40 pointer-events-none' : ''}`}>
+                                <span className="text-xs font-bold text-gray-600 uppercase">Supervisor:</span>
+                                <select value={shiftsMeta[shift].supervisor} onChange={(e) => handleMetaChange(shift, 'supervisor', e.target.value)} className="p-1.5 rounded border-2 border-gray-300 bg-white text-xs font-bold outline-none focus:border-orange-500">
+                                  <option value="">Select...</option>{dropdowns.supervisors.map((s, i) => <option key={i} value={s.supervisorName}>{s.supervisorName}</option>)}
+                                </select>
+                              </div>
                             </div>
-                            <div className={`flex items-center gap-2 transition-opacity ${isIdle ? 'opacity-40 pointer-events-none' : ''}`}>
-                              <span className="text-xs font-bold text-gray-600 uppercase">Supervisor:</span>
-                              <select value={shiftsMeta[shift].supervisor} onChange={(e) => handleMetaChange(shift, 'supervisor', e.target.value)} className="p-1.5 rounded border-2 border-gray-300 bg-white text-xs font-bold outline-none focus:border-orange-500">
-                                <option value="">Select...</option>{dropdowns.supervisors.map((s, i) => <option key={i} value={s.supervisorName}>{s.supervisorName}</option>)}
-                              </select>
-                            </div>
+                            <button onClick={() => addRow(shift)} disabled={isIdle} className={`flex items-center gap-1 border-2 px-3 py-1.5 rounded transition-all shadow-sm text-xs font-bold uppercase ${isIdle ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed' : 'bg-white border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-white'}`}>
+                              <PlusCircle className="w-4 h-4" /> Add Row
+                            </button>
                           </div>
-                          <button onClick={() => addRow(shift)} disabled={isIdle} className={`flex items-center gap-1 border-2 px-3 py-1.5 rounded transition-all shadow-sm text-xs font-bold uppercase ${isIdle ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed' : 'bg-white border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-white'}`}>
-                            <PlusCircle className="w-4 h-4" /> Add Row
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    {shiftsData[shift].map((row, index) => (
-                      <tr key={row.id} className={`h-12 transition-all ${isIdle ? 'bg-gray-100/50 opacity-40 grayscale pointer-events-none select-none' : 'hover:bg-orange-50/20 group'}`}>
-                        <td className={`border border-gray-300 font-bold text-gray-600 sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${isIdle ? 'bg-gray-200/50' : 'bg-gray-50 group-hover:bg-orange-50/80'}`}>{index + 1}</td>
-                        {allColumns.map(col => {
-                          const val = col.isCustom ? row.customValues[col.id] : row[col.key];
-                          return (
-                            <td key={col.key} className="border border-gray-300 p-0 relative">
-                              <input
-                                type={col.inputType} step={col.step || undefined} disabled={isIdle}
-                                value={isIdle ? '' : (val || '')}
-                                onChange={(e) => handleInputChange(shift, row.id, col.key, e.target.value, col.isCustom, col.id)}
-                                className={`absolute inset-0 w-full h-full text-center text-sm font-bold text-gray-800 outline-none px-1 ${isIdle ? 'bg-transparent cursor-not-allowed' : 'bg-transparent focus:bg-orange-100 focus:ring-inset focus:ring-2 focus:ring-orange-500'}`}
-                              />
-                            </td>
-                          )
-                        })}
-                        <td className={`border border-gray-300 sticky right-0 z-10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] ${isIdle ? 'bg-gray-200/50' : 'bg-gray-50 group-hover:bg-orange-50/80'}`}>
-                          <button onClick={() => removeRow(shift, row.id)} disabled={isIdle} className="text-gray-400 hover:text-red-600 transition-colors mx-auto block disabled:opacity-0"><Trash2 className="w-5 h-5" /></button>
                         </td>
                       </tr>
-                    ))}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+                      {shiftsData[shift].map((row, index) => (
+                        <tr key={row.id} className={`h-12 transition-all ${isIdle ? 'bg-gray-100/50 opacity-40 grayscale pointer-events-none select-none' : 'hover:bg-orange-50/20 group'}`}>
+                          <td className={`border border-gray-300 font-bold text-gray-600 sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${isIdle ? 'bg-gray-200/50' : 'bg-gray-50 group-hover:bg-orange-50/80'}`}>{index + 1}</td>
+                          {allColumns.map(col => {
+                            const val = col.isCustom ? row.customValues[col.id] : row[col.key];
+                            return (
+                              <td key={col.key} className="border border-gray-300 p-0 relative">
+                                <input
+                                  type={col.inputType} step={col.step || undefined} disabled={isIdle}
+                                  value={isIdle ? '' : (val || '')}
+                                  onChange={(e) => handleInputChange(shift, row.id, col.key, e.target.value, col.isCustom, col.id)}
+                                  className={`absolute inset-0 w-full h-full text-center text-sm font-bold text-gray-800 outline-none px-1 ${isIdle ? 'bg-transparent cursor-not-allowed' : 'bg-transparent focus:bg-orange-100 focus:ring-inset focus:ring-2 focus:ring-orange-500'}`}
+                                />
+                              </td>
+                            )
+                          })}
+                          <td className={`border border-gray-300 sticky right-0 z-10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] ${isIdle ? 'bg-gray-200/50' : 'bg-gray-50 group-hover:bg-orange-50/80'}`}>
+                            <button onClick={() => removeRow(shift, row.id)} disabled={isIdle} className="text-gray-400 hover:text-red-600 transition-colors mx-auto block disabled:opacity-0"><Trash2 className="w-5 h-5" /></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div id="checklist-footer" className="bg-slate-100 p-8 border-t border-gray-200 mt-6 flex justify-end gap-6 rounded-xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <button onClick={generatePDF} className="bg-white border-2 border-gray-900 text-gray-900 hover:bg-gray-200 font-bold py-3 px-6 rounded-lg shadow-md uppercase flex items-center gap-2 mt-auto transition-colors"><FileDown size={20} /> PDF</button>
+            <button onClick={handleSave} disabled={loading} className="bg-gray-900 hover:bg-orange-600 text-white font-bold py-3 px-12 rounded-lg shadow-lg uppercase mt-auto transition-colors flex items-center gap-3">
+              {loading ? <Loader className="animate-spin w-5 h-5" /> : <Save className="w-5 h-5" />}{loading ? 'Saving...' : 'Send to Supervisor'}
+            </button>
+          </div>
+
         </div>
 
-        <div id="checklist-footer" className="bg-slate-100 p-8 border-t border-gray-200 sticky bottom-0 z-20 flex justify-end gap-6 rounded-b-2xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-          <button onClick={generatePDF} className="bg-white border-2 border-gray-900 text-gray-900 hover:bg-gray-200 font-bold py-3 px-6 rounded-lg shadow-md uppercase flex items-center gap-2 mt-auto transition-colors"><FileDown size={20} /> PDF</button>
-          <button onClick={handleSave} disabled={loading} className="bg-gray-900 hover:bg-orange-600 text-white font-bold py-3 px-12 rounded-lg shadow-lg uppercase mt-auto transition-colors flex items-center gap-3">
-            {loading ? <Loader className="animate-spin w-5 h-5" /> : <Save className="w-5 h-5" />}{loading ? 'Saving...' : 'Send to Supervisor'}
-          </button>
-        </div>
-
+        <style dangerouslySetInnerHTML={{
+          __html: `
+          .custom-scrollbar::-webkit-scrollbar { height: 12px; }
+          .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+          .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+          input[type=time]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; }
+          input[type=number]::-webkit-inner-spin-button, 
+          input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+          input[type=number] { -moz-appearance: textfield; }
+        `}} />
       </div>
-
-      <style dangerouslySetInnerHTML={{
-        __html: `
-        .custom-scrollbar::-webkit-scrollbar { height: 12px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        input[type=time]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; }
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type=number] { -moz-appearance: textfield; }
-      `}} />
-    </div>
+    </>
   );
 };
 

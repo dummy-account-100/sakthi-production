@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import Header from "../components/Header";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import SignatureCanvas from "react-signature-canvas";
-import logo from "../Assets/logo.png";
 
 // --- HELPER: Calculate Production Date (Strict 7 AM to 7 AM Logic) ---
 const getProductionDate = () => {
@@ -142,7 +142,6 @@ const DailyProductionPerformance = () => {
           ["I", "II", "III"].forEach(s => {
             newSummary[s].pouredMoulds = "-";
             newSummary[s].tonnage = "-";
-            // 🔥 FIX: Properly reset editable fields when DISA/Date changes
             newSummary[s].casted = "";
             newSummary[s].value = "";
           });
@@ -401,21 +400,18 @@ const DailyProductionPerformance = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#2d2d2d] flex flex-col items-center justify-center p-6">
+    <>
+      <Header />
       <ToastContainer position="top-right" autoClose={3000} theme="colored" />
 
-      <div className="bg-white w-full max-w-[90rem] rounded-xl p-8 shadow-2xl overflow-x-auto border-4 border-gray-100">
+      <div className="min-h-screen bg-[#2d2d2d] flex flex-col items-center justify-center p-6 pb-20">
+        <div className="bg-white w-full max-w-[90rem] rounded-xl p-8 shadow-2xl overflow-x-auto border-4 border-gray-100">
 
-        {/* HEADER */}
-        <div className="flex justify-between items-center border-b-2 border-gray-800 pb-4 mb-6">
-          <div className="flex items-center gap-4">
-            <img src={logo} alt="Sakthi Auto" className="h-10 w-auto object-contain bg-white p-1 rounded" />
-            <h1 className="text-2xl font-bold text-gray-800 tracking-wide uppercase">
-              DAILY PRODUCTION PERFORMANCE (FOUNDRY - B)
-            </h1>
-          </div>
+          <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 uppercase tracking-wide">
+            Daily Production Performance (Foundry - B)
+          </h2>
 
-          <div className="flex items-center gap-6">
+          <div className="flex justify-end items-center gap-6 mb-8 border-b-2 border-gray-200 pb-4">
             <div className="w-40">
               <label className="font-bold text-gray-700 block mb-1 text-sm">DISA-</label>
               <select
@@ -443,240 +439,239 @@ const DailyProductionPerformance = () => {
               />
             </div>
           </div>
-        </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-8 min-w-[1100px]">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-8 min-w-[1100px]">
 
-          {/* 1. SUMMARY TABLE */}
-          <div>
-            <table className="w-full border-collapse border border-gray-800 text-sm text-center">
-              <thead className="text-gray-800 font-bold bg-gray-100">
-                <tr>
-                  <th className="border border-gray-800 p-2 w-32">SHIFT</th>
-                  <th className="border border-gray-800 p-2">POURED MOULDS</th>
-                  <th className="border border-gray-800 p-2">TONNAGE</th>
-                  <th className="border border-gray-800 p-2">CASTED</th>
-                  <th className="border border-gray-800 p-2">VALUE</th>
-                </tr>
-              </thead>
-              <tbody>
-                {["I", "II", "III"].map((shift) => (
-                  <tr key={shift} className="bg-white">
-                    <td className="border border-gray-800 p-2 font-bold bg-gray-50">{shift}</td>
-                    <td className="border border-gray-800 p-0">
-                      <input type="text" value={String(summary[shift].pouredMoulds)} readOnly className="w-full h-full text-center outline-none bg-gray-50 py-2 cursor-not-allowed font-semibold text-gray-600" />
-                    </td>
-                    <td className="border border-gray-800 p-0">
-                      <input type="text" value={String(summary[shift].tonnage)} readOnly className="w-full h-full text-center outline-none bg-gray-50 py-2 cursor-not-allowed font-semibold text-gray-600" />
-                    </td>
-                    <td className="border border-gray-800 p-0">
-                      <input type="text" value={String(summary[shift].casted)} onChange={(e) => handleSummaryChange(shift, "casted", e.target.value)} placeholder="Type '-' if none" className="w-full h-full text-center outline-none bg-transparent py-2" />
-                    </td>
-                    <td className="border border-gray-800 p-0">
-                      <input type="text" value={String(summary[shift].value)} onChange={(e) => handleSummaryChange(shift, "value", e.target.value)} placeholder="Type '-' if none" className="w-full h-full text-center outline-none bg-transparent py-2" />
-                    </td>
+            {/* 1. SUMMARY TABLE */}
+            <div>
+              <table className="w-full border-collapse border border-gray-800 text-sm text-center">
+                <thead className="text-gray-800 font-bold bg-gray-100">
+                  <tr>
+                    <th className="border border-gray-800 p-2 w-32">SHIFT</th>
+                    <th className="border border-gray-800 p-2">POURED MOULDS</th>
+                    <th className="border border-gray-800 p-2">TONNAGE</th>
+                    <th className="border border-gray-800 p-2">CASTED</th>
+                    <th className="border border-gray-800 p-2">VALUE</th>
                   </tr>
-                ))}
-                {/* TOTAL ROW */}
-                <tr className="bg-gray-100 font-bold border-t-2 border-gray-800">
-                  <td className="border border-gray-800 p-2">TOTAL</td>
-                  <td className="border border-gray-800 p-2">{summaryTotals.pouredMoulds > 0 ? summaryTotals.pouredMoulds : "-"}</td>
-                  <td className="border border-gray-800 p-2">{summaryTotals.tonnage > 0 ? summaryTotals.tonnage.toFixed(3) : "-"}</td>
-                  <td className="border border-gray-800 p-2">{summaryTotals.casted > 0 ? summaryTotals.casted.toFixed(0) : "-"}</td>
-                  <td className="border border-gray-800 p-2">{summaryTotals.value > 0 ? summaryTotals.value.toFixed(2) : "-"}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* 2. DETAILS TABLE */}
-          <div>
-            <div className="flex items-center justify-end mb-2">
-              <button type="button" onClick={addDetailRow} className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-1 rounded shadow text-sm">+ Add Row</button>
+                </thead>
+                <tbody>
+                  {["I", "II", "III"].map((shift) => (
+                    <tr key={shift} className="bg-white">
+                      <td className="border border-gray-800 p-2 font-bold bg-gray-50">{shift}</td>
+                      <td className="border border-gray-800 p-0">
+                        <input type="text" value={String(summary[shift].pouredMoulds)} readOnly className="w-full h-full text-center outline-none bg-gray-50 py-2 cursor-not-allowed font-semibold text-gray-600" />
+                      </td>
+                      <td className="border border-gray-800 p-0">
+                        <input type="text" value={String(summary[shift].tonnage)} readOnly className="w-full h-full text-center outline-none bg-gray-50 py-2 cursor-not-allowed font-semibold text-gray-600" />
+                      </td>
+                      <td className="border border-gray-800 p-0">
+                        <input type="text" value={String(summary[shift].casted)} onChange={(e) => handleSummaryChange(shift, "casted", e.target.value)} placeholder="Type '-' if none" className="w-full h-full text-center outline-none bg-transparent py-2" />
+                      </td>
+                      <td className="border border-gray-800 p-0">
+                        <input type="text" value={String(summary[shift].value)} onChange={(e) => handleSummaryChange(shift, "value", e.target.value)} placeholder="Type '-' if none" className="w-full h-full text-center outline-none bg-transparent py-2" />
+                      </td>
+                    </tr>
+                  ))}
+                  {/* TOTAL ROW */}
+                  <tr className="bg-gray-100 font-bold border-t-2 border-gray-800">
+                    <td className="border border-gray-800 p-2">TOTAL</td>
+                    <td className="border border-gray-800 p-2">{summaryTotals.pouredMoulds > 0 ? summaryTotals.pouredMoulds : "-"}</td>
+                    <td className="border border-gray-800 p-2">{summaryTotals.tonnage > 0 ? summaryTotals.tonnage.toFixed(3) : "-"}</td>
+                    <td className="border border-gray-800 p-2">{summaryTotals.casted > 0 ? summaryTotals.casted.toFixed(0) : "-"}</td>
+                    <td className="border border-gray-800 p-2">{summaryTotals.value > 0 ? summaryTotals.value.toFixed(2) : "-"}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
-            <table className="w-full border-collapse border border-gray-800 text-sm text-center relative z-0">
-              <thead className="bg-gray-100 text-gray-800 font-bold border-b-2 border-gray-800">
-                <tr>
-                  <th className="border border-gray-800 p-2 w-10" rowSpan="2">Sl.<br />No.</th>
-                  <th className="border border-gray-800 p-2 w-48" rowSpan="2">Pattern Code</th>
-                  <th className="border border-gray-800 p-2 w-64" rowSpan="2">Item Description</th>
-                  <th className="border border-gray-800 p-1" colSpan="2">Item</th>
-                  <th className="border border-gray-800 p-2 w-24" rowSpan="2">Number of<br />Moulds Prod.</th>
-                  <th className="border border-gray-800 p-2 w-24" rowSpan="2">Number of<br />Moulds Pour.</th>
-                  <th className="border border-gray-800 p-2 w-16" rowSpan="2">No. of<br />Cavity</th>
-                  <th className="border border-gray-800 p-2 w-56" rowSpan="2">Poured WT (Kg)</th>
-                  <th className="border border-gray-800 p-2 w-10" rowSpan="2">Act</th>
-                </tr>
-                <tr>
-                  <th className="border border-gray-800 p-1 font-normal w-16 text-xs">Planned</th>
-                  <th className="border border-gray-800 p-1 font-normal w-20 text-xs">Un Planned</th>
-                </tr>
-              </thead>
-              <tbody>
-                {details.map((row, index) => (
-                  <tr key={index} className="bg-white hover:bg-gray-50 transition-colors">
-                    <td className="border border-gray-800 p-1 font-bold">{index + 1}</td>
+            {/* 2. DETAILS TABLE */}
+            <div>
+              <div className="flex items-center justify-end mb-2">
+                <button type="button" onClick={addDetailRow} className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-1 rounded shadow text-sm">+ Add Row</button>
+              </div>
 
-                    <td className="border border-gray-800 p-1 relative overflow-visible">
-                      <SearchableSelect
-                        key={`pattern-${index}-${resetKey}`}
-                        options={components} displayKey="code"
-                        value={row.patternCode} placeholder="Type '-'"
-                        onSelect={(item) => handleComponentSelect(index, item)}
-                      />
-                    </td>
+              <table className="w-full border-collapse border border-gray-800 text-sm text-center relative z-0">
+                <thead className="bg-gray-100 text-gray-800 font-bold border-b-2 border-gray-800">
+                  <tr>
+                    <th className="border border-gray-800 p-2 w-10" rowSpan="2">Sl.<br />No.</th>
+                    <th className="border border-gray-800 p-2 w-48" rowSpan="2">Pattern Code</th>
+                    <th className="border border-gray-800 p-2 w-64" rowSpan="2">Item Description</th>
+                    <th className="border border-gray-800 p-1" colSpan="2">Item</th>
+                    <th className="border border-gray-800 p-2 w-24" rowSpan="2">Number of<br />Moulds Prod.</th>
+                    <th className="border border-gray-800 p-2 w-24" rowSpan="2">Number of<br />Moulds Pour.</th>
+                    <th className="border border-gray-800 p-2 w-16" rowSpan="2">No. of<br />Cavity</th>
+                    <th className="border border-gray-800 p-2 w-56" rowSpan="2">Poured WT (Kg)</th>
+                    <th className="border border-gray-800 p-2 w-10" rowSpan="2">Act</th>
+                  </tr>
+                  <tr>
+                    <th className="border border-gray-800 p-1 font-normal w-16 text-xs">Planned</th>
+                    <th className="border border-gray-800 p-1 font-normal w-20 text-xs">Un Planned</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {details.map((row, index) => (
+                    <tr key={index} className="bg-white hover:bg-gray-50 transition-colors">
+                      <td className="border border-gray-800 p-1 font-bold">{index + 1}</td>
 
+                      <td className="border border-gray-800 p-1 relative overflow-visible">
+                        <SearchableSelect
+                          key={`pattern-${index}-${resetKey}`}
+                          options={components} displayKey="code"
+                          value={row.patternCode} placeholder="Type '-'"
+                          onSelect={(item) => handleComponentSelect(index, item)}
+                        />
+                      </td>
+
+                      <td className="border border-gray-800 p-0">
+                        <input type="text" value={String(row.itemDescription)} readOnly className="w-full h-full text-left outline-none bg-gray-50 text-gray-700 py-2 px-2 cursor-not-allowed" />
+                      </td>
+                      <td className="border border-gray-800 p-0">
+                        <input type="text" value={String(row.planned)} onChange={(e) => handleDetailChange(index, "planned", e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2" />
+                      </td>
+                      <td className="border border-gray-800 p-0">
+                        <input type="text" value={String(row.unplanned)} onChange={(e) => handleDetailChange(index, "unplanned", e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2" />
+                      </td>
+                      <td className="border border-gray-800 p-0">
+                        <input type="text" value={String(row.mouldsProd)} onChange={(e) => handleDetailChange(index, "mouldsProd", e.target.value)} placeholder="-" className="w-full h-full text-center outline-none bg-transparent py-2" />
+                      </td>
+                      <td className="border border-gray-800 p-0">
+                        <input type="text" value={String(row.mouldsPour)} onChange={(e) => handleDetailChange(index, "mouldsPour", e.target.value)} placeholder="-" className="w-full h-full text-center outline-none bg-transparent py-2 font-bold" />
+                      </td>
+                      <td className="border border-gray-800 p-0">
+                        <input type="text" value={String(row.cavity)} readOnly className="w-full h-full text-center outline-none bg-gray-50 text-gray-700 py-2 cursor-not-allowed font-bold" />
+                      </td>
+                      <td className="border border-gray-800 p-0">
+                        <div className="flex items-center justify-center w-full h-full gap-1 px-1 font-semibold text-gray-700">
+                          <span>[</span>
+                          <input type="text" placeholder="Wt" value={String(row.unitWeight)} readOnly className="w-12 text-center outline-none border-b border-gray-400 bg-transparent py-1 font-normal text-gray-500 cursor-not-allowed" />
+                          <span className="mx-1">X</span>
+                          <input type="text" value={String(row.mouldsPour)} readOnly placeholder="Qty" className="w-12 text-center outline-none border-b border-gray-400 bg-transparent py-1 font-normal text-gray-500 cursor-not-allowed" />
+                          <span>] =</span>
+                          <span className="w-16 text-right pr-1 text-black font-bold">{row.totalWeight}</span>
+                        </div>
+                      </td>
+                      <td className="border border-gray-800 p-0 text-center">
+                        {details.length > 1 && (
+                          <button type="button" onClick={() => removeDetailRow(index)} className="text-red-500 font-bold hover:text-red-700 w-full h-full" title="Remove Row">✕</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+
+                  {/* DETAILS TOTAL ROW */}
+                  <tr className="bg-gray-100 font-bold text-gray-800 border-t-2 border-gray-800">
+                    <td className="border border-gray-800 p-2"></td><td className="border border-gray-800 p-2"></td><td className="border border-gray-800 p-2"></td><td className="border border-gray-800 p-2"></td>
+                    <td className="border border-gray-800 p-2 text-center text-black tracking-widest text-sm">TOTAL</td>
+                    <td className="border border-gray-800 p-2 text-center text-black">{detailTotals.mouldsProd > 0 ? detailTotals.mouldsProd : "-"}</td>
+                    <td className="border border-gray-800 p-2 text-center text-black">{detailTotals.mouldsPour > 0 ? detailTotals.mouldsPour : "-"}</td>
+                    <td className="border border-gray-800 p-2 bg-gray-100"></td>
                     <td className="border border-gray-800 p-0">
-                      <input type="text" value={String(row.itemDescription)} readOnly className="w-full h-full text-left outline-none bg-gray-50 text-gray-700 py-2 px-2 cursor-not-allowed" />
-                    </td>
-                    <td className="border border-gray-800 p-0">
-                      <input type="text" value={String(row.planned)} onChange={(e) => handleDetailChange(index, "planned", e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2" />
-                    </td>
-                    <td className="border border-gray-800 p-0">
-                      <input type="text" value={String(row.unplanned)} onChange={(e) => handleDetailChange(index, "unplanned", e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2" />
-                    </td>
-                    <td className="border border-gray-800 p-0">
-                      <input type="text" value={String(row.mouldsProd)} onChange={(e) => handleDetailChange(index, "mouldsProd", e.target.value)} placeholder="-" className="w-full h-full text-center outline-none bg-transparent py-2" />
-                    </td>
-                    <td className="border border-gray-800 p-0">
-                      <input type="text" value={String(row.mouldsPour)} onChange={(e) => handleDetailChange(index, "mouldsPour", e.target.value)} placeholder="-" className="w-full h-full text-center outline-none bg-transparent py-2 font-bold" />
-                    </td>
-                    <td className="border border-gray-800 p-0">
-                      <input type="text" value={String(row.cavity)} readOnly className="w-full h-full text-center outline-none bg-gray-50 text-gray-700 py-2 cursor-not-allowed font-bold" />
-                    </td>
-                    <td className="border border-gray-800 p-0">
-                      <div className="flex items-center justify-center w-full h-full gap-1 px-1 font-semibold text-gray-700">
-                        <span>[</span>
-                        <input type="text" placeholder="Wt" value={String(row.unitWeight)} readOnly className="w-12 text-center outline-none border-b border-gray-400 bg-transparent py-1 font-normal text-gray-500 cursor-not-allowed" />
-                        <span className="mx-1">X</span>
-                        <input type="text" value={String(row.mouldsPour)} readOnly placeholder="Qty" className="w-12 text-center outline-none border-b border-gray-400 bg-transparent py-1 font-normal text-gray-500 cursor-not-allowed" />
-                        <span>] =</span>
-                        <span className="w-16 text-right pr-1 text-black font-bold">{row.totalWeight}</span>
+                      <div className="flex items-center justify-center w-full h-full gap-1 px-1 font-bold text-gray-800">
+                        <span className="w-16 text-right pr-1 text-black">{detailTotals.totalWeight > 0 ? Math.round(detailTotals.totalWeight) : "-"}</span>
                       </div>
                     </td>
-                    <td className="border border-gray-800 p-0 text-center">
-                      {details.length > 1 && (
-                        <button type="button" onClick={() => removeDetailRow(index)} className="text-red-500 font-bold hover:text-red-700 w-full h-full" title="Remove Row">✕</button>
-                      )}
-                    </td>
+                    <td className="border border-gray-800 p-2"></td>
                   </tr>
-                ))}
+                </tbody>
+              </table>
+            </div>
 
-                {/* DETAILS TOTAL ROW */}
-                <tr className="bg-gray-100 font-bold text-gray-800 border-t-2 border-gray-800">
-                  <td className="border border-gray-800 p-2"></td><td className="border border-gray-800 p-2"></td><td className="border border-gray-800 p-2"></td><td className="border border-gray-800 p-2"></td>
-                  <td className="border border-gray-800 p-2 text-center text-black tracking-widest text-sm">TOTAL</td>
-                  <td className="border border-gray-800 p-2 text-center text-black">{detailTotals.mouldsProd > 0 ? detailTotals.mouldsProd : "-"}</td>
-                  <td className="border border-gray-800 p-2 text-center text-black">{detailTotals.mouldsPour > 0 ? detailTotals.mouldsPour : "-"}</td>
-                  <td className="border border-gray-800 p-2 bg-gray-100"></td>
-                  <td className="border border-gray-800 p-0">
-                    <div className="flex items-center justify-center w-full h-full gap-1 px-1 font-bold text-gray-800">
-                      {/* <span>[</span><span className="w-12 text-center inline-block"></span><span className="mx-1">X</span><span className="w-12 text-center inline-block"></span><span>] =</span> */}
-                      <span className="w-16 text-right pr-1 text-black">{detailTotals.totalWeight > 0 ? Math.round(detailTotals.totalWeight) : "-"}</span>
-                    </div>
-                  </td>
-                  <td className="border border-gray-800 p-2"></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+            {/* 3. GROUPED PRODUCTION DELAYS TABLE */}
+            <div>
+              <table className="w-full border-collapse border border-gray-800 text-sm text-center">
+                <thead className="bg-gray-100 text-gray-800 font-bold">
+                  <tr><th className="border border-gray-800 p-2 bg-gray-200" colSpan="6">Production delays / Remarks</th></tr>
+                  <tr>
+                    <th className="border border-gray-800 p-2 w-16" rowSpan="2">S.No.</th>
+                    <th className="border border-gray-800 p-2" rowSpan="2">Reasons</th>
+                    <th className="border border-gray-800 p-1" colSpan="3">Shift (Mins)</th>
+                    <th className="border border-gray-800 p-2 w-32" rowSpan="2">Total Duration</th>
+                  </tr>
+                  <tr>
+                    <th className="border border-gray-800 p-1 font-normal text-xs w-20">I</th>
+                    <th className="border border-gray-800 p-1 font-normal text-xs w-20">II</th>
+                    <th className="border border-gray-800 p-1 font-normal text-xs w-20">III</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupedDelays.length > 0 ? (
+                    groupedDelays.map((d, index) => (
+                      <tr key={index} className="bg-white">
+                        <td className="border border-gray-800 p-2">{index + 1}</td>
+                        <td className="border border-gray-800 p-2 text-left px-4">{d.reason}</td>
+                        <td className="border border-gray-800 p-2">{d.I > 0 ? d.I : "-"}</td>
+                        <td className="border border-gray-800 p-2">{d.II > 0 ? d.II : "-"}</td>
+                        <td className="border border-gray-800 p-2">{d.III > 0 ? d.III : "-"}</td>
+                        <td className="border border-gray-800 p-2 font-bold text-blue-800">{d.total > 0 ? d.total : "-"}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr className="bg-white h-10"><td className="border border-gray-800 p-2 text-gray-500 font-semibold italic" colSpan="6">{(disa !== "-" && disa) ? "No delays recorded for this date and DISA." : "Select DISA to view delays."}</td></tr>
+                  )}
 
-          {/* 3. GROUPED PRODUCTION DELAYS TABLE */}
-          <div>
-            <table className="w-full border-collapse border border-gray-800 text-sm text-center">
-              <thead className="bg-gray-100 text-gray-800 font-bold">
-                <tr><th className="border border-gray-800 p-2 bg-gray-200" colSpan="6">Production delays / Remarks</th></tr>
-                <tr>
-                  <th className="border border-gray-800 p-2 w-16" rowSpan="2">S.No.</th>
-                  <th className="border border-gray-800 p-2" rowSpan="2">Reasons</th>
-                  <th className="border border-gray-800 p-1" colSpan="3">Shift (Mins)</th>
-                  <th className="border border-gray-800 p-2 w-32" rowSpan="2">Total Duration</th>
-                </tr>
-                <tr>
-                  <th className="border border-gray-800 p-1 font-normal text-xs w-20">I</th>
-                  <th className="border border-gray-800 p-1 font-normal text-xs w-20">II</th>
-                  <th className="border border-gray-800 p-1 font-normal text-xs w-20">III</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groupedDelays.length > 0 ? (
-                  groupedDelays.map((d, index) => (
-                    <tr key={index} className="bg-white">
-                      <td className="border border-gray-800 p-2">{index + 1}</td>
-                      <td className="border border-gray-800 p-2 text-left px-4">{d.reason}</td>
-                      <td className="border border-gray-800 p-2">{d.I > 0 ? d.I : "-"}</td>
-                      <td className="border border-gray-800 p-2">{d.II > 0 ? d.II : "-"}</td>
-                      <td className="border border-gray-800 p-2">{d.III > 0 ? d.III : "-"}</td>
-                      <td className="border border-gray-800 p-2 font-bold text-blue-800">{d.total > 0 ? d.total : "-"}</td>
+                  {/* DELAYS TOTAL ROW */}
+                  {groupedDelays.length > 0 && (
+                    <tr className="bg-gray-100 font-bold border-t-2 border-gray-800">
+                      <td className="border border-gray-800 p-2 text-right pr-4" colSpan="2">TOTAL</td>
+                      <td className="border border-gray-800 p-2">{totalShiftI > 0 ? totalShiftI : "-"}</td>
+                      <td className="border border-gray-800 p-2">{totalShiftII > 0 ? totalShiftII : "-"}</td>
+                      <td className="border border-gray-800 p-2">{totalShiftIII > 0 ? totalShiftIII : "-"}</td>
+                      <td className="border border-gray-800 p-2 text-red-600">{grandTotalDelay > 0 ? grandTotalDelay : "-"}</td>
                     </tr>
-                  ))
-                ) : (
-                  <tr className="bg-white h-10"><td className="border border-gray-800 p-2 text-gray-500 font-semibold italic" colSpan="6">{(disa !== "-" && disa) ? "No delays recorded for this date and DISA." : "Select DISA to view delays."}</td></tr>
-                )}
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-                {/* DELAYS TOTAL ROW */}
-                {groupedDelays.length > 0 && (
-                  <tr className="bg-gray-100 font-bold border-t-2 border-gray-800">
-                    <td className="border border-gray-800 p-2 text-right pr-4" colSpan="2">TOTAL</td>
-                    <td className="border border-gray-800 p-2">{totalShiftI > 0 ? totalShiftI : "-"}</td>
-                    <td className="border border-gray-800 p-2">{totalShiftII > 0 ? totalShiftII : "-"}</td>
-                    <td className="border border-gray-800 p-2">{totalShiftIII > 0 ? totalShiftIII : "-"}</td>
-                    <td className="border border-gray-800 p-2 text-red-600">{grandTotalDelay > 0 ? grandTotalDelay : "-"}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+            {/* 4. FOOTER & REASONS */}
+            <div className="border-2 border-gray-800 flex flex-col min-h-[100px]">
+              <div className="px-2 py-1 font-bold text-gray-800 text-sm border-b border-gray-400">Reasons for producing un-planned items.</div>
+              <textarea className="w-full h-full p-2 outline-none resize-none text-sm bg-transparent" placeholder="Type '-' if none..." value={String(unplannedReasons)} onChange={(e) => setUnplannedReasons(e.target.value)} />
+            </div>
 
-          {/* 4. FOOTER & REASONS */}
-          <div className="border-2 border-gray-800 flex flex-col min-h-[100px]">
-            <div className="px-2 py-1 font-bold text-gray-800 text-sm border-b border-gray-400">Reasons for producing un-planned items.</div>
-            <textarea className="w-full h-full p-2 outline-none resize-none text-sm bg-transparent" placeholder="Type '-' if none..." value={String(unplannedReasons)} onChange={(e) => setUnplannedReasons(e.target.value)} />
-          </div>
-
-          {/* 5. SIGNATURES & ASSIGNMENTS */}
-          <div className="flex justify-between items-end mt-8 mb-4 px-10 gap-6">
-            <div className="flex flex-col w-64">
-              <label className="font-bold text-gray-700 block mb-1 text-sm text-center">Operator Signature</label>
-              <div className="border-2 border-dashed border-gray-400 rounded-lg overflow-hidden h-24 mb-1">
-                <SignatureCanvas ref={opSigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-full cursor-crosshair bg-gray-50' }} />
+            {/* 5. SIGNATURES & ASSIGNMENTS */}
+            <div className="flex justify-between items-end mt-8 mb-4 px-10 gap-6">
+              <div className="flex flex-col w-64">
+                <label className="font-bold text-gray-700 block mb-1 text-sm text-center">Operator Signature</label>
+                <div className="border-2 border-dashed border-gray-400 rounded-lg overflow-hidden h-24 mb-1">
+                  <SignatureCanvas ref={opSigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-full cursor-crosshair bg-gray-50' }} />
+                </div>
+                <button type="button" onClick={() => opSigCanvas.current.clear()} className="text-xs text-red-500 hover:text-red-700 font-bold self-end uppercase">Clear</button>
               </div>
-              <button type="button" onClick={() => opSigCanvas.current.clear()} className="text-xs text-red-500 hover:text-red-700 font-bold self-end uppercase">Clear</button>
+
+              <div className="w-64">
+                <SearchableSelect
+                  key={`sign-inc-${resetKey}`} label="Assign In-charge"
+                  options={incharges} displayKey="name" value={signatures.incharge}
+                  onSelect={(item) => setSignatures({ ...signatures, incharge: item.name || item.name })}
+                />
+              </div>
+              <div className="w-64">
+                <SearchableSelect
+                  key={`sign-hof-${resetKey}`} label="Assign HOF"
+                  options={hofs} displayKey="name" value={signatures.hof}
+                  onSelect={(item) => setSignatures({ ...signatures, hof: item.name || item.name })}
+                />
+              </div>
+              <div className="w-64">
+                <SearchableSelect
+                  key={`sign-hod-${resetKey}`} label="Assign HOD - Production"
+                  options={hods} displayKey="name" value={signatures.hod}
+                  onSelect={(item) => setSignatures({ ...signatures, hod: item.name || item.name })}
+                />
+              </div>
             </div>
 
-            <div className="w-64">
-              <SearchableSelect
-                key={`sign-inc-${resetKey}`} label="Assign In-charge"
-                options={incharges} displayKey="name" value={signatures.incharge}
-                onSelect={(item) => setSignatures({ ...signatures, incharge: item.name || item.name })}
-              />
+            {/* BUTTONS */}
+            <div className="flex justify-end gap-4 mt-2 pt-4 border-t border-gray-300">
+              <button type="button" onClick={handleDownload} className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-2 rounded font-bold transition-colors flex items-center gap-2 shadow-lg"><span>⬇️</span> Generate Report (PDF)</button>
+              <button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white px-10 py-3 rounded font-bold transition-colors shadow-lg">Submit & Send to HOF/HOD</button>
             </div>
-            <div className="w-64">
-              <SearchableSelect
-                key={`sign-hof-${resetKey}`} label="Assign HOF"
-                options={hofs} displayKey="name" value={signatures.hof}
-                onSelect={(item) => setSignatures({ ...signatures, hof: item.name || item.name })}
-              />
-            </div>
-            <div className="w-64">
-              <SearchableSelect
-                key={`sign-hod-${resetKey}`} label="Assign HOD - Production"
-                options={hods} displayKey="name" value={signatures.hod}
-                onSelect={(item) => setSignatures({ ...signatures, hod: item.name || item.name })}
-              />
-            </div>
-          </div>
 
-          {/* BUTTONS */}
-          <div className="flex justify-end gap-4 mt-2 pt-4 border-t border-gray-300">
-            <button type="button" onClick={handleDownload} className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-2 rounded font-bold transition-colors flex items-center gap-2 shadow-lg"><span>⬇️</span> Generate Report (PDF)</button>
-            <button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white px-10 py-3 rounded font-bold transition-colors shadow-lg">Submit & Send to HOF/HOD</button>
-          </div>
-
-        </form>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

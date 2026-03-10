@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import logo from "../Assets/logo.png"; // Imported logo
+import Header from "../components/Header";
 
 // --- HELPER: Calculate Production Date & Shift ---
 const getProductionDateTime = () => {
@@ -551,25 +551,21 @@ const DisamaticProductReport = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#2d2d2d] flex flex-col items-center justify-center p-6">
-      <ToastContainer position="top-right" autoClose={3000} theme="colored" />
-      
-      <div className="bg-white w-full max-w-[90rem] rounded-xl p-8 shadow-2xl overflow-x-auto">
+    <>
+      <Header />
+      <div className="min-h-screen bg-[#2d2d2d] flex flex-col items-center justify-center p-6 pb-20">
+        <ToastContainer position="top-right" autoClose={3000} theme="colored" />
         
-        {/* HEADER WITH LOGO */}
-        <div className="flex items-center gap-4 border-b-2 border-gray-800 pb-4 mb-6">
-            <img src={logo} alt="Sakthi Auto" className="h-10 w-auto object-contain bg-white p-1 rounded" />
-            <h1 className="text-2xl font-bold text-gray-800 tracking-wide uppercase">
-              DISAMATIC PRODUCTION REPORT
-            </h1>
-        </div>
-
-        <form onSubmit={handleSubmit} className="min-w-[1100px] flex flex-col gap-6">
+        <div className="bg-white w-full max-w-[90rem] rounded-xl p-8 shadow-2xl overflow-x-auto border-4 border-gray-100">
           
-          <div className="grid grid-cols-3 gap-6 bg-gray-100 p-4 rounded-lg border border-gray-300">
-            <div>
-              <label className="font-bold text-gray-700 block mb-1">DISA-</label>
-              <select name="disa" value={formData.disa} onChange={handleDisaChange} className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-1 focus:ring-orange-500">
+          <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 uppercase tracking-wide">
+            DISAMATIC PRODUCTION REPORT
+          </h2>
+
+          <div className="flex justify-end items-center gap-6 mb-8 border-b-2 border-gray-200 pb-4">
+            <div className="w-40">
+              <label className="font-bold text-gray-700 block mb-1 text-sm">DISA-</label>
+              <select name="disa" value={formData.disa} onChange={handleDisaChange} className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm font-semibold bg-white text-gray-800">
                 <option value="">Select</option>
                 <option value="I">I</option>
                 <option value="II">II</option>
@@ -579,23 +575,25 @@ const DisamaticProductReport = () => {
                 <option value="VI">VI</option>
               </select>
             </div>
-            <div>
-              <label className="font-bold text-gray-700 block mb-1">Date</label>
+            
+            <div className="w-48">
+              <label className="font-bold text-gray-700 block mb-1 text-sm">DATE :</label>
               <input 
                 type="date" 
                 name="date" 
                 value={formData.date} 
                 onChange={handleChange} 
-                className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-gray-700" 
+                className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm font-semibold text-gray-800 bg-white" 
               />
             </div>
-            <div>
-              <label className="font-bold text-gray-700 block mb-1">Shift</label>
+            
+            <div className="w-48">
+              <label className="font-bold text-gray-700 block mb-1 text-sm">SHIFT :</label>
               <select 
                 name="shift" 
                 value={formData.shift} 
                 onChange={handleChange} 
-                className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-gray-700"
+                className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm font-semibold text-gray-800 bg-white"
               >
                 <option value="I">I (7 AM - 3:30 PM)</option>
                 <option value="II">II (3:30 PM - 12 AM)</option>
@@ -604,305 +602,308 @@ const DisamaticProductReport = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-6">
-            <SearchableSelect key={`incharge-${resetKey}`} label="Incharge" options={incharges} displayKey="name" value={formData.incharge} onSelect={(item) => setFormData({ ...formData, incharge: item.name || item.name })} />
-            <SearchableSelect key={`ppOperator-${resetKey}`} label="P/P Operator" options={operators} displayKey="operatorName" value={formData.ppOperator} onSelect={(item) => setFormData({ ...formData, ppOperator: item.operatorName || item.operatorName })} />
-            <SearchableSelect key={`member-${resetKey}`} label="Member" options={employees} displayKey="name" value={formData.member} onSelect={(item) => setFormData({ ...formData, member: item.name || item.name })} />
-          </div>
-
-          {/* PRODUCTION SECTION */}
-          <div className="mt-6 border-t pt-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-800">Production :</h2>
-              <button type="button" onClick={addProduction} className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-3 py-1 rounded flex items-center justify-center leading-none" title="Add Row">+ Add Row</button>
+          <form onSubmit={handleSubmit} className="min-w-[1100px] flex flex-col gap-6">
+            
+            <div className="grid grid-cols-3 gap-6">
+              <SearchableSelect key={`incharge-${resetKey}`} label="Incharge" options={incharges} displayKey="name" value={formData.incharge} onSelect={(item) => setFormData({ ...formData, incharge: item.name || item.name })} />
+              <SearchableSelect key={`ppOperator-${resetKey}`} label="P/P Operator" options={operators} displayKey="operatorName" value={formData.ppOperator} onSelect={(item) => setFormData({ ...formData, ppOperator: item.operatorName || item.operatorName })} />
+              <SearchableSelect key={`member-${resetKey}`} label="Member" options={employees} displayKey="name" value={formData.member} onSelect={(item) => setFormData({ ...formData, member: item.name || item.name })} />
             </div>
 
-            {productions.map((prod, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50 relative">
-                {productions.length > 1 && (
-                  <button type="button" onClick={() => removeProduction(index)} className="absolute top-2 right-2 text-red-600 font-bold hover:text-red-800">✕</button>
-                )}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  
-                  <div className="flex flex-col gap-2">
+            {/* PRODUCTION SECTION */}
+            <div className="mt-6 border-t pt-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-gray-800">Production :</h2>
+                <button type="button" onClick={addProduction} className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-3 py-1 rounded flex items-center justify-center leading-none" title="Add Row">+ Add Row</button>
+              </div>
+
+              {productions.map((prod, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50 relative">
+                  {productions.length > 1 && (
+                    <button type="button" onClick={() => removeProduction(index)} className="absolute top-2 right-2 text-red-600 font-bold hover:text-red-800">✕</button>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    <div className="flex flex-col gap-2">
+                      <div>
+                        <label className="font-medium text-sm text-gray-700 block mb-1">Mould Counter No.</label>
+                        <input type="text" value={String(prod.mouldCounterNo)} onChange={(e) => updateProduction(index, "mouldCounterNo", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
+                      </div>
+                      <div>
+                        <label className="font-medium text-sm text-gray-500 block mb-1">Closed Mould Count</label>
+                        <input type="text" value={String(index === 0 ? (isNaN(previousMouldCounter) ? "-" : previousMouldCounter) : (productions[index - 1].mouldCounterNo || "-"))} readOnly className="w-full border border-gray-300 p-2 rounded bg-gray-200 cursor-not-allowed text-gray-600" />
+                      </div>
+                    </div>
+                    
                     <div>
-                      <label className="font-medium text-sm text-gray-700 block mb-1">Mould Counter No.</label>
-                      <input type="text" value={String(prod.mouldCounterNo)} onChange={(e) => updateProduction(index, "mouldCounterNo", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500" placeholder="Type '-' if none" />
+                      <label className="font-medium text-sm text-gray-700 block mb-1">Component Name</label>
+                      <SearchableSelect 
+                        key={`prod-comp-${index}-${resetKey}`} 
+                        options={components} 
+                        displayKey="description" 
+                        value={prod.componentName} 
+                        onSelect={(item) => updateProduction(index, "componentName", item.description, item.pouredWeight)} 
+                      />
+                      {prod.pouredWeight != null && prod.pouredWeight !== "" && (
+                        <p className="text-sm font-semibold text-blue-600 mt-2 ml-1">
+                          Poured Weight: {prod.pouredWeight}
+                        </p>
+                      )}
                     </div>
                     <div>
-                      <label className="font-medium text-sm text-gray-500 block mb-1">Closed Mould Count</label>
-                      <input type="text" value={String(index === 0 ? (isNaN(previousMouldCounter) ? "-" : previousMouldCounter) : (productions[index - 1].mouldCounterNo || "-"))} readOnly className="w-full border border-gray-300 p-2 rounded bg-gray-200 cursor-not-allowed text-gray-600" />
+                      <label className="font-medium text-sm text-gray-500">Produced (Updates Previous Form)</label>
+                      <input type="text" value={String(prod.produced)} readOnly className="w-full border border-gray-300 p-2 rounded bg-gray-200 cursor-not-allowed text-gray-600" />
                     </div>
-                  </div>
-                  
-                  <div>
-                    <label className="font-medium text-sm text-gray-700 block mb-1">Component Name</label>
-                    <SearchableSelect 
-                      key={`prod-comp-${index}-${resetKey}`} 
-                      options={components} 
-                      displayKey="description" 
-                      value={prod.componentName} 
-                      onSelect={(item) => updateProduction(index, "componentName", item.description, item.pouredWeight)} 
-                    />
-                    {prod.pouredWeight != null && prod.pouredWeight !== "" && (
-                      <p className="text-sm font-semibold text-blue-600 mt-2 ml-1">
-                        Poured Weight: {prod.pouredWeight}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="font-medium text-sm text-gray-500">Produced (Updates Previous Form)</label>
-                    <input type="text" value={String(prod.produced)} readOnly className="w-full border border-gray-300 p-2 rounded bg-gray-200 cursor-not-allowed text-gray-600" />
-                  </div>
-                  <div>
-                    <label className="font-medium text-sm text-gray-700">Poured</label>
-                    <input type="text" value={String(prod.poured)} onChange={(e) => updateProduction(index, "poured", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500" placeholder="Type '-' if none" />
-                  </div>
-                  <div>
-                    <label className="font-medium text-sm text-gray-700">Cycle Time</label>
-                    <input type="text" value={String(prod.cycleTime)} onChange={(e) => updateProduction(index, "cycleTime", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500" placeholder="Type '-' if none" />
-                  </div>
-                  <div>
-                    <label className="font-medium text-sm text-gray-700">Moulds Per Hour</label>
-                    <input type="text" value={String(prod.mouldsPerHour)} onChange={(e) => updateProduction(index, "mouldsPerHour", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500" placeholder="Type '-' if none" />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="font-medium text-sm text-gray-700">Remarks</label>
-                    <textarea value={String(prod.remarks)} onChange={(e) => updateProduction(index, "remarks", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 h-10 resize-y" placeholder="Type '-' if none" />
+                    <div>
+                      <label className="font-medium text-sm text-gray-700">Poured</label>
+                      <input type="text" value={String(prod.poured)} onChange={(e) => updateProduction(index, "poured", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
+                    </div>
+                    <div>
+                      <label className="font-medium text-sm text-gray-700">Cycle Time</label>
+                      <input type="text" value={String(prod.cycleTime)} onChange={(e) => updateProduction(index, "cycleTime", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
+                    </div>
+                    <div>
+                      <label className="font-medium text-sm text-gray-700">Moulds Per Hour</label>
+                      <input type="text" value={String(prod.mouldsPerHour)} onChange={(e) => updateProduction(index, "mouldsPerHour", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="font-medium text-sm text-gray-700">Remarks</label>
+                      <textarea value={String(prod.remarks)} onChange={(e) => updateProduction(index, "remarks", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 h-10 resize-y bg-white" placeholder="Type '-' if none" />
+                    </div>
                   </div>
                 </div>
+              ))}
+            </div>
+
+            {/* NEXT SHIFT PLAN */}
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-lg font-bold text-gray-800">Next Shift Plan :</h2>
+                <button type="button" onClick={addNextShiftPlan} className="bg-orange-500 hover:bg-orange-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-lg leading-none">+</button>
               </div>
-            ))}
-          </div>
-
-          {/* NEXT SHIFT PLAN */}
-          <div className="mt-4">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-bold text-gray-800">Next Shift Plan :</h2>
-              <button type="button" onClick={addNextShiftPlan} className="bg-orange-500 hover:bg-orange-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-lg leading-none">+</button>
-            </div>
-            <table className="w-full border-collapse border border-gray-300 text-sm">
-              <thead className="bg-gray-100 text-gray-700">
-                <tr>
-                  <th className="border border-gray-300 p-2 text-left w-1/3">Component Name</th>
-                  <th className="border border-gray-300 p-2 w-48">Planned Moulds</th>
-                  <th className="border border-gray-300 p-2">Remarks</th>
-                </tr>
-              </thead>
-              <tbody>
-                {nextShiftPlans.map((plan, index) => (
-                  <tr key={index} className="bg-white">
-                    <td className="border border-gray-300 p-2 align-top">
-                      <SearchableSelect key={`nextPlan-${index}-${resetKey}`} options={components} displayKey="description" value={plan.componentName} onSelect={(item) => updateNextShiftPlan(index, "componentName", item.description)} />
-                    </td>
-                    <td className="border border-gray-300 p-2 align-top">
-                      <input type="text" value={String(plan.plannedMoulds)} onChange={(e) => updateNextShiftPlan(index, "plannedMoulds", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500" placeholder="Type '-' if none" />
-                    </td>
-                    <td className="border border-gray-300 p-2 align-top">
-                      <div className="flex gap-2 w-full">
-                        <textarea value={String(plan.remarks)} onChange={(e) => updateNextShiftPlan(index, "remarks", e.target.value)} className="flex-1 w-full border border-gray-300 p-2 rounded focus:outline-orange-500 h-10 resize-y" placeholder="Type '-' if none" />
-                        {nextShiftPlans.length > 1 && <button type="button" onClick={() => removeNextShiftPlan(index)} className="text-red-500 font-bold hover:text-red-700 px-2">✕</button>}
-                      </div>
-                    </td>
+              <table className="w-full border-collapse border border-gray-300 text-sm">
+                <thead className="bg-gray-100 text-gray-700">
+                  <tr>
+                    <th className="border border-gray-300 p-2 text-left w-1/3">Component Name</th>
+                    <th className="border border-gray-300 p-2 w-48">Planned Moulds</th>
+                    <th className="border border-gray-300 p-2">Remarks</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* DELAYS */}
-          <div className="mt-4">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-bold text-gray-800">Delays :</h2>
-              <button type="button" onClick={addDelay} className="bg-orange-500 hover:bg-orange-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-lg leading-none">+</button>
+                </thead>
+                <tbody>
+                  {nextShiftPlans.map((plan, index) => (
+                    <tr key={index} className="bg-white">
+                      <td className="border border-gray-300 p-2 align-top">
+                        <SearchableSelect key={`nextPlan-${index}-${resetKey}`} options={components} displayKey="description" value={plan.componentName} onSelect={(item) => updateNextShiftPlan(index, "componentName", item.description)} />
+                      </td>
+                      <td className="border border-gray-300 p-2 align-top">
+                        <input type="text" value={String(plan.plannedMoulds)} onChange={(e) => updateNextShiftPlan(index, "plannedMoulds", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
+                      </td>
+                      <td className="border border-gray-300 p-2 align-top">
+                        <div className="flex gap-2 w-full">
+                          <textarea value={String(plan.remarks)} onChange={(e) => updateNextShiftPlan(index, "remarks", e.target.value)} className="flex-1 w-full border border-gray-300 p-2 rounded focus:outline-orange-500 h-10 resize-y bg-white" placeholder="Type '-' if none" />
+                          {nextShiftPlans.length > 1 && <button type="button" onClick={() => removeNextShiftPlan(index)} className="text-red-500 font-bold hover:text-red-700 px-2">✕</button>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <table className="w-full border-collapse border border-gray-300 text-sm">
-              <thead className="bg-gray-100 text-gray-700">
-                <tr>
-                  <th className="border border-gray-300 p-2 text-left w-1/3">Reason</th>
-                  <th className="border border-gray-300 p-2 w-48">Start Time (HH:MM)</th>
-                  <th className="border border-gray-300 p-2 w-48">End Time (HH:MM)</th>
-                  <th className="border border-gray-300 p-2">Duration (Mins)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {delays.map((delay, index) => (
-                  <tr key={index} className="bg-white">
-                    <td className="border border-gray-300 p-2 align-top">
-                      <SearchableSelect key={`delay-${index}-${resetKey}`} options={delaysMaster} displayKey="reasonName" value={delay.delayType} onSelect={(item) => updateDelay(index, "delayType", item.reasonName)} />
-                    </td>
-                    <td className="border border-gray-300 p-2 align-top">
-                      <input type="text" value={String(delay.startTime)} onChange={(e) => updateDelay(index, "startTime", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500" placeholder="Type '-' if none" />
-                    </td>
-                    <td className="border border-gray-300 p-2 align-top">
-                      <input type="text" value={String(delay.endTime)} onChange={(e) => updateDelay(index, "endTime", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500" placeholder="Type '-' if none" />
-                    </td>
-                    <td className="border border-gray-300 p-2 align-top">
-                      <div className="flex gap-2 w-full">
-                        <input type="text" value={String(delay.duration)} readOnly className="flex-1 w-full border border-gray-300 p-2 rounded bg-gray-100 cursor-not-allowed text-gray-600" />
-                        {delays.length > 1 && <button type="button" onClick={() => removeDelay(index)} className="text-red-500 font-bold hover:text-red-700 px-2">✕</button>}
-                      </div>
-                    </td>
+
+            {/* DELAYS */}
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-lg font-bold text-gray-800">Delays :</h2>
+                <button type="button" onClick={addDelay} className="bg-orange-500 hover:bg-orange-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-lg leading-none">+</button>
+              </div>
+              <table className="w-full border-collapse border border-gray-300 text-sm">
+                <thead className="bg-gray-100 text-gray-700">
+                  <tr>
+                    <th className="border border-gray-300 p-2 text-left w-1/3">Reason</th>
+                    <th className="border border-gray-300 p-2 w-48">Start Time (HH:MM)</th>
+                    <th className="border border-gray-300 p-2 w-48">End Time (HH:MM)</th>
+                    <th className="border border-gray-300 p-2">Duration (Mins)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* MOULD HARDNESS */}
-          <div className="mt-4">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-bold text-gray-800">Mould Hardness :</h2>
-              <button type="button" onClick={addMouldHardness} className="bg-orange-500 hover:bg-orange-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-lg leading-none">+</button>
+                </thead>
+                <tbody>
+                  {delays.map((delay, index) => (
+                    <tr key={index} className="bg-white">
+                      <td className="border border-gray-300 p-2 align-top">
+                        <SearchableSelect key={`delay-${index}-${resetKey}`} options={delaysMaster} displayKey="reasonName" value={delay.delayType} onSelect={(item) => updateDelay(index, "delayType", item.reasonName)} />
+                      </td>
+                      <td className="border border-gray-300 p-2 align-top">
+                        <input type="text" value={String(delay.startTime)} onChange={(e) => updateDelay(index, "startTime", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
+                      </td>
+                      <td className="border border-gray-300 p-2 align-top">
+                        <input type="text" value={String(delay.endTime)} onChange={(e) => updateDelay(index, "endTime", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
+                      </td>
+                      <td className="border border-gray-300 p-2 align-top">
+                        <div className="flex gap-2 w-full">
+                          <input type="text" value={String(delay.duration)} readOnly className="flex-1 w-full border border-gray-300 p-2 rounded bg-gray-100 cursor-not-allowed text-gray-600" />
+                          {delays.length > 1 && <button type="button" onClick={() => removeDelay(index)} className="text-red-500 font-bold hover:text-red-700 px-2">✕</button>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <table className="w-full border-collapse border border-gray-300 text-sm">
-              <thead className="bg-gray-100 text-gray-700">
-                <tr>
-                  <th rowSpan="2" className="border border-gray-300 p-2 text-left w-64 align-middle">Component Name</th>
-                  <th colSpan="2" className="border border-gray-300 p-1 text-center bg-gray-200">Penetration (N/cm²)</th>
-                  <th colSpan="2" className="border border-gray-300 p-1 text-center bg-gray-200">B-Scale</th>
-                  <th rowSpan="2" className="border border-gray-300 p-2 align-middle">Remarks</th>
-                </tr>
-                <tr>
-                  <th className="border border-gray-300 p-2 w-40">PP</th>
-                  <th className="border border-gray-300 p-2 w-40">SP</th>
-                  <th className="border border-gray-300 p-2 w-40">PP</th>
-                  <th className="border border-gray-300 p-2 w-40">SP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mouldHardness.map((item, index) => (
-                  <tr key={index} className="bg-white">
-                    <td className="border border-gray-300 p-2 align-top">
-                      <SearchableSelect key={`hardness-${index}-${resetKey}`} options={components} displayKey="description" value={item.componentName} onSelect={(comp) => updateMouldHardness(index, "componentName", comp.description)} />
-                    </td>
-                    <td className="border border-gray-300 p-2 align-top">
-                      <input 
-                        type="text" value={String(item.penetrationPP)} placeholder="Ex: 21.5, 23.2"
-                        onChange={(e) => updateMouldHardness(index, "penetrationPP", e.target.value)} 
-                        className={`w-full border border-gray-300 p-2 rounded focus:outline-orange-500 ${!validateMultipleNumbers(item.penetrationPP, 20) ? 'border-red-500' : ''}`} 
-                      />
-                      {!validateMultipleNumbers(item.penetrationPP, 20) && <p className="text-red-500 text-xs mt-1 font-medium">Min: 20</p>}
-                    </td>
-                    <td className="border border-gray-300 p-2 align-top">
-                      <input 
-                        type="text" value={String(item.penetrationSP)} placeholder="Ex: 21.5, 23.2"
-                        onChange={(e) => updateMouldHardness(index, "penetrationSP", e.target.value)} 
-                        className={`w-full border border-gray-300 p-2 rounded focus:outline-orange-500 ${!validateMultipleNumbers(item.penetrationSP, 20) ? 'border-red-500' : ''}`} 
-                      />
-                      {!validateMultipleNumbers(item.penetrationSP, 20) && <p className="text-red-500 text-xs mt-1 font-medium">Min: 20</p>}
-                    </td>
-                    <td className="border border-gray-300 p-2 align-top">
-                      <input 
-                        type="text" value={String(item.bScalePP)} placeholder="Ex: 86.5, 88.2"
-                        onChange={(e) => updateMouldHardness(index, "bScalePP", e.target.value)} 
-                        className={`w-full border border-gray-300 p-2 rounded focus:outline-orange-500 ${!validateMultipleNumbers(item.bScalePP, 85) ? 'border-red-500' : ''}`} 
-                      />
-                      {!validateMultipleNumbers(item.bScalePP, 85) && <p className="text-red-500 text-xs mt-1 font-medium">Min: 85</p>}
-                    </td>
-                    <td className="border border-gray-300 p-2 align-top">
-                      <input 
-                        type="text" value={String(item.bScaleSP)} placeholder="Ex: 86.5, 88.2"
-                        onChange={(e) => updateMouldHardness(index, "bScaleSP", e.target.value)} 
-                        className={`w-full border border-gray-300 p-2 rounded focus:outline-orange-500 ${!validateMultipleNumbers(item.bScaleSP, 85) ? 'border-red-500' : ''}`} 
-                      />
-                      {!validateMultipleNumbers(item.bScaleSP, 85) && <p className="text-red-500 text-xs mt-1 font-medium">Min: 85</p>}
-                    </td>
-                    <td className="border border-gray-300 p-2 align-top">
-                      <div className="flex gap-2 w-full">
-                        <MultiSelectDropdown 
-                          options={mouldRemarksList} 
-                          displayKey="remarkName" 
-                          selectedValue={item.remarks} 
-                          onChange={(val) => updateMouldHardness(index, "remarks", val)} 
+
+            {/* MOULD HARDNESS */}
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-lg font-bold text-gray-800">Mould Hardness :</h2>
+                <button type="button" onClick={addMouldHardness} className="bg-orange-500 hover:bg-orange-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-lg leading-none">+</button>
+              </div>
+              <table className="w-full border-collapse border border-gray-300 text-sm">
+                <thead className="bg-gray-100 text-gray-700">
+                  <tr>
+                    <th rowSpan="2" className="border border-gray-300 p-2 text-left w-64 align-middle">Component Name</th>
+                    <th colSpan="2" className="border border-gray-300 p-1 text-center bg-gray-200">Penetration (N/cm²)</th>
+                    <th colSpan="2" className="border border-gray-300 p-1 text-center bg-gray-200">B-Scale</th>
+                    <th rowSpan="2" className="border border-gray-300 p-2 align-middle">Remarks</th>
+                  </tr>
+                  <tr>
+                    <th className="border border-gray-300 p-2 w-40">PP</th>
+                    <th className="border border-gray-300 p-2 w-40">SP</th>
+                    <th className="border border-gray-300 p-2 w-40">PP</th>
+                    <th className="border border-gray-300 p-2 w-40">SP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mouldHardness.map((item, index) => (
+                    <tr key={index} className="bg-white">
+                      <td className="border border-gray-300 p-2 align-top">
+                        <SearchableSelect key={`hardness-${index}-${resetKey}`} options={components} displayKey="description" value={item.componentName} onSelect={(comp) => updateMouldHardness(index, "componentName", comp.description)} />
+                      </td>
+                      <td className="border border-gray-300 p-2 align-top">
+                        <input 
+                          type="text" value={String(item.penetrationPP)} placeholder="Ex: 21.5, 23.2"
+                          onChange={(e) => updateMouldHardness(index, "penetrationPP", e.target.value)} 
+                          className={`w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white ${!validateMultipleNumbers(item.penetrationPP, 20) ? 'border-red-500' : ''}`} 
                         />
-                        {mouldHardness.length > 1 && <button type="button" onClick={() => removeMouldHardness(index)} className="text-red-500 font-bold hover:text-red-700 px-2 mt-2">✕</button>}
-                      </div>
-                    </td>
+                        {!validateMultipleNumbers(item.penetrationPP, 20) && <p className="text-red-500 text-xs mt-1 font-medium">Min: 20</p>}
+                      </td>
+                      <td className="border border-gray-300 p-2 align-top">
+                        <input 
+                          type="text" value={String(item.penetrationSP)} placeholder="Ex: 21.5, 23.2"
+                          onChange={(e) => updateMouldHardness(index, "penetrationSP", e.target.value)} 
+                          className={`w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white ${!validateMultipleNumbers(item.penetrationSP, 20) ? 'border-red-500' : ''}`} 
+                        />
+                        {!validateMultipleNumbers(item.penetrationSP, 20) && <p className="text-red-500 text-xs mt-1 font-medium">Min: 20</p>}
+                      </td>
+                      <td className="border border-gray-300 p-2 align-top">
+                        <input 
+                          type="text" value={String(item.bScalePP)} placeholder="Ex: 86.5, 88.2"
+                          onChange={(e) => updateMouldHardness(index, "bScalePP", e.target.value)} 
+                          className={`w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white ${!validateMultipleNumbers(item.bScalePP, 85) ? 'border-red-500' : ''}`} 
+                        />
+                        {!validateMultipleNumbers(item.bScalePP, 85) && <p className="text-red-500 text-xs mt-1 font-medium">Min: 85</p>}
+                      </td>
+                      <td className="border border-gray-300 p-2 align-top">
+                        <input 
+                          type="text" value={String(item.bScaleSP)} placeholder="Ex: 86.5, 88.2"
+                          onChange={(e) => updateMouldHardness(index, "bScaleSP", e.target.value)} 
+                          className={`w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white ${!validateMultipleNumbers(item.bScaleSP, 85) ? 'border-red-500' : ''}`} 
+                        />
+                        {!validateMultipleNumbers(item.bScaleSP, 85) && <p className="text-red-500 text-xs mt-1 font-medium">Min: 85</p>}
+                      </td>
+                      <td className="border border-gray-300 p-2 align-top">
+                        <div className="flex gap-2 w-full">
+                          <MultiSelectDropdown 
+                            options={mouldRemarksList} 
+                            displayKey="remarkName" 
+                            selectedValue={item.remarks} 
+                            onChange={(val) => updateMouldHardness(index, "remarks", val)} 
+                          />
+                          {mouldHardness.length > 1 && <button type="button" onClick={() => removeMouldHardness(index)} className="text-red-500 font-bold hover:text-red-700 px-2 mt-2">✕</button>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* PATTERN TEMPERATURE */}
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-lg font-bold text-gray-800">Pattern Temp. (°C) :</h2>
+                <button type="button" onClick={addPatternTemp} className="bg-orange-500 hover:bg-orange-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-lg leading-none">+</button>
+              </div>
+              <table className="w-full border-collapse border border-gray-300 text-sm">
+                <thead className="bg-gray-100 text-gray-700">
+                  <tr>
+                    <th className="border border-gray-300 p-2 text-left w-1/3">Component Name</th>
+                    <th className="border border-gray-300 p-2 w-32">PP</th>
+                    <th className="border border-gray-300 p-2 w-32">SP</th>
+                    <th className="border border-gray-300 p-2">Remarks</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* PATTERN TEMPERATURE */}
-          <div className="mt-4">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-bold text-gray-800">Pattern Temp. (°C) :</h2>
-              <button type="button" onClick={addPatternTemp} className="bg-orange-500 hover:bg-orange-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-lg leading-none">+</button>
+                </thead>
+                <tbody>
+                  {patternTemps.map((pt, index) => (
+                    <tr key={index} className="bg-white">
+                      <td className="border border-gray-300 p-2 align-top">
+                        <SearchableSelect key={`patternTemp-${index}-${resetKey}`} options={components} displayKey="description" value={pt.componentName} onSelect={(item) => updatePatternTemp(index, "componentName", item.description)} />
+                      </td>
+                      <td className="border border-gray-300 p-2 align-top">
+                        <input 
+                          type="text" value={String(pt.pp)} placeholder="-"
+                          onChange={(e) => updatePatternTemp(index, "pp", e.target.value)} 
+                          className={`w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white ${!validateMultipleNumbers(pt.pp, 45) ? 'border-red-500' : ''}`} 
+                        />
+                        {!validateMultipleNumbers(pt.pp, 45) && <p className="text-red-500 text-xs mt-1 font-medium">Min: 45</p>}
+                      </td>
+                      <td className="border border-gray-300 p-2 align-top">
+                        <input 
+                          type="text" value={String(pt.sp)} placeholder="-"
+                          onChange={(e) => updatePatternTemp(index, "sp", e.target.value)} 
+                          className={`w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white ${!validateMultipleNumbers(pt.sp, 45) ? 'border-red-500' : ''}`} 
+                        />
+                        {!validateMultipleNumbers(pt.sp, 45) && <p className="text-red-500 text-xs mt-1 font-medium">Min: 45</p>}
+                      </td>
+                      <td className="border border-gray-300 p-2 align-top">
+                        <div className="flex gap-2 w-full">
+                          <textarea value={String(pt.remarks)} onChange={(e) => updatePatternTemp(index, "remarks", e.target.value)} className="flex-1 w-full border border-gray-300 p-2 rounded focus:outline-orange-500 h-10 resize-y bg-white" placeholder="Type '-' if none" />
+                          {patternTemps.length > 1 && <button type="button" onClick={() => removePatternTemp(index)} className="text-red-500 font-bold hover:text-red-700 px-2">✕</button>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <table className="w-full border-collapse border border-gray-300 text-sm">
-              <thead className="bg-gray-100 text-gray-700">
-                <tr>
-                  <th className="border border-gray-300 p-2 text-left w-1/3">Component Name</th>
-                  <th className="border border-gray-300 p-2 w-32">PP</th>
-                  <th className="border border-gray-300 p-2 w-32">SP</th>
-                  <th className="border border-gray-300 p-2">Remarks</th>
-                </tr>
-              </thead>
-              <tbody>
-                {patternTemps.map((pt, index) => (
-                  <tr key={index} className="bg-white">
-                    <td className="border border-gray-300 p-2 align-top">
-                      <SearchableSelect key={`patternTemp-${index}-${resetKey}`} options={components} displayKey="description" value={pt.componentName} onSelect={(item) => updatePatternTemp(index, "componentName", item.description)} />
-                    </td>
-                    <td className="border border-gray-300 p-2 align-top">
-                      <input 
-                        type="text" value={String(pt.pp)} placeholder="-"
-                        onChange={(e) => updatePatternTemp(index, "pp", e.target.value)} 
-                        className={`w-full border border-gray-300 p-2 rounded focus:outline-orange-500 ${!validateMultipleNumbers(pt.pp, 45) ? 'border-red-500' : ''}`} 
-                      />
-                      {!validateMultipleNumbers(pt.pp, 45) && <p className="text-red-500 text-xs mt-1 font-medium">Min: 45</p>}
-                    </td>
-                    <td className="border border-gray-300 p-2 align-top">
-                      <input 
-                        type="text" value={String(pt.sp)} placeholder="-"
-                        onChange={(e) => updatePatternTemp(index, "sp", e.target.value)} 
-                        className={`w-full border border-gray-300 p-2 rounded focus:outline-orange-500 ${!validateMultipleNumbers(pt.sp, 45) ? 'border-red-500' : ''}`} 
-                      />
-                      {!validateMultipleNumbers(pt.sp, 45) && <p className="text-red-500 text-xs mt-1 font-medium">Min: 45</p>}
-                    </td>
-                    <td className="border border-gray-300 p-2 align-top">
-                      <div className="flex gap-2 w-full">
-                        <textarea value={String(pt.remarks)} onChange={(e) => updatePatternTemp(index, "remarks", e.target.value)} className="flex-1 w-full border border-gray-300 p-2 rounded focus:outline-orange-500 h-10 resize-y" placeholder="Type '-' if none" />
-                        {patternTemps.length > 1 && <button type="button" onClick={() => removePatternTemp(index)} className="text-red-500 font-bold hover:text-red-700 px-2">✕</button>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
 
-          {/* OTHER DETAILS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-            <div>
-              <label className="font-bold text-gray-700 block mb-1">Significant Event</label>
-              <textarea name="significantEvent" value={String(formData.significantEvent || "")} onChange={handleChange} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 h-20 resize-y" placeholder="Type '-' if none..." />
+            {/* OTHER DETAILS */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">Significant Event</label>
+                <textarea name="significantEvent" value={String(formData.significantEvent || "")} onChange={handleChange} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 h-20 resize-y bg-white" placeholder="Type '-' if none..." />
+              </div>
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">Maintenance</label>
+                <textarea name="maintenance" value={String(formData.maintenance || "")} onChange={handleChange} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 h-20 resize-y bg-white" placeholder="Type '-' if none..." />
+              </div>
             </div>
-            <div>
-              <label className="font-bold text-gray-700 block mb-1">Maintenance</label>
-              <textarea name="maintenance" value={String(formData.maintenance || "")} onChange={handleChange} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 h-20 resize-y" placeholder="Type '-' if none..." />
+
+            <div className="w-1/3 mt-4">
+              <SearchableSelect key={`supervisor-${resetKey}`} label="Supervisor Name" options={supervisors} displayKey="supervisorName" value={formData.supervisorName} onSelect={(item) => setFormData({ ...formData, supervisorName: item.supervisorName || item.supervisorName })} />
             </div>
-          </div>
 
-          <div className="w-1/3 mt-4">
-            <SearchableSelect key={`supervisor-${resetKey}`} label="Supervisor Name" options={supervisors} displayKey="supervisorName" value={formData.supervisorName} onSelect={(item) => setFormData({ ...formData, supervisorName: item.supervisorName || item.supervisorName })} />
-          </div>
-
-          {/* BUTTONS */}
-          <div className="flex justify-end gap-4 mt-6">
-            <button type="button" onClick={handleDownload} className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-2 rounded font-bold transition-colors flex items-center gap-2 shadow-lg">
-              <span>⬇️</span> Generate Report (PDF)
-            </button>
-            <button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-2 rounded font-bold transition-colors shadow-md">
-              Submit Form
-            </button>
-          </div>
-          
-        </form>
+            {/* BUTTONS */}
+            <div className="flex justify-end gap-4 mt-6">
+              <button type="button" onClick={handleDownload} className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-2 rounded font-bold transition-colors flex items-center gap-2 shadow-lg">
+                <span>⬇️</span> Generate Report (PDF)
+              </button>
+              <button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-2 rounded font-bold transition-colors shadow-md">
+                Submit Form
+              </button>
+            </div>
+            
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
