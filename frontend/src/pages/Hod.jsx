@@ -43,6 +43,10 @@ const Hod = () => {
 
   const formatDate = (dateString) => { return new Date(dateString).toLocaleDateString("en-GB"); };
 
+  const getAuthHeader = () => {
+    return { Authorization: `Bearer ${localStorage.getItem('token')}` };
+  };
+
   // ===============================================
   //  DISAMATIC LOGIC
   // ===============================================
@@ -68,13 +72,16 @@ const Hod = () => {
       ]);
 
       const checklist = detailsRes.data.checklist; const monthlyLogs = monthlyRes.data.monthlyLogs || []; const ncReports = monthlyRes.data.ncReports || [];
-      const historyMap = {}; const holidayDays = new Set(); const vatDays = new Set();
+      const historyMap = {}; const holidayDays = new Set(); const vatDays = new Set(); const pmDays = new Set();
       const opSigMap = {}; const hodSigMap = {};
 
       monthlyLogs.forEach(log => {
         const logDay = log.DayVal; const key = String(log.MasterId); 
         if (Number(log.IsHoliday) === 1) holidayDays.add(logDay);
         if (Number(log.IsVatCleaning) === 1) vatDays.add(logDay);
+        // 🔥 FIX: Added Preventive Maintenance tracking
+        if (Number(log.IsPreventiveMaintenance) === 1) pmDays.add(logDay);
+
         if (log.OperatorSignature) opSigMap[logDay] = log.OperatorSignature;
         if (log.HODSignature) hodSigMap[logDay] = log.HODSignature;
         if (!historyMap[key]) historyMap[key] = {};
@@ -96,6 +103,8 @@ const Hod = () => {
         for (let i = 1; i <= 31; i++) {
             if (holidayDays.has(i)) { if (rowIndex === 0) row.push({ content: 'H\nO\nL\nI\nD\nA\nY', rowSpan: checklist.length, styles: { halign: 'center', valign: 'middle', fillColor: [230, 230, 230], fontStyle: 'bold', textColor: [100, 100, 100] } }); } 
             else if (vatDays.has(i)) { if (rowIndex === 0) row.push({ content: 'V\nA\nT\n\nC\nL\nE\nA\nN\nI\nN\nG', rowSpan: checklist.length, styles: { halign: 'center', valign: 'middle', fillColor: [210, 230, 255], fontStyle: 'bold', textColor: [50, 100, 150] } }); } 
+            // 🔥 FIX: Added Preventive Maintenance cell rendering
+            else if (pmDays.has(i)) { if (rowIndex === 0) row.push({ content: 'P\nR\nE\nV\n.\n\nM\nA\nI\nN\nT', rowSpan: checklist.length, styles: { halign: 'center', valign: 'middle', fillColor: [240, 220, 255], fontStyle: 'bold', textColor: [100, 50, 150] } }); }
             else { row.push(historyMap[String(item.MasterId)]?.[i] || ''); }
         }
         return row;
@@ -129,7 +138,8 @@ const Hod = () => {
              const rawTextArray = data.cell.text || []; const rawTextString = rawTextArray.join('').replace(/\n/g, ''); const text = rawTextArray[0] ? rawTextArray[0] : '';
              if (text === 'Y') { data.cell.styles.font = 'ZapfDingbats'; data.cell.text = '3'; data.cell.styles.textColor = [0, 100, 0]; } 
              else if (text === 'N') { data.cell.styles.textColor = [255, 0, 0]; data.cell.text = 'X'; data.cell.styles.fontStyle = 'bold'; } 
-             else if (text && !rawTextString.includes('HOLIDAY') && !rawTextString.includes('VATCLEANING')) { data.cell.styles.fontSize = 4; data.cell.styles.fontStyle = 'bold'; data.cell.styles.textColor = [0, 0, 0]; data.cell.styles.halign = 'center'; data.cell.styles.cellPadding = 0.2; }
+             // 🔥 FIX: Added PREV.MAINT to exclusion list
+             else if (text && !rawTextString.includes('HOLIDAY') && !rawTextString.includes('VATCLEANING') && !rawTextString.includes('PREV.')) { data.cell.styles.fontSize = 4; data.cell.styles.fontStyle = 'bold'; data.cell.styles.textColor = [0, 0, 0]; data.cell.styles.halign = 'center'; data.cell.styles.cellPadding = 0.2; }
            }
         }
       });
@@ -186,7 +196,8 @@ const Hod = () => {
     try {
       const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/4m-change/report`, { 
           params: { reportId: report.id },
-          responseType: 'blob' 
+          responseType: 'blob',
+          headers: getAuthHeader()
       });
       const pdfBlobUrl = URL.createObjectURL(response.data);
       setFourMPdfUrl(pdfBlobUrl);
@@ -223,7 +234,8 @@ const Hod = () => {
       const dateStr = new Date(report.productionDate).toISOString().split('T')[0];
       const response = await axios.get(`${DAILY_API_BASE}/download-pdf`, { 
         params: { date: dateStr, disa: report.disa }, 
-        responseType: 'blob' 
+        responseType: 'blob',
+        headers: getAuthHeader()
       });
       const pdfBlobUrl = URL.createObjectURL(response.data);
       setDailyPdfUrl(pdfBlobUrl);

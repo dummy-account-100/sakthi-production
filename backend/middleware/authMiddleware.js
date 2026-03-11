@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET = process.env.JWT_SECRET || "your_super_secret_key_change_me_in_production";
+const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_2026";
 
 const verifyToken = (req, res, next) => {
     const token = req.headers["authorization"];

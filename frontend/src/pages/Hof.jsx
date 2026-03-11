@@ -121,13 +121,18 @@ const Hof = () => {
       const todayStr = new Date().toISOString().split('T')[0];
       const detailsRes = await axios.get(`${API_BASE}/details`, { params: { date: todayStr, disaMachine } });
       const checklist = detailsRes.data.checklist;
-      const historyMap = {}; const holidayDays = new Set(); const vatDays = new Set();
+      
+      // 🔥 FIX: Added pmDays Set here
+      const historyMap = {}; const holidayDays = new Set(); const vatDays = new Set(); const pmDays = new Set();
       const supSigMap = {}; const hofSig = report.hofSignature;
 
       monthlyLogs.forEach(log => {
         const logDay = log.DayVal; const key = String(log.MasterId); 
         if (Number(log.IsHoliday) === 1) holidayDays.add(logDay);
         if (Number(log.IsVatCleaning) === 1) vatDays.add(logDay);
+        // 🔥 FIX: Adding Preventive Maintenance tracking
+        if (Number(log.IsPreventiveMaintenance) === 1) pmDays.add(logDay);
+        
         if (log.SupervisorSignature) supSigMap[logDay] = log.SupervisorSignature;
         if (!historyMap[key]) historyMap[key] = {};
         if (log.IsNA == 1) { historyMap[key][logDay] = 'NA'; } else if (log.IsDone == 1) { historyMap[key][logDay] = 'Y'; } else { historyMap[key][logDay] = 'N'; }
@@ -150,6 +155,8 @@ const Hof = () => {
         for (let i = 1; i <= daysInMonth; i++) {
             if (holidayDays.has(i)) { if (rowIndex === 0) row.push({ content: 'H\nO\nL\nI\nD\nA\nY', rowSpan: checklist.length, styles: { halign: 'center', valign: 'middle', fillColor: [230, 230, 230], fontStyle: 'bold', textColor: [100, 100, 100] } }); } 
             else if (vatDays.has(i)) { if (rowIndex === 0) row.push({ content: 'V\nA\nT\n\nC\nL\nE\nA\nN\nI\nN\nG', rowSpan: checklist.length, styles: { halign: 'center', valign: 'middle', fillColor: [210, 230, 255], fontStyle: 'bold', textColor: [50, 100, 150] } }); } 
+            // 🔥 FIX: Added Preventive Maintenance cell rendering
+            else if (pmDays.has(i)) { if (rowIndex === 0) row.push({ content: 'P\nR\nE\nV\n.\n\nM\nA\nI\nN\nT', rowSpan: checklist.length, styles: { halign: 'center', valign: 'middle', fillColor: [240, 220, 255], fontStyle: 'bold', textColor: [100, 50, 150] } }); }
             else { row.push(historyMap[String(item.MasterId)]?.[i] || ''); }
         }
         return row;
