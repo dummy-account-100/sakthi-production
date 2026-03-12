@@ -76,10 +76,10 @@ const AdminDashboard = () => {
     const [loadingUsers, setLoadingUsers] = useState(false);
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [editUser, setEditUser] = useState({ id: "", username: "", role: "" });
+    const [editUser, setEditUser] = useState({ id: "", username: "", employeeId: "", role: "" });
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [newUser, setNewUser] = useState({ username: "", password: "", role: "" });
+    const [newUser, setNewUser] = useState({ username: "", employeeId: "", password: "", role: "" });
 
     // 🔥 State for QF Settings Manager
     const [qfSettings, setQfSettings] = useState([]);
@@ -155,7 +155,7 @@ const AdminDashboard = () => {
             await axios.post(`${process.env.REACT_APP_API_URL}/api/users/add`, newUser);
             setNotification({ show: true, type: 'success', message: 'User added successfully!' });
             setIsAddModalOpen(false);
-            setNewUser({ username: "", password: "", role: "" });
+            setNewUser({ username: "", employeeId: "", password: "", role: "" });
             fetchUsers();
         } catch (error) {
             const errorMsg = error.response?.data?.error || 'Failed to add user';
@@ -168,6 +168,7 @@ const AdminDashboard = () => {
         try {
             await axios.put(`${process.env.REACT_APP_API_URL}/api/users/${editUser.id}`, {
                 username: editUser.username,
+                employeeId: editUser.employeeId,
                 role: editUser.role,
             });
             setNotification({ show: true, type: 'success', message: 'User updated successfully!' });
@@ -530,7 +531,7 @@ const AdminDashboard = () => {
                             <table className="w-full text-left border-collapse bg-white">
                                 <thead className="bg-gray-800 text-white">
                                     <tr>
-                                        <th className="p-4 border-b border-gray-700 w-20 text-center uppercase tracking-wider text-xs font-bold">ID</th>
+                                        <th className="p-4 border-b border-gray-700 w-32 text-center uppercase tracking-wider text-xs font-bold">Emp ID</th>
                                         <th className="p-4 border-b border-gray-700 uppercase tracking-wider text-xs font-bold">Username</th>
                                         <th className="p-4 border-b border-gray-700 w-48 uppercase tracking-wider text-xs font-bold">Role</th>
                                         <th className="p-4 border-b border-gray-700 w-32 text-center uppercase tracking-wider text-xs font-bold">Actions</th>
@@ -540,7 +541,7 @@ const AdminDashboard = () => {
                                     {users.length > 0 ? (
                                         users.map((u) => (
                                             <tr key={u.id} className="hover:bg-orange-50 transition-colors border-b border-gray-200 last:border-0 group">
-                                                <td className="p-4 text-center font-black text-gray-400 group-hover:text-[#ff9100] transition-colors">{u.id}</td>
+                                                <td className="p-4 text-center font-black text-gray-400 group-hover:text-[#ff9100] transition-colors">{u.employeeId}</td>
                                                 <td className="p-4 font-bold text-gray-800 text-lg">{u.username}</td>
                                                 <td className="p-4">
                                                     <span className="bg-gray-200 text-gray-800 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-widest">
@@ -549,7 +550,7 @@ const AdminDashboard = () => {
                                                 </td>
                                                 <td className="p-4">
                                                     <div className="flex justify-center gap-4">
-                                                        <button onClick={() => { setEditUser({ id: u.id, username: u.username, role: u.role }); setIsEditModalOpen(true); }} className="text-blue-500 hover:text-blue-700 transition-transform hover:scale-110" title="Edit User">
+                                                        <button onClick={() => { setEditUser({ id: u.id, username: u.username, employeeId: u.employeeId, role: u.role }); setIsEditModalOpen(true); }} className="text-blue-500 hover:text-blue-700 transition-transform hover:scale-110" title="Edit User">
                                                             <Edit size={20} />
                                                         </button>
                                                         <button onClick={() => handleDeleteUser(u.id)} className="text-red-500 hover:text-red-700 transition-transform hover:scale-110" title="Delete User">
@@ -583,6 +584,10 @@ const AdminDashboard = () => {
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-wider text-gray-600 mb-1">Username</label>
                                     <input type="text" required value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} className="w-full border-2 border-gray-300 p-3 rounded-xl focus:outline-none focus:border-[#ff9100] transition-colors font-bold text-gray-800" placeholder="Enter username" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-black uppercase tracking-wider text-gray-600 mb-1">Employee ID</label>
+                                    <input type="text" required value={newUser.employeeId} onChange={(e) => setNewUser({ ...newUser, employeeId: e.target.value })} className="w-full border-2 border-gray-300 p-3 rounded-xl focus:outline-none focus:border-[#ff9100] transition-colors font-bold text-gray-800" placeholder="Enter Employee ID" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-wider text-gray-600 mb-1">Password</label>
@@ -619,6 +624,10 @@ const AdminDashboard = () => {
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-wider text-gray-600 mb-1">Username</label>
                                     <input type="text" required value={editUser.username} onChange={(e) => setEditUser({ ...editUser, username: e.target.value })} className="w-full border-2 border-gray-300 p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-gray-800" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-black uppercase tracking-wider text-gray-600 mb-1">Employee ID</label>
+                                    <input type="text" required value={editUser.employeeId} onChange={(e) => setEditUser({ ...editUser, employeeId: e.target.value })} className="w-full border-2 border-gray-300 p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-gray-800" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-wider text-gray-600 mb-1">Role</label>
