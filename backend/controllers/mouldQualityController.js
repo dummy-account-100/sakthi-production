@@ -181,21 +181,26 @@ exports.generateReport = async (req, res) => {
 
     y += 55; 
 
-    const colWidths = [25, 30, 80, 45, 35, 35, 35, 35, 35, 35, 35, 35, 35, 45, 30, 25, 25, 25, 25, 25, 25];
+    // 🔥 Changed the third column (Part Name) from 80 to 140
+    const colWidths = [25, 30, 140, 45, 35, 35, 35, 35, 35, 35, 35, 35, 35, 45, 30, 25, 25, 25, 25, 25, 25];
     
     const drawTableHeaders = (startY) => {
         let cy = startY;
         doc.fontSize(7).font("Helvetica-Bold");
         doc.rect(startX, cy, 25, 55).stroke(); doc.text("S.No", startX, cy + 25, { width: 25, align: "center" });
         doc.rect(startX + 25, cy, 30, 55).stroke(); doc.text("Shift", startX + 25, cy + 25, { width: 30, align: "center" });
-        doc.rect(startX + 55, cy, 80, 55).stroke(); doc.text("Part Name", startX + 55, cy + 25, { width: 80, align: "center" });
-        doc.rect(startX + 135, cy, 45, 55).stroke(); doc.text("Data\nCode", startX + 135, cy + 20, { width: 45, align: "center" });
         
-        doc.rect(startX + 180, cy, 210, 15).stroke(); doc.text("First Moulding", startX + 180, cy + 5, { width: 210, align: "center" });
-        doc.rect(startX + 390, cy, 330, 15).stroke(); doc.text("During Running", startX + 390, cy + 5, { width: 330, align: "center" });
+        // Enlarged Part Name (width 140)
+        doc.rect(startX + 55, cy, 140, 55).stroke(); doc.text("Part Name", startX + 55, cy + 25, { width: 140, align: "center" }); 
+        
+        // Shifted all subsequent columns +60 points to the right
+        doc.rect(startX + 195, cy, 45, 55).stroke(); doc.text("Data\nCode", startX + 195, cy + 20, { width: 45, align: "center" });
+        
+        doc.rect(startX + 240, cy, 210, 15).stroke(); doc.text("First Moulding", startX + 240, cy + 5, { width: 210, align: "center" });
+        doc.rect(startX + 450, cy, 330, 15).stroke(); doc.text("During Running", startX + 450, cy + 5, { width: 330, align: "center" });
 
         let cy2 = cy + 15;
-        let cx = startX + 180;
+        let cx = startX + 240; // Shifted start for sub-headers
         doc.fontSize(6);
         
         const l2Single = [
@@ -222,7 +227,7 @@ exports.generateReport = async (req, res) => {
         });
 
         let cy3 = cy2 + 25; 
-        cx = startX + 570; 
+        cx = startX + 630; // Shifted start for PP/SP columns
         doc.fontSize(7);
         for(let i=0; i<3; i++) {
             doc.rect(cx, cy3, 25, 15).stroke(); doc.text("PP", cx, cy3 + 5, { width: 25, align: "center" }); cx += 25;

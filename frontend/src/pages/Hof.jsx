@@ -127,7 +127,6 @@ const Hof = () => {
     } catch (err) { toast.error("Failed to save Daily Performance signature."); }
   };
 
-
   // --- EXISTING MODAL LOGIC (Bottom Level, Error V1, Error V2) ---
   const handleOpenSignModal = async (report) => {
     setSelectedReport(report); setPdfUrl(null); setIsPdfLoading(true);
@@ -237,7 +236,9 @@ const Hof = () => {
   const handleOpenErrorModal = async (report) => {
     setSelectedErrorReport(report); setErrorPdfUrl(null); setIsErrorPdfLoading(true);
     try {
-      const response = await axios.get(`${ERR_API_BASE}/report`, { params: { line: report.disa }, responseType: 'blob' });
+      // 🔥 FIX: Extract the date from the report and pass it to the backend so the dynamic QF history logic works
+      const reportDateStr = new Date(report.reportDate).toISOString().split('T')[0];
+      const response = await axios.get(`${ERR_API_BASE}/report`, { params: { line: report.disa, date: reportDateStr }, responseType: 'blob' });
       const pdfBlobUrl = URL.createObjectURL(response.data);
       setErrorPdfUrl(pdfBlobUrl);
     } catch (error) { toast.error("Failed to generate Error Proof PDF."); }
@@ -259,7 +260,9 @@ const Hof = () => {
   const handleOpenErrorModalV2 = async (report) => {
     setSelectedErrorReportV2(report); setErrorPdfUrlV2(null); setIsErrorPdfLoadingV2(true);
     try {
-      const response = await axios.get(`${ERR_API_BASE_V2}/report`, { params: { line: report.disa }, responseType: 'blob' });
+      // 🔥 FIX: Added dynamic date extraction for V2 as well to support backend QF history logic
+      const reportDateStr = new Date(report.reportDate).toISOString().split('T')[0];
+      const response = await axios.get(`${ERR_API_BASE_V2}/report`, { params: { line: report.disa, date: reportDateStr }, responseType: 'blob' });
       const pdfBlobUrl = URL.createObjectURL(response.data);
       setErrorPdfUrlV2(pdfBlobUrl);
     } catch (error) { toast.error("Failed to generate Error Proof V2 PDF."); }

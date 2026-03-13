@@ -4,6 +4,7 @@ import Header from "../components/Header";
 import SignatureCanvas from "react-signature-canvas";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { FileDown, Save } from 'lucide-react'; 
 
 // --- Custom Searchable Dropdown for Table Cells ---
 const TableSearchableSelect = ({ options, displayKey, onSelect, value, placeholder }) => {
@@ -76,13 +77,13 @@ const ErrorProofVerification = () => {
   const [approvedBy, setApprovedBy] = useState("");
   const [remarks, setRemarks] = useState("");
 
-  const [verifiedBy, setVerifiedBy] = useState("");
+  const verifiedBy = ""; 
   const [reviewedByMain, setReviewedByMain] = useState("");
 
-  // 🔥 Lists for dropdowns
   const [operatorList, setOperatorList] = useState([]);
   const [supervisorList, setSupervisorList] = useState([]);
   const [hofList, setHofList] = useState([]);
+  const [qfHistory, setQfHistory] = useState([]); 
 
   const opSigCanvas = useRef({});
   const [assignedHOF, setAssignedHOF] = useState("");
@@ -93,10 +94,13 @@ const ErrorProofVerification = () => {
       setSNo(snoRes.data.nextSNo);
 
       const inchargeRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/error-proof/incharges`);
-      // 🔥 Extract arrays properly from updated backend
       setOperatorList(inchargeRes.data.operators || []);
       setSupervisorList(inchargeRes.data.supervisors || []);
       setHofList(inchargeRes.data.hofs || []);
+      
+      const bulkRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/error-proof/bulk-data`);
+      setQfHistory(bulkRes.data.qfHistory || []);
+      
     } catch (err) { console.error("Error fetching initial data", err); }
   };
 
@@ -107,13 +111,22 @@ const ErrorProofVerification = () => {
   const hasNotOk = Object.values(observations).includes("NOT_OK");
 
   const handleSubmit = async () => {
-    if (Object.keys(observations).length === 0) { alert("Please check OK or Not OK for at least one Error Proof."); return; }
+    if (Object.keys(observations).length === 0) { 
+      toast.warning("Please check OK or Not OK for at least one Error Proof."); 
+      return; 
+    }
     if (hasNotOk && (!errorProofNo || !problem || !reviewedByReaction || !approvedBy)) {
-      alert("Reaction Plan requires an Error Proof No, Problem, Operator Name, and Supervisor Assignment.");
+      toast.warning("Reaction Plan requires an Error Proof No, Problem, Operator Name, and Supervisor Assignment.");
       return;
     }
-    if (opSigCanvas.current.isEmpty()) { alert("Please provide your Operator Signature."); return; }
-    if (!assignedHOF) { alert("Please assign a HOF for verification."); return; }
+    if (opSigCanvas.current.isEmpty()) { 
+      toast.warning("Please provide your Operator Signature."); 
+      return; 
+    }
+    if (!assignedHOF) { 
+      toast.warning("Please assign a HOF for verification."); 
+      return; 
+    }
 
     const signatureData = opSigCanvas.current.getCanvas().toDataURL("image/png");
 
@@ -136,7 +149,7 @@ const ErrorProofVerification = () => {
         }
       }
 
-      alert("Records saved and sent to HOF/Supervisor!");
+      toast.success("Records saved and sent to HOF/Supervisor!");
 
       setObservations({});
       setErrorProofNo(""); setProblem(""); setRootCause(""); setCorrectiveAction(""); setReviewedByMain(""); setReviewedByReaction(""); setApprovedBy(""); setRemarks("");
@@ -144,27 +157,38 @@ const ErrorProofVerification = () => {
       setAssignedHOF("");
 
       fetchInitialData();
-    } catch (err) { alert("Error saving record"); }
+    } catch (err) { 
+      toast.error(err.response?.data?.message || "Error saving record"); 
+    }
   };
 
- const handleGenerateReport = async () => {
+  const handleGenerateReport = async () => {
     const targetLine = encodeURIComponent(defaultErrorProofs[0].line);
+    
     try {
-      // 🔥 FIX: Added `&_t=${Date.now()}` to force the browser to get a fresh PDF every time
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/error-proof/report?line=${targetLine}&_t=${Date.now()}`, {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/error-proof/report?line=${targetLine}&date=${recordDate}&_t=${Date.now()}`, {
         responseType: 'blob'
       });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `ErrorProof_Verification_${targetLine}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
       toast.success("PDF Downloaded successfully!");
     } catch (err) {
       console.error("Download failed", err);
-      toast.error("Failed to download PDF. Please check your connection or login again.");
+      // Custom toast for backend 404 block
+      if (err.response && err.response.data && err.response.data instanceof Blob) {
+        const errorText = await err.response.data.text();
+        toast.error(errorText || "Failed to download PDF. Please check your connection.");
+      } else {
+        toast.error(err.response?.data?.message || "Failed to download PDF. Please check your connection or login again.");
+      }
     }
   };
 
@@ -214,7 +238,6 @@ const ErrorProofVerification = () => {
             <div className="mt-8 animate-fade-in border-t-2 border-red-200 pt-6">
               <h3 className="text-xl font-bold mb-4 text-gray-800 text-center bg-red-100 py-2 rounded">REACTION PLAN REQUIRED</h3>
 
-              {/* 🔥 Added padding-bottom so dropdowns don't get clipped by overflow */}
               <div className="min-w-[1300px] pb-32 overflow-visible">
                 <table className="w-full text-center border-collapse border border-gray-300 text-sm mb-6 relative">
                   <thead className="bg-gray-100 text-gray-700 text-center text-xs uppercase tracking-wide">
@@ -229,12 +252,10 @@ const ErrorProofVerification = () => {
                       <td className="border border-gray-300 p-0 relative bg-gray-50"><textarea className="absolute inset-0 w-full h-full p-2 text-sm font-bold bg-transparent outline-none focus:ring-2 focus:ring-orange-500 resize-none placeholder:text-gray-400" placeholder="Action taken..." value={correctiveAction} onChange={(e) => setCorrectiveAction(e.target.value)} /></td>
                       <td className="border border-gray-300 p-0 relative bg-gray-50"><input type="text" className="absolute inset-0 w-full h-full text-center text-sm font-bold bg-yellow-50 text-yellow-700 cursor-not-allowed outline-none" value={status} readOnly /></td>
 
-                      {/* 🔥 New Searchable Operator Dropdown */}
                       <td className="border border-gray-300 p-0 align-top relative bg-gray-50">
                         <TableSearchableSelect options={operatorList} displayKey="name" value={reviewedByReaction} onSelect={setReviewedByReaction} placeholder="Operator Name..." />
                       </td>
 
-                      {/* 🔥 New Searchable Supervisor Dropdown */}
                       <td className="border border-gray-300 p-0 align-top relative bg-gray-50">
                         <TableSearchableSelect options={supervisorList} displayKey="name" value={approvedBy} onSelect={setApprovedBy} placeholder="Supervisor Name..." />
                       </td>
@@ -261,16 +282,17 @@ const ErrorProofVerification = () => {
                 <label className="text-xs font-black text-gray-700 uppercase mb-2 block">Assign HOF for Verification</label>
                 <select value={assignedHOF} onChange={(e) => setAssignedHOF(e.target.value)} className="w-full p-3 border-2 border-gray-400 bg-white rounded-lg font-bold text-gray-800 outline-none focus:border-blue-500">
                   <option value="">Select HOF...</option>
+                  
                   {hofList.map((hof, i) => <option key={i} value={hof.name}>{hof.name}</option>)}
                 </select>
               </div>
 
               <div className="flex gap-4">
-                <button onClick={handleGenerateReport} className="w-1/2 bg-gray-800 hover:bg-gray-900 text-white py-3 rounded font-bold transition-colors shadow-md">
-                  Download PDF
+                <button onClick={handleGenerateReport} className="w-1/2 bg-gray-800 hover:bg-gray-900 text-white py-3 rounded font-bold transition-colors shadow-md flex justify-center items-center gap-2">
+                  <FileDown size={18} /> Preview PDF
                 </button>
-                <button onClick={handleSubmit} className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded font-bold transition-colors shadow-lg">
-                  Save & Assign
+                <button onClick={handleSubmit} className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded font-bold transition-colors shadow-lg flex justify-center items-center gap-2">
+                  <Save size={18} /> Save & Assign
                 </button>
               </div>
             </div>

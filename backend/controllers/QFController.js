@@ -48,11 +48,17 @@ exports.getFormSettings = async (req, res) => {
                 FROM FourMChangeQFvalues
             ) t9 WHERE rn = 1
             UNION ALL
-            -- ✅ ADDED ERROR PROOF HERE
+            -- ✅ ADDED ERROR PROOF 2 HERE
             SELECT id, formName, qfValue, date FROM (
                 SELECT id, formName, qfValue, date, ROW_NUMBER() OVER(PARTITION BY formName ORDER BY date DESC, id DESC) as rn
                 FROM ErrorProof2QFvalues
             ) t10 WHERE rn = 1
+            UNION ALL
+            -- ✅ ADDED ERROR PROOF 1 HERE
+            SELECT id, formName, qfValue, date FROM (
+                SELECT id, formName, qfValue, date, ROW_NUMBER() OVER(PARTITION BY formName ORDER BY date DESC, id DESC) as rn
+                FROM ErrorProof1QFvalues
+            ) t11 WHERE rn = 1
             ORDER BY formName ASC
         `;
         res.json(result.recordset);
@@ -87,10 +93,17 @@ exports.updateFormSettings = async (req, res) => {
         } else if (setting.formName === '4m-change') {
             await sql.query`INSERT INTO FourMChangeQFvalues (formName, qfValue, date) VALUES (${setting.formName}, ${setting.qfValue}, ${safeDate})`;
         } 
-        // ✅ ERROR PROOF ALREADY PRESENT (kept unchanged)
+        // ✅ ERROR PROOF 2 ALREADY PRESENT (kept unchanged)
         else if (setting.formName === 'error-proof2') {
             await sql.query`
                 INSERT INTO ErrorProof2QFvalues (formName, qfValue, date)
+                VALUES (${setting.formName}, ${setting.qfValue}, ${safeDate})
+            `;
+        }
+        // ✅ ERROR PROOF 1 ADDED HERE
+        else if (setting.formName === 'error-proof') {
+            await sql.query`
+                INSERT INTO ErrorProof1QFvalues (formName, qfValue, date)
                 VALUES (${setting.formName}, ${setting.qfValue}, ${safeDate})
             `;
         }

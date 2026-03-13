@@ -8,7 +8,8 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  const handleLogin = async () => {
+  const handleLogin = async (e) => {
+    if (e) e.preventDefault(); // Prevents the default page reload on form submit
     try {
       const res = await axios.post(
         `${process.env.REACT_APP_API_URL}/api/auth/login`,
@@ -41,14 +42,15 @@ const Login = () => {
       <div className="w-full max-w-md bg-white p-10 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-10 relative border border-white/20 backdrop-blur-sm">
         
         <div className="text-center mb-10">
-          <div className="w-20 h-20 bg-white-100  flex items-center justify-center mx-auto mb-4  border-2 border-gray-200">
+          <div className="w-20 h-20 bg-white-100 flex items-center justify-center mx-auto mb-4 border-2 border-gray-200">
             <img src={myLogo} alt="SA" />
           </div>
           <h2 className="text-3xl font-black text-gray-800 uppercase tracking-widest mb-2">Welcome</h2>
           <p className="text-xs font-bold text-[#ff9100] uppercase tracking-[0.2em]">Sakthi Auto Component Limited</p>
         </div>
 
-        <div className="space-y-6">
+        {/* Changed this div to a <form> tag */}
+        <form className="space-y-6" onSubmit={handleLogin}>
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2 ml-1">Employee ID</label>
             <input
@@ -72,7 +74,7 @@ const Login = () => {
           </div>
 
           <button
-            onClick={handleLogin}
+            type="submit" // Changed to type="submit"
             className="w-full bg-gradient-to-r from-[#ff9100] to-orange-600 hover:from-orange-500 hover:to-orange-700 text-white font-black text-lg py-4 rounded-xl shadow-[0_10px_20px_rgba(255,145,0,0.3)] hover:shadow-[0_15px_25px_rgba(255,145,0,0.4)] transition-all transform hover:-translate-y-1 active:translate-y-0 active:scale-95 uppercase tracking-widest mt-6 flex items-center justify-center gap-3"
           >
             Secure Login
@@ -81,7 +83,7 @@ const Login = () => {
               <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
             </svg>
           </button>
-        </div>
+        </form>
         
       </div>
     </div>

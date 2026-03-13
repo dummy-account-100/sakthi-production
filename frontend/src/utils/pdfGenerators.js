@@ -679,13 +679,9 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
     doc.save(`${safeTitle}_Bulk_${dateRange.from}_to_${dateRange.to}.pdf`);
 };
 
-// ============================================================================
-// 5. ERROR PROOF VERIFICATION (Legacy / Fallback)
-// ============================================================================
 export const generateErrorProofPDF = (data, dateRange) => {
     const doc = new jsPDF('l', 'mm', 'a4');
     
-    // 🔥 Extract verifications, plans, and qfHistory from the passed data 🔥
     const verifications = data.verifications || [];
     const plans = data.plans || [];
     const qfHistory = data.qfHistory || [];
@@ -707,10 +703,36 @@ export const generateErrorProofPDF = (data, dateRange) => {
 
     if (plans) {
         plans.forEach(plan => {
-            const dateKey = String(plan.recordDate || plan.RecordDate).split('T')[0];
-            const machine = verifications.find(v => (v.errorProofName || v.ErrorProofName) === (plan.errorProofName || plan.ErrorProofName))?.line || verifications[0]?.line;
-            if (machine && groupedByDateAndMachine[dateKey] && groupedByDateAndMachine[dateKey][machine]) {
-                groupedByDateAndMachine[dateKey][machine].r.push(plan);
+            const planDateKey = String(plan.recordDate || plan.RecordDate).split('T')[0];
+            const planName = plan.errorProofName || plan.ErrorProofName;
+
+            // 🔥 CRITICAL FIX: Match the reaction plan EXACTLY to the verification on the same Date and Error Proof Name
+            const exactVerification = verifications.find(v => 
+                String(v.recordDate || v.RecordDate).split('T')[0] === planDateKey &&
+                (v.errorProofName || v.ErrorProofName) === planName
+            );
+
+            // Fallback in case timestamps drifted: find any verification in the whole array with the same name
+            const fallbackVerification = verifications.find(v => (v.errorProofName || v.ErrorProofName) === planName);
+
+            const machine = exactVerification ? (exactVerification.line || exactVerification.DisaMachine) : 
+                            (fallbackVerification ? (fallbackVerification.line || fallbackVerification.DisaMachine) : null);
+
+            if (machine) {
+                // Standard exact match
+                if (groupedByDateAndMachine[planDateKey] && groupedByDateAndMachine[planDateKey][machine]) {
+                    groupedByDateAndMachine[planDateKey][machine].r.push(plan);
+                } 
+                // Fallback: If dates drifted, attach it to the actual date group where the machine and error proof exist
+                else {
+                    const actualDateKey = Object.keys(groupedByDateAndMachine).find(dk => 
+                        groupedByDateAndMachine[dk][machine] && 
+                        groupedByDateAndMachine[dk][machine].v.some(v => (v.errorProofName || v.ErrorProofName) === planName)
+                    );
+                    if (actualDateKey) {
+                        groupedByDateAndMachine[actualDateKey][machine].r.push(plan);
+                    }
+                }
             }
         });
     }
@@ -723,8 +745,7 @@ export const generateErrorProofPDF = (data, dateRange) => {
             if (!isFirstPage) doc.addPage();
             isFirstPage = false;
 
-            // 🔥 FIND DYNAMIC QF VALUE FOR THIS SPECIFIC DATE 🔥
-            let currentPageQfValue = "QF/07/FBP-13, Rev.No:06 dt 08.10.2025"; // Fallback System Default
+            let currentPageQfValue = "QF/07/FBP-13, Rev.No:06 dt 08.10.2025"; 
             const reportDate = new Date(dateKey);
             reportDate.setHours(0, 0, 0, 0);
 
@@ -739,7 +760,7 @@ export const generateErrorProofPDF = (data, dateRange) => {
             }
 
             const records = groupedByDateAndMachine[dateKey][machine];
-            const headerData = { date: dateKey, disaMachine: machine, reviewedBy: records.v[0]?.ReviewedByHOF || '', approvedBy: records.v[0]?.ApprovedBy || '' };
+            const headerData = { date: dateKey, disaMachine: machine, reviewedBy: records.v[0]?.ReviewedByHOF || records.v[0]?.HOFSignature || '', approvedBy: records.v[0]?.ApprovedBy || records.v[0]?.OperatorSignature || '' };
 
             doc.setLineWidth(0.3);
             doc.rect(10, 10, 40, 20);
@@ -758,18 +779,24 @@ export const generateErrorProofPDF = (data, dateRange) => {
             doc.setFontSize(10); doc.setFont('helvetica', 'normal'); 
             doc.text(`DATE: ${formatDate(dateKey)}`, 258.5, 26, { align: 'center' });
 
-            const vRows = records.v.map((item, index) => [
-                index + 1, item.line || item.DisaMachine, item.errorProofName || item.ErrorProofName, item.natureOfErrorProof || item.NatureOfErrorProof, item.frequency || item.Frequency,
-                item.Date1_Shift1_Res === 'OK' ? 'OK' : item.Date1_Shift1_Res === 'NOT OK' ? 'NOT OK' : '-',
-                item.Date1_Shift2_Res === 'OK' ? 'OK' : item.Date1_Shift2_Res === 'NOT OK' ? 'NOT OK' : '-',
-                item.Date1_Shift3_Res === 'OK' ? 'OK' : item.Date1_Shift3_Res === 'NOT OK' ? 'NOT OK' : '-'
-            ]);
+            const vRows = records.v.map((item, index) => {
+                const obs = item.observationResult === 'NOT_OK' ? 'NOT OK' : (item.observationResult || '-');
+                return [
+                    index + 1, 
+                    item.line || item.DisaMachine, 
+                    item.errorProofName || item.ErrorProofName, 
+                    item.natureOfErrorProof || item.NatureOfErrorProof, 
+                    item.frequency || item.Frequency,
+                    obs
+                ];
+            });
 
             autoTable(doc, {
                 startY: 35,
-                head: [[{ content: 'S.No', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }, { content: 'Line', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }, { content: 'Error Proof Name', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }, { content: 'Nature of Error Proof', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }, { content: 'Frequency', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }, { content: 'Verification Result', colSpan: 3, styles: { halign: 'center' } }], ['I - Shift', 'II - Shift', 'III - Shift']],
+                head: [['S.No', 'Line', 'Error Proof Name', 'Nature of Error Proof', 'Frequency', 'Observation Result']],
                 body: vRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0], valign: 'middle' },
-                headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0], fontStyle: 'bold' }
+                headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
+                columnStyles: { 0: { halign: 'center', cellWidth: 12 }, 5: { halign: 'center', fontStyle: 'bold', cellWidth: 25 } }
             });
 
             let currentY = doc.lastAutoTable.finalY + 10;
@@ -779,13 +806,35 @@ export const generateErrorProofPDF = (data, dateRange) => {
                 doc.text("Reaction Plan", 148.5, currentY, { align: 'center' });
                 currentY += 5;
 
-                const rRows = records.r.map((item, index) => [index + 1, item.errorProofNo || '-', item.errorProofName || item.ErrorProofName, item.shift || '-', item.problem || item.Problem, item.rootCause || item.RootCause, item.correctiveAction || item.CorrectiveAction, item.status || item.Status, item.remarks || item.Remarks]);
+                const rRows = records.r.map((item, index) => [
+                    index + 1, 
+                    item.errorProofNo || '-', 
+                    item.errorProofName || item.ErrorProofName, 
+                    formatDate(dateKey), 
+                    item.problem || item.Problem, 
+                    item.rootCause || item.RootCause, 
+                    item.correctiveAction || item.CorrectiveAction, 
+                    item.status || item.Status, 
+                    item.remarks || item.Remarks
+                ]);
+                
                 autoTable(doc, {
                     startY: currentY,
-                    head: [['S.No', 'Ep.No', 'Error Proof Name', 'Verification \n Date & Shift', 'Problem', 'Root Cause', 'Corrective action taken \n (Temporary)', 'Status', 'Remarks']],
+                    margin: { left: 10, right: 10 }, 
+                    head: [['S.No', 'Ep.No', 'Error Proof Name', 'Verification Date', 'Problem', 'Root Cause', 'Corrective action taken \n (Temporary)', 'Status', 'Remarks']],
                     body: rRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
                     headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
-                    columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 15 }, 2: { cellWidth: 35 }, 3: { cellWidth: 25 }, 4: { cellWidth: 35 }, 5: { cellWidth: 35 }, 6: { cellWidth: 40 }, 7: { cellWidth: 20 }, 8: { cellWidth: 20 } }
+                    columnStyles: { 
+                        0: { cellWidth: 10, halign: 'center' }, 
+                        1: { cellWidth: 12 }, 
+                        2: { cellWidth: 35 }, 
+                        3: { cellWidth: 20 }, 
+                        4: { cellWidth: 35 }, 
+                        5: { cellWidth: 35 }, 
+                        6: { cellWidth: 40 }, 
+                        7: { cellWidth: 15 }, 
+                        8: { cellWidth: 'auto' } 
+                    }
                 });
                 currentY = doc.lastAutoTable.finalY + 10;
             }
@@ -793,11 +842,29 @@ export const generateErrorProofPDF = (data, dateRange) => {
             if (currentY + 30 > PAGE_HEIGHT) { doc.addPage(); currentY = 20; }
 
             autoTable(doc, {
-                startY: currentY, margin: { left: 10, right: 10 }, head: [['REVIEWED BY HOF', 'APPROVED BY']], body: [[headerData.reviewedBy || '', headerData.approvedBy || '']], theme: 'grid',
-                styles: { fontSize: 10, cellPadding: 4, lineColor: [0, 0, 0], lineWidth: 0.1, halign: 'center', minCellHeight: 15 }, headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' }
+                startY: currentY, margin: { left: 10, right: 10 }, head: [['REVIEWED BY (OP/HOF)', 'APPROVED BY (SUP)']], 
+                body: [['SIG1', 'SIG2']], theme: 'grid',
+                styles: { fontSize: 10, cellPadding: 4, lineColor: [0, 0, 0], lineWidth: 0.1, halign: 'center', minCellHeight: 15 }, 
+                headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+                didDrawCell: function (data) {
+                    if (data.section === 'body') {
+                        if (data.column.index === 0 && headerData.reviewedBy && headerData.reviewedBy.startsWith('data:image')) {
+                            try { doc.addImage(headerData.reviewedBy, 'PNG', data.cell.x + 2, data.cell.y + 2, 40, 10); } catch (e) {}
+                        }
+                        if (data.column.index === 1 && headerData.approvedBy && headerData.approvedBy.startsWith('data:image')) {
+                            try { doc.addImage(headerData.approvedBy, 'PNG', data.cell.x + 2, data.cell.y + 2, 40, 10); } catch (e) {}
+                        }
+                    }
+                },
+                didParseCell: function (data) {
+                    if (data.section === 'body' && (data.cell.raw === 'SIG1' || data.cell.raw === 'SIG2')) {
+                        const val = data.column.index === 0 ? headerData.reviewedBy : headerData.approvedBy;
+                        if (val && !val.startsWith('data:image')) data.cell.text = val;
+                        else data.cell.text = '';
+                    }
+                }
             });
 
-            // 🔥 PRINT DYNAMIC QF VALUE 🔥
             doc.setFontSize(8); doc.setFont('helvetica', 'normal'); 
             doc.text(currentPageQfValue, 10, 200);
         });
@@ -807,7 +874,7 @@ export const generateErrorProofPDF = (data, dateRange) => {
 };
 
 // ============================================================================
-// 5a. ERROR PROOF VERIFICATION (V1)
+// 5a. ERROR PROOF VERIFICATION (V1 - Alternate layout structure)
 // ============================================================================
 export const generateErrorProofV1PDF = (data, dateRange) => {
     const doc = new jsPDF('l', 'mm', 'a4');
@@ -832,11 +899,28 @@ export const generateErrorProofV1PDF = (data, dateRange) => {
     });
 
     plans.forEach(p => {
-        const d = p.recordDate ? p.recordDate.split('T')[0] : 'Unknown';
-        const matchV = verifications.find(v => v.errorProofName === p.errorProofName && v.recordDate && v.recordDate.split('T')[0] === d);
-        const l = matchV ? matchV.line : 'Unknown';
-        const key = `${d}_${l}`;
-        if (grouped[key]) grouped[key].plans.push(p);
+        const planDateKey = p.recordDate ? p.recordDate.split('T')[0] : 'Unknown';
+        const planName = p.errorProofName;
+        
+        // 🔥 CRITICAL FIX: Ensure exact mapping
+        let matchV = verifications.find(v => v.errorProofName === planName && v.recordDate && v.recordDate.split('T')[0] === planDateKey);
+        
+        // Fallback
+        if (!matchV) {
+            matchV = verifications.find(v => v.errorProofName === planName);
+        }
+
+        if (matchV) {
+            const l = matchV.line || 'Unknown';
+            const targetDateKey = matchV.recordDate ? matchV.recordDate.split('T')[0] : 'Unknown';
+            const key = `${targetDateKey}_${l}`;
+            
+            if (grouped[key]) {
+                if (!grouped[key].plans.some(existing => existing.sNo === p.sNo)) {
+                    grouped[key].plans.push(p);
+                }
+            }
+        }
     });
 
     let pageIndex = 0;
@@ -897,6 +981,7 @@ export const generateErrorProofV1PDF = (data, dateRange) => {
             doc.setFontSize(12).text("REACTION PLAN", 148.5, finalY, { align: 'center' });
             autoTable(doc, {
                 startY: finalY + 5,
+                margin: { left: 10, right: 10 },
                 head: [['S.No', 'EP No', 'Error Proof Name', 'Problem', 'Root Cause', 'Corrective Action', 'Status', 'Op Sign', 'Sup Sign', 'Remarks']],
                 body: group.plans.map(p => [
                     p.sNo, p.errorProofNo, p.errorProofName, p.problem, p.rootCause, p.correctiveAction, p.status,
@@ -905,6 +990,18 @@ export const generateErrorProofV1PDF = (data, dateRange) => {
                 theme: 'grid',
                 styles: { fontSize: 7, halign: 'center', valign: 'middle' },
                 headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0] },
+                columnStyles: { 
+                    0: { cellWidth: 10 }, 
+                    1: { cellWidth: 12 }, 
+                    2: { cellWidth: 35 }, 
+                    3: { cellWidth: 35 }, 
+                    4: { cellWidth: 35 }, 
+                    5: { cellWidth: 35 }, 
+                    6: { cellWidth: 15 }, 
+                    7: { cellWidth: 20 }, 
+                    8: { cellWidth: 20 }, 
+                    9: { cellWidth: 'auto' } 
+                },
                 didDrawCell: function (data) {
                     if (data.section === 'body' && data.column.index === 8) {
                         const p = group.plans[data.row.index];
@@ -919,7 +1016,6 @@ export const generateErrorProofV1PDF = (data, dateRange) => {
             });
         }
 
-        // 🔥 DYNAMIC QF VALUE 🔥
         const dynamicQf = getDynamicQfString(group.date, qfHistory, "QF/07/FYQ-05, Rev.No: 02 dt 28.02.2023");
         doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.text(dynamicQf, 10, 200);
     });
@@ -928,7 +1024,7 @@ export const generateErrorProofV1PDF = (data, dateRange) => {
 };
 
 // ============================================================================
-// 5b. ERROR PROOF VERIFICATION (V2)
+// 5b. ERROR PROOF VERIFICATION (V2 - ENTIRELY UNTOUCHED)
 // ============================================================================
 export const generateErrorProofV2PDF = (data, dateRange) => {
     const doc = new jsPDF('l', 'mm', 'a4');
@@ -1040,7 +1136,6 @@ export const generateErrorProofV2PDF = (data, dateRange) => {
             });
         }
 
-        // 🔥 DYNAMIC QF VALUE 🔥
         const dynamicQf = getDynamicQfString(group.date, qfHistory, "QF/07/FYQ-05, Rev.No: 02 dt 28.02.2023");
         doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.text(dynamicQf, 10, 200);
     });

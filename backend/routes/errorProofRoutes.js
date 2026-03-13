@@ -163,9 +163,33 @@ router.get("/report", async (req, res) => {
     const verificationResult = await request.query(verificationQuery);
     const reactionResult = await request.query(reactionQuery);
 
+    if (verificationResult.recordset.length === 0) {
+      return res.status(404).send("Report not found. Please click 'Save & Assign' before downloading the PDF.");
+    }
+
+    let qfHistory = [];
+    try {
+        const qfRes = await sql.query`SELECT qfValue, date FROM ErrorProof1QFvalues WHERE formName = 'error-proof' ORDER BY date DESC, id DESC`;
+        qfHistory = qfRes.recordset;
+    } catch(e) {}
+
+    let currentPageQfValue = "QF/07/FYQ-05, Rev.No: 02 dt 28.02.2023"; 
+    if (fDate) {
+        fDate.setHours(0,0,0,0);
+        for (let qf of qfHistory) {
+            if (!qf.date) continue;
+            const qfDate = new Date(qf.date);
+            qfDate.setHours(0,0,0,0);
+            if (qfDate <= fDate) {
+                currentPageQfValue = qf.qfValue;
+                break;
+            }
+        }
+    }
+
     const marginOptions = { top: 30, bottom: 20, left: 30, right: 30 };
+    // Initialize standard A4 landscape for the first section
     const doc = new PDFDocument({ margins: marginOptions, size: "A4", layout: "landscape", bufferPages: true, autoPageBreak: false });
-    const PAGE_HEIGHT = 595.28;
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", "inline; filename=Error_Proof_Check_List.pdf");
@@ -173,9 +197,6 @@ router.get("/report", async (req, res) => {
 
     const startX = 30;
     const startY = 30;
-    
-    // 🔥 PERFECT ALIGNMENT: Dynamically matching the page width constraints
-    const pageWidth = doc.page.width - (startX * 2); 
 
     const getISODate = (dateStr) => {
       const d = new Date(dateStr);
@@ -187,7 +208,6 @@ router.get("/report", async (req, res) => {
       return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
     };
 
-    // 🔥 SMART LOGO FINDER
     const findLogo = () => {
       const possiblePaths = [
         path.join(__dirname, "logo.png"),
@@ -204,17 +224,17 @@ router.get("/report", async (req, res) => {
     const actualLogoPath = findLogo();
 
     // =========================================================
-    // 🔥 IDENTICAL 3-BOX HEADER LOGIC TO 4M REPORT
+    // 🔥 DYNAMIC HEADER LOGIC (Adapts to A4 or A3)
     // =========================================================
     const draw3BoxHeader = (y, mainTitle) => {
+      const currentWidth = doc.page.width - (startX * 2); // Dynamically fetched
       const logoBoxWidth = 100;
       const metaBoxWidth = 150;
-      const titleBoxWidth = pageWidth - logoBoxWidth - metaBoxWidth;
+      const titleBoxWidth = currentWidth - logoBoxWidth - metaBoxWidth;
       const headerHeight = 40;
 
       doc.lineWidth(1);
 
-      // BOX 1: LOGO
       doc.rect(startX, y, logoBoxWidth, headerHeight).stroke();
       if (actualLogoPath) {
           doc.image(actualLogoPath, startX + 10, y + 5, {
@@ -224,30 +244,26 @@ router.get("/report", async (req, res) => {
           doc.font("Helvetica-Bold").fontSize(12).fillColor('black').text("SAKTHI\nAUTO", startX, y + 10, { width: logoBoxWidth, align: "center" });
       }
 
-      // BOX 2: TITLE
       doc.rect(startX + logoBoxWidth, y, titleBoxWidth, headerHeight).stroke();
       doc.font("Helvetica-Bold").fontSize(14).fillColor('black').text("SAKTHI AUTO COMPONENT LIMITED", startX + logoBoxWidth, y + 8, { width: titleBoxWidth, align: "center" });
       doc.fontSize(12).text(mainTitle, startX + logoBoxWidth, y + 24, { width: titleBoxWidth, align: "center" });
 
-      // BOX 3: META DATA (Line & Dates)
       doc.rect(startX + logoBoxWidth + titleBoxWidth, y, metaBoxWidth, headerHeight).stroke();
       doc.font("Helvetica-Bold").fontSize(11).text(headerLine, startX + logoBoxWidth + titleBoxWidth, y + 7, { width: metaBoxWidth, align: "center" });
       
-      // Flush line mapping directly to the right margin border
-      doc.moveTo(startX + logoBoxWidth + titleBoxWidth, y + 20).lineTo(startX + pageWidth, y + 20).stroke();
-      
+      doc.moveTo(startX + logoBoxWidth + titleBoxWidth, y + 20).lineTo(startX + currentWidth, y + 20).stroke();
       let dateText = headerDate === 'MULTIPLE' ? "ALL DATES" : `DATE: ${headerDate}`;
       doc.font("Helvetica").fontSize(9).text(dateText, startX + logoBoxWidth + titleBoxWidth, y + 26, { width: metaBoxWidth, align: "center" });
 
       return y + headerHeight + 5;
     };
 
-    // 🔥 DYNAMIC TABLE COLUMNS TO PERFECTLY MATCH PAGEWIDTH
-    const wLine = 45, wName = 135, wNature = 160, wFreq = 65;
-    const wDateBox = (pageWidth - wLine - wName - wNature - wFreq) / 3;
-
-    const drawMainHeaders = (y, datesArr = []) => {
+    const drawMainHeaders = (y, targetDateStr) => {
       const headerTopY = draw3BoxHeader(y, "ERROR PROOF VERIFICATION CHECK LIST - FDY");
+      const currentWidth = doc.page.width - (startX * 2);
+
+      const wLine = 45, wName = 135, wNature = 160, wFreq = 65;
+      const wDateBox = currentWidth - wLine - wName - wNature - wFreq; 
 
       doc.rect(startX, headerTopY, wLine, 60).stroke();
       doc.font("Helvetica-Bold").fontSize(10).fillColor('black');
@@ -266,28 +282,26 @@ router.get("/report", async (req, res) => {
       doc.text("Frequency\nS,D,W,M", cx, headerTopY + 15, { width: wFreq, align: "center" });
 
       cx += wFreq;
-      for (let i = 0; i < 3; i++) {
-        const boxX = cx + (i * wDateBox);
+      
+      const boxX = cx;
+      doc.rect(boxX, headerTopY, wDateBox, 20).stroke();
+      let dateLabel = targetDateStr ? `Date: ${formatDate(targetDateStr)}` : "Date:";
 
-        doc.rect(boxX, headerTopY, wDateBox, 20).stroke();
-        let dateLabel = datesArr[i] ? `Date: ${formatDate(datesArr[i])}` : "Date:";
+      doc.font("Helvetica-Bold").fontSize(9);
+      doc.text(dateLabel, boxX + 2, headerTopY + 5, { width: wDateBox, align: "left" });
 
-        doc.font("Helvetica-Bold").fontSize(9);
-        doc.text(dateLabel, boxX + 2, headerTopY + 5, { width: wDateBox, align: "left" });
-
-        doc.rect(boxX, headerTopY + 20, wDateBox, 40).stroke();
-        doc.fontSize(8);
-        doc.text("Observation Result", boxX, headerTopY + 35, { width: wDateBox, align: "center" });
-      }
+      doc.rect(boxX, headerTopY + 20, wDateBox, 40).stroke();
+      doc.fontSize(8);
+      doc.text("Observation Result", boxX, headerTopY + 35, { width: wDateBox, align: "center" });
 
       return headerTopY + 60;
     };
 
     const allRecords = verificationResult.recordset;
     const allUniqueDates = [...new Set(allRecords.map(r => getISODate(r.recordDate)))].sort();
-    const last3Dates = allUniqueDates.slice(-3);
+    const lastDateArr = allUniqueDates.slice(-1);
 
-    const filteredRecords = allRecords.filter(r => last3Dates.includes(getISODate(r.recordDate)));
+    const filteredRecords = allRecords.filter(r => lastDateArr.includes(getISODate(r.recordDate)));
 
     const uniqueProofsMap = new Map();
     filteredRecords.forEach(r => {
@@ -297,12 +311,16 @@ router.get("/report", async (req, res) => {
     });
     const uniqueProofs = Array.from(uniqueProofsMap.keys());
 
-    const dateChunks = last3Dates.length > 0 ? [last3Dates] : [[]];
+    const dateChunks = lastDateArr.length > 0 ? [lastDateArr] : [[]];
     let y = startY;
 
     dateChunks.forEach((chunk, chunkIndex) => {
-      if (chunkIndex > 0) { doc.addPage({ layout: "landscape", margin: 30 }); y = startY; }
-      y = drawMainHeaders(y, chunk);
+      if (chunkIndex > 0) { doc.addPage({ size: 'A4', layout: "landscape", margin: 30 }); y = startY; }
+      y = drawMainHeaders(y, chunk[0]);
+
+      const currentWidth = doc.page.width - (startX * 2);
+      const wLine = 45, wName = 135, wNature = 160, wFreq = 65;
+      const wDateBox = currentWidth - wLine - wName - wNature - wFreq; 
 
       uniqueProofs.forEach((proofName) => {
         const proofData = uniqueProofsMap.get(proofName);
@@ -313,9 +331,9 @@ router.get("/report", async (req, res) => {
         const freqHeight = doc.heightOfString(proofData.frequency || "", { width: wFreq - 8, align: "center" });
         let rowHeight = Math.max(50, nameHeight + 20, natureHeight + 20, freqHeight + 20);
 
-        if (y + rowHeight > PAGE_HEIGHT - 120) {
-          doc.addPage({ layout: "landscape", margin: 30 });
-          y = drawMainHeaders(30, chunk);
+        if (y + rowHeight > doc.page.height - 120) {
+          doc.addPage({ size: 'A4', layout: "landscape", margin: 30 });
+          y = drawMainHeaders(30, chunk[0]);
         }
 
         let cx = startX;
@@ -335,14 +353,15 @@ router.get("/report", async (req, res) => {
         doc.text(proofData.frequency || "", cx + 4, y + 10, { width: wFreq - 8, align: "center" });
         cx += wFreq;
 
-        for (let i = 0; i < 3; i++) { doc.rect(cx + (i * wDateBox), y, wDateBox, rowHeight).stroke(); }
+        doc.rect(cx, y, wDateBox, rowHeight).stroke(); 
 
-        chunk.forEach((dateStr, dateIndex) => {
+        if (chunk.length > 0) {
+          const dateStr = chunk[0];
           const recordsForDateAndProof = filteredRecords.filter(r => getISODate(r.recordDate) === dateStr && r.errorProofName === proofName);
 
           if (recordsForDateAndProof.length > 0) {
             const record = recordsForDateAndProof[0];
-            const targetX = cx + (dateIndex * wDateBox);
+            const targetX = cx;
             const targetY = y + (rowHeight / 2) - 8;
 
             doc.fontSize(8);
@@ -352,14 +371,13 @@ router.get("/report", async (req, res) => {
               doc.text("Checked Not OK", targetX, targetY, { width: wDateBox, align: "center" });
             }
           }
-        });
+        }
 
         y += rowHeight;
       });
 
-      // Signature Grid
       const sigY = y + 20;
-      if (sigY + 80 > PAGE_HEIGHT - 40) { doc.addPage({ layout: "landscape", margin: 30 }); y = 30; }
+      if (sigY + 80 > doc.page.height - 40) { doc.addPage({ size: 'A4', layout: "landscape", margin: 30 }); y = 30; }
 
       doc.font("Helvetica-Bold").fontSize(10).fillColor('black');
       doc.text("Verified By Moulding Incharge", startX, sigY);
@@ -387,7 +405,7 @@ router.get("/report", async (req, res) => {
     });
 
     // =========================================================
-    // PART B: REACTION PLAN TABLE (SCALED TO PAGEWIDTH)
+    // PART B: REACTION PLAN TABLE (🔥 LARGER A3 PAGE FOR PERFECT FIT)
     // =========================================================
     const notOkProofNames = new Set(
       filteredRecords
@@ -395,53 +413,62 @@ router.get("/report", async (req, res) => {
         .map(r => r.errorProofName)
     );
     const filteredReactions = reactionResult.recordset.filter(r =>
-      last3Dates.includes(getISODate(r.recordDate)) && notOkProofNames.has(r.errorProofName)
+      lastDateArr.includes(getISODate(r.recordDate)) && notOkProofNames.has(r.errorProofName)
     );
 
     if (filteredReactions.length > 0) {
-      doc.addPage({ layout: "landscape", margin: 30 });
+      // 🔥 CRITICAL FIX: Upgrading to A3 Size (1190.55 width) for Reaction Plan to provide massive room
+      doc.addPage({ size: 'A3', layout: "landscape", margin: 30 });
 
-      // 🔥 PERFECT TABLE WIDTH CALCULATION
-      const rColBaseWeights = [30, 50, 90, 60, 80, 80, 80, 50, 70, 70, 90];
-      const totalReactionWeight = rColBaseWeights.reduce((a, b) => a + b, 0); 
-      const rColWidths = rColBaseWeights.map(w => (w / totalReactionWeight) * pageWidth);
+      const currentA3Width = doc.page.width - 60; 
+
+      // 🔥 Percentages that map beautifully to 1130.55 points
+      // Array mapped to: [S.No, EpNo, Name, Date, Prob, Root, Corrective, Status, RevBy, AppBy, Remarks]
+      const rColWeights = [3, 4, 12, 6, 14, 14, 15, 6, 8, 8, 10]; // Sums to 100
+      const rColWidths = rColWeights.map(weight => (weight / 100) * currentA3Width);
 
       const drawReactionHeaders = (ry) => {
         const headerY = draw3BoxHeader(ry, "REACTION PLAN");
         
-        doc.font("Helvetica-Bold").fontSize(8).fillColor('black');
+        doc.font("Helvetica-Bold").fontSize(10).fillColor('black');
         const rHeaders = ["S.No", "Error\nProof No", "Error proof\nName", "Date", "Problem", "Root Cause", "Corrective\naction", "Status", "Reviewed\nBy (Op)", "Approved By\n(Sup)", "Remarks"];
 
         let currX = startX;
         rHeaders.forEach((h, i) => {
-          doc.rect(currX, headerY, rColWidths[i], 30).stroke();
-          doc.text(h, currX + 2, headerY + 5, { width: rColWidths[i] - 4, align: "center" });
+          doc.rect(currX, headerY, rColWidths[i], 40).stroke();
+          doc.text(h, currX + 2, headerY + 10, { width: rColWidths[i] - 4, align: "center" });
           currX += rColWidths[i];
         });
-        return headerY + 30;
+        return headerY + 40;
       };
 
       let ry = drawReactionHeaders(30);
 
       filteredReactions.forEach((rRow, index) => {
-        doc.font("Helvetica").fontSize(8).fillColor('black');
+        doc.font("Helvetica").fontSize(9).fillColor('black');
 
         const dDate = new Date(rRow.recordDate);
         const dateStr = !isNaN(dDate) ? `${String(dDate.getDate()).padStart(2, '0')}/${String(dDate.getMonth() + 1).padStart(2, '0')}/${dDate.getFullYear()}` : "";
 
-        const hName = doc.heightOfString(rRow.errorProofName || "", { width: rColWidths[2] - 8, align: "center" });
-        const hProb = doc.heightOfString(rRow.problem || "", { width: rColWidths[4] - 8, align: "center" });
+        // 🔥 CRITICAL FIX: Use current font explicitly before calculating height 🔥
+        const hName = doc.heightOfString(rRow.errorProofName || "-", { width: rColWidths[2] - 8, align: "center" });
+        const hProb = doc.heightOfString(rRow.problem || "-", { width: rColWidths[4] - 8, align: "center" });
+        const hRoot = doc.heightOfString(rRow.rootCause || "-", { width: rColWidths[5] - 8, align: "center" });
+        const hCorr = doc.heightOfString(rRow.correctiveAction || "-", { width: rColWidths[6] - 8, align: "center" });
+        const hRem = doc.heightOfString(rRow.remarks || "-", { width: rColWidths[10] - 8, align: "center" });
 
-        let rRowHeight = Math.max(40, hName + 15, hProb + 15);
+        // Row height matches the tallest paragraph with 20px padding
+        let rRowHeight = Math.max(40, hName + 20, hProb + 20, hRoot + 20, hCorr + 20, hRem + 20);
 
-        if (ry + rRowHeight > PAGE_HEIGHT - 60) {
-          doc.addPage({ layout: "landscape", margin: 30 });
+        // Safe pagination checking dynamic page height
+        if (ry + rRowHeight > doc.page.height - 40) {
+          doc.addPage({ size: 'A3', layout: "landscape", margin: 30 });
           ry = drawReactionHeaders(30);
         }
 
         const rowData = [
-          (index + 1).toString(), rRow.errorProofNo || "", rRow.errorProofName || "", dateStr, rRow.problem || "", rRow.rootCause || "",
-          rRow.correctiveAction || "", rRow.status || "", rRow.reviewedBy || "", rRow.SupervisorSignature || rRow.approvedBy || "", rRow.remarks || ""
+          (index + 1).toString(), rRow.errorProofNo || "-", rRow.errorProofName || "-", dateStr, rRow.problem || "-", rRow.rootCause || "-",
+          rRow.correctiveAction || "-", rRow.status || "-", rRow.reviewedBy || "-", rRow.SupervisorSignature || rRow.approvedBy || "-", rRow.remarks || "-"
         ];
 
         let currX = startX;
@@ -454,7 +481,9 @@ router.get("/report", async (req, res) => {
               doc.image(imgBuffer, currX + 2, ry + 2, { fit: [rColWidths[i] - 4, rRowHeight - 4] });
             } catch (e) { }
           } else {
-            const textY = (i === 4 || i === 5 || i === 6 || i === 10 || i === 2) ? ry + 5 : ry + (rRowHeight / 2) - 5;
+            // Push text to the top for larger columns
+            const alignTop = [2, 4, 5, 6, 10].includes(i);
+            const textY = alignTop ? ry + 5 : ry + (rRowHeight / 2) - 4;
 
             if (i === 7) {
               if (String(cellText).toLowerCase() === 'completed') { doc.fillColor('green').font("Helvetica-Bold"); }
@@ -464,7 +493,7 @@ router.get("/report", async (req, res) => {
               doc.fillColor('black').font("Helvetica");
             }
 
-            doc.text(String(cellText), currX + 4, textY, { width: rColWidths[i] - 8, align: "center" });
+            doc.text(String(cellText || "-"), currX + 4, textY, { width: rColWidths[i] - 8, align: "center" });
             doc.fillColor('black').font("Helvetica");
           }
           currX += rColWidths[i];
@@ -478,7 +507,8 @@ router.get("/report", async (req, res) => {
     for (let i = range.start; i < (range.start + range.count); i++) {
       doc.switchToPage(i);
       doc.font("Helvetica-Bold").fontSize(9).fillColor('black');
-      doc.text("QF/07/FYQ-05, Rev.No: 02 dt 28.02.2023", 30, PAGE_HEIGHT - 45, { align: "left", lineBreak: false });
+      // Render text at the bottom dynamically based on the current page's height
+      doc.text(currentPageQfValue, 30, doc.page.height - 35, { align: "left", lineBreak: false });
     }
 
     doc.end();
@@ -609,9 +639,16 @@ router.get('/bulk-data', async (req, res) => {
         ORDER BY recordDate ASC, sNo ASC
     `;
 
+    let qfHistory = [];
+    try {
+        const qfRes = await sql.query`SELECT qfValue, date FROM ErrorProof1QFvalues WHERE formName = 'error-proof' ORDER BY date DESC, id DESC`;
+        qfHistory = qfRes.recordset;
+    } catch(e) {}
+
     res.json({
       verifications: verifications.recordset,
-      plans: plans.recordset
+      plans: plans.recordset,
+      qfHistory 
     });
   } catch (err) {
     console.error(err);
