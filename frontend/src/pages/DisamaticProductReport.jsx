@@ -181,9 +181,21 @@ const DisamaticProductReport = () => {
     return initialFormState;
   });
 
-  const [productions, setProductions] = useState([
-    { componentName: "", pouredWeight: "", mouldCounterNo: "", produced: "", poured: "", cycleTime: "", mouldsPerHour: "", remarks: "" }
-  ]);
+  // --- Update the productions state to include patternCode and castedWeight ---
+const [productions, setProductions] = useState([
+  { 
+    componentName: "", 
+    patternCode: "", 
+    castedWeight: "", 
+    pouredWeight: "", 
+    mouldCounterNo: "", 
+    produced: "", 
+    poured: "", 
+    cycleTime: "", 
+    mouldsPerHour: "", 
+    remarks: "" 
+  }
+]);
   const [resetKey, setResetKey] = useState(0);
 
   const [incharges, setIncharges] = useState([]);
@@ -408,67 +420,84 @@ const DisamaticProductReport = () => {
     recalculateChain(updated);
   };
 
-  const updateProduction = (index, field, value, extraValue = null) => {
-    const updated = [...productions];
-    
-    if (field === "componentName") {
-      updated[index].componentName = value;
-      updated[index].pouredWeight = extraValue;
-      setProductions(updated);
+const updateProduction = (index, field, value, itemObj = null) => {
+  const updated = [...productions];
+
+  if (field === "componentName" || field === "patternCode") {
+    // itemObj is the full database record from the select dropdown
+    // If selecting by Component Name, itemObj.description is the name.
+    // If selecting by Pattern Code, itemObj.code is the code.
+    updated[index].componentName = itemObj?.description || value;
+    updated[index].patternCode = itemObj?.code || value;
+    updated[index].pouredWeight = itemObj?.pouredWeight || "";
+    updated[index].castedWeight = itemObj?.castedWeight || "";
+    setProductions(updated);
+  }
+  else if (field === "mouldCounterNo" || field === "prevCount") {
+    updated[index][field] = value;
+    if (index === 0 && field === "prevCount") {
+      recalculateChain(updated, Number(value));
+    } else {
+      recalculateChain(updated);
     }
-    else if (field === "mouldCounterNo") {
-      updated[index][field] = value;
-      recalculateChain(updated); 
-    } 
-    else if (field === "cycleTime") {
-      updated[index][field] = value;
-      if (value === "-" || value.trim() === "") {
-        updated[index].mouldsPerHour = "-";
-      } else {
-        const c = Number(value);
-        updated[index].mouldsPerHour = (c > 0 && !isNaN(c)) ? Math.round(3600 / c) : "-"; 
-      }
-      setProductions(updated);
-    } 
-    else {
-      updated[index][field] = value;
-      setProductions(updated);
+  } 
+  else if (field === "cycleTime") {
+    updated[index][field] = value;
+    if (value === "-" || value.trim() === "") {
+      updated[index].mouldsPerHour = "-";
+    } else {
+      const c = Number(value);
+      updated[index].mouldsPerHour = (c > 0 && !isNaN(c)) ? Math.round(3600 / c) : "-"; 
     }
-  };
+    setProductions(updated);
+  } 
+  else {
+    updated[index][field] = value;
+    setProductions(updated);
+  }
+};
 
   // 🔥 Integrated Recalculate Logic with Wrap-Around support
-  const recalculateChain = (list, baseCounter = previousMouldCounter) => {
-    let prev = Number(baseCounter) || 0; 
-    const newList = list.map((item) => {
-      if (item.mouldCounterNo === "-" || String(item.mouldCounterNo).trim() === "") return { ...item, produced: "-" };
-      
-      let currentInput = Number(item.mouldCounterNo) || 0;
-      let produced = 0;
-      let displayCounter = String(item.mouldCounterNo);
+const recalculateChain = (list, baseCounter = previousMouldCounter) => {
+  let prev = Number(baseCounter) || 0; 
+  const newList = list.map((item, idx) => {
+    // If a manual prevCount was entered for this specific row (other than the first row calculation), use it
+    if (item.prevCount !== undefined && item.prevCount !== null && item.prevCount !== "") {
+        prev = Number(item.prevCount);
+    }
 
-      if (currentInput > 600000) {
-        const remainder = currentInput % 600000;
-        produced = (600000 - prev) + remainder;
-        displayCounter = String(remainder); 
-        prev = remainder;
-      } 
-      else if (currentInput > 0 && currentInput < prev) {
-        produced = (600000 - prev) + currentInput;
-        prev = currentInput;
-      } 
-      else {
-        produced = currentInput ? Math.max(0, currentInput - prev) : 0;
-        prev = currentInput;
-      }
+    if (item.mouldCounterNo === "-" || String(item.mouldCounterNo).trim() === "") {
+        return { ...item, produced: "-" };
+    }
+    
+    let currentInput = Number(item.mouldCounterNo) || 0;
+    let produced = 0;
+    let displayCounter = String(item.mouldCounterNo);
 
-      return { 
-        ...item, 
-        mouldCounterNo: displayCounter, 
-        produced: isNaN(produced) ? "-" : produced 
-      };
-    });
-    setProductions(newList);
-  };
+    // Wrap-around logic
+    if (currentInput > 600000) {
+      const remainder = currentInput % 600000;
+      produced = (600000 - prev) + remainder;
+      displayCounter = String(remainder); 
+      prev = remainder;
+    } 
+    else if (currentInput > 0 && currentInput < prev) {
+      produced = (600000 - prev) + currentInput;
+      prev = currentInput;
+    } 
+    else {
+      produced = currentInput ? Math.max(0, currentInput - prev) : 0;
+      prev = currentInput;
+    }
+
+    return { 
+      ...item, 
+      mouldCounterNo: displayCounter, 
+      produced: isNaN(produced) ? "-" : produced 
+    };
+  });
+  setProductions(newList);
+};
 
   const isInvalid = (val) => val === undefined || val === null || val.toString().trim() === "";
 
@@ -655,26 +684,49 @@ const DisamaticProductReport = () => {
                         <input type="text" value={String(prod.mouldCounterNo)} onChange={(e) => updateProduction(index, "mouldCounterNo", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
                       </div>
                       <div>
-                        <label className="font-medium text-sm text-gray-500 block mb-1">Closed Mould Count</label>
-                        <input type="text" value={String(index === 0 ? (isNaN(previousMouldCounter) ? "-" : previousMouldCounter) : (productions[index - 1].mouldCounterNo || "-"))} readOnly className="w-full border border-gray-300 p-2 rounded bg-gray-200 cursor-not-allowed text-gray-600" />
+                        <label className="font-medium text-sm text-gray-700 block mb-1">Closed Mould Count</label>
+                        <input 
+                          type="text" 
+                          value={String(prod.prevCount ?? (index === 0 ? previousMouldCounter : (productions[index - 1].mouldCounterNo || "0")))} 
+                          onChange={(e) => updateProduction(index, "prevCount", e.target.value)}
+                          className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" 
+                          placeholder="Edit start count"
+                        />
                       </div>
                     </div>
                     
-                    <div>
-                      <label className="font-medium text-sm text-gray-700 block mb-1">Component Name</label>
-                      <SearchableSelect 
-                        key={`prod-comp-${index}-${resetKey}`} 
-                        options={components} 
-                        displayKey="description" 
-                        value={prod.componentName} 
-                        onSelect={(item) => updateProduction(index, "componentName", item.description, item.pouredWeight)} 
-                      />
-                      {prod.pouredWeight != null && prod.pouredWeight !== "" && (
-                        <p className="text-sm font-semibold text-blue-600 mt-2 ml-1">
-                          Poured Weight: {prod.pouredWeight}
-                        </p>
-                      )}
+                    {/* Replace the existing Component Name div with this flex-col block */}
+                    <div className="flex flex-col gap-4">
+                    {/* Component Name Selection */}
+                    <SearchableSelect 
+                      label="Component Name"
+                      key={`prod-comp-${index}-${resetKey}`} 
+                      options={components} 
+                      displayKey="description" 
+                      value={prod.componentName} 
+                      onSelect={(item) => updateProduction(index, "componentName", item.description, item)} 
+                    />
+
+                    {/* Pattern Code Selection */}
+                    <SearchableSelect 
+                      label="Pattern Code"
+                      key={`prod-patt-${index}-${resetKey}`} 
+                      options={components} 
+                      displayKey="code" 
+                      value={prod.patternCode} 
+                      onSelect={(item) => updateProduction(index, "patternCode", item.code, item)} 
+                    />
+                    
+                    {/* Styled Weights Row (matches your image) */}
+                    <div className="flex justify-between items-center px-1">
+                      <span className="text-sm font-bold text-blue-700">
+                        Poured: {prod.pouredWeight ? `${prod.pouredWeight} kg` : "-"}
+                      </span>
+                      <span className="text-sm font-bold text-green-700">
+                        Casted: {prod.castedWeight ? `${prod.castedWeight} kg` : "-"}
+                      </span>
                     </div>
+                  </div>
                     <div>
                       <label className="font-medium text-sm text-gray-500">Produced (Updates Previous Form)</label>
                       <input type="text" value={String(prod.produced)} readOnly className="w-full border border-gray-300 p-2 rounded bg-gray-200 cursor-not-allowed text-gray-600" />

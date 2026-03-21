@@ -23,7 +23,7 @@ const safeStr = (val) => {
 // ==========================================
 exports.getComponents = async (req, res) => {
   try {
-    const result = await sql.query("SELECT code, description, pouredWeight, cavity FROM Component");
+    const result = await sql.query("SELECT code, description, pouredWeight, cavity, castedWeight FROM Component");
     res.json(result.recordset);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch components" });
