@@ -110,9 +110,8 @@ const AdminDashboard = () => {
         { name: "Mould Quality Inspection", id: "mould-quality", icon: ClipboardCheck },
         { name: "Manage QF Values", id: "qf-settings", isSpecial: true, icon: BookOpen },
         { name: "Add / Manage Users", id: "users", isSpecial: true, icon: Users },
-        { name: "Manage QF Values", id: "qf-settings", isSpecial: true, icon: BookOpen },
-        { name: "Add / Manage Components", id: "components", isSpecial: true, icon: Package }, // <-- ADDED
-        { name: "Add / Manage Users", id: "users", isSpecial: true, icon: Users }
+        { name: "Add / Manage Components", id: "components", isSpecial: true, icon: Package }, 
+        
     ];
 
     const hideManageFormIds = ['disamatic-report', 'performance', 'error-proof', 'mould-quality'];
