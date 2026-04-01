@@ -62,6 +62,7 @@ const baseColumns = [
   { key: 'others', label: 'OTHERS', group: 'OTHERS' }
 ];
 
+// Initialize with empty strings so placeholders show up on initial load
 const emptyShift = baseColumns.reduce((acc, col) => ({ ...acc, [col.key]: '' }), {});
 
 const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa = null }) => {
@@ -77,7 +78,7 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
     3: { ...emptyShift, customValues: {}, operatorSignature: '' }
   });
   const [unpouredSummary, setUnpouredSummary] = useState([]);
-  const [qfHistory, setQfHistory] = useState([]); // 🔥 State to store QF History
+  const [qfHistory, setQfHistory] = useState([]); 
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState({ show: false, type: '', message: '' });
 
@@ -128,15 +129,23 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
       };
 
       [1, 2, 3].forEach(shift => {
-        if (res.data.shiftsData && res.data.shiftsData[shift]) {
+        const dbShift = res.data.shiftsData && res.data.shiftsData[shift];
+        
+        // VERIFY IF SHIFT IS SAVED:
+        const isShiftSaved = dbShift && dbShift.patternChange !== undefined;
+
+        if (isShiftSaved) {
+          // If the shift WAS saved, populate empty values with '-'
           mergedColumns.forEach(col => {
             if (col.isCustom) {
-              loadedData[shift].customValues[col.id] = res.data.shiftsData[shift].customValues?.[col.id] || '';
+              const val = dbShift.customValues?.[col.id];
+              loadedData[shift].customValues[col.id] = (val === '' || val == null || val === 0) ? '-' : val;
             } else {
-              loadedData[shift][col.key] = res.data.shiftsData[shift][col.key] || '';
+              const val = dbShift[col.key];
+              loadedData[shift][col.key] = (val === '' || val == null || val === 0) ? '-' : val;
             }
           });
-          loadedData[shift].operatorSignature = res.data.shiftsData[shift].operatorSignature || '';
+          loadedData[shift].operatorSignature = dbShift.operatorSignature || '';
 
           if (loadedData[shift].operatorSignature && sigRefs[shift].current) {
             sigRefs[shift].current.fromDataURL(loadedData[shift].operatorSignature);
@@ -144,6 +153,15 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
             sigRefs[shift].current.clear();
           }
         } else {
+          // If the shift was NOT saved, force everything to be an empty string '' so the placeholder shows!
+          mergedColumns.forEach(col => {
+            if (col.isCustom) {
+              loadedData[shift].customValues[col.id] = '';
+            } else {
+              loadedData[shift][col.key] = '';
+            }
+          });
+          loadedData[shift].operatorSignature = '';
           if (sigRefs[shift].current) sigRefs[shift].current.clear();
         }
       });
@@ -156,9 +174,8 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
       const summaryRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/unpoured-moulds/summary`, {
         params: { date: headerData.date }
       });
-      // Extract the new response struct
       setUnpouredSummary(summaryRes.data.summary || []);
-      setQfHistory(summaryRes.data.qfHistory || []); // Store QF History
+      setQfHistory(summaryRes.data.qfHistory || []); 
     } catch (e) {
       setUnpouredSummary([]);
     }
@@ -187,7 +204,7 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
 
   const getRowTotal = (shift) => columns.reduce((sum, col) => {
     const val = col.isCustom ? shiftsData[shift]?.customValues?.[col.id] : shiftsData[shift]?.[col.key];
-    return sum + (parseInt(val) || 0);
+    return sum + (parseInt(val) || 0); 
   }, 0);
 
   const getColTotal = (col) => [1, 2, 3].reduce((sum, shift) => {
@@ -207,35 +224,56 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
   const getDisaData = (disaName) => unpouredSummary.find(d => d.disa === disaName) || {};
 
   const handleSave = async () => {
-    let hasEmpty = false;
+    setLoading(true);
+    
+    // 🔥 NEW: We will dynamically build the payload to ONLY include shifts that have data.
+    const payloadData = {};
+    let hasAnyData = false;
+
     [1, 2, 3].forEach(s => {
+      let shiftHasData = false;
+      const shiftData = shiftsData[s];
+
+      // Check if any standard or custom column has a value
       columns.forEach(col => {
-        const val = col.isCustom ? shiftsData[s]?.customValues?.[col.id] : shiftsData[s]?.[col.key];
-        if (val === undefined || val === null || String(val).trim() === '') {
-          hasEmpty = true;
+        const val = col.isCustom ? shiftData.customValues?.[col.id] : shiftData[col.key];
+        if (val !== undefined && val !== null && String(val).trim() !== '') {
+          shiftHasData = true;
         }
       });
+
+      // Check if a signature exists
+      const sigBase64 = (sigRefs[s].current && !sigRefs[s].current.isEmpty())
+        ? sigRefs[s].current.getCanvas().toDataURL('image/png') 
+        : (shiftData.operatorSignature || '');
+
+      if (sigBase64 && sigBase64.trim() !== '') {
+        shiftHasData = true;
+      }
+
+      // If the shift has ANY data, include it in the save payload
+      if (shiftHasData) {
+        hasAnyData = true;
+        payloadData[s] = { 
+          ...shiftData, 
+          rowTotal: getRowTotal(s), 
+          operatorSignature: sigBase64 
+        };
+      }
     });
 
-    if (hasEmpty) {
-      setNotification({ show: true, type: 'error', message: "Please fill all input fields. Type '-' if empty." });
+    // 🔥 NEW: Prevent submission if the user completely ignored all fields
+    if (!hasAnyData) {
+      setLoading(false);
+      setNotification({ show: true, type: 'error', message: 'Please enter data for at least one shift before submitting.' });
       return;
     }
-
-    setLoading(true);
-    const payloadData = { ...shiftsData };
-
-    [1, 2, 3].forEach(s => {
-      payloadData[s].rowTotal = getRowTotal(s);
-      payloadData[s].operatorSignature = (sigRefs[s].current && !sigRefs[s].current.isEmpty())
-        ? sigRefs[s].current.getCanvas().toDataURL('image/png') : '';
-    });
 
     try {
       await axios.post(`${process.env.REACT_APP_API_URL}/api/unpoured-moulds/save`, {
         date: headerData.date, disa: headerData.disaMachine, shiftsData: payloadData
       });
-      setNotification({ show: true, type: 'success', message: 'Data Saved Successfully!' });
+      setNotification({ show: true, type: 'success', message: 'Shift Data Saved Successfully!' });
       setTimeout(() => setNotification({ show: false }), 3000);
     } catch (error) {
       setNotification({ show: true, type: 'error', message: 'Failed to save data.' });
@@ -248,7 +286,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
     try {
       const doc = new jsPDF('l', 'mm', 'a4');
 
-      // 🔥 MATCH QF VALUE TO CURRENT FORM DATE 🔥
       let currentPageQfValue = "QF/07/FBP-13, Rev.No:06 dt 08.10.2025";
       const reportDate = new Date(headerData.date);
       reportDate.setHours(0, 0, 0, 0);
@@ -419,7 +456,6 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
         }
       });
 
-      // 🔥 PRINT DYNAMIC QF VALUE 🔥
       doc.setFontSize(8); doc.setFont('helvetica', 'normal');
       doc.text(currentPageQfValue, 10, 200);
 
@@ -517,7 +553,7 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
                           <input
                             type="text"
                             placeholder="Type '-' if empty"
-                            value={val || ''}
+                            value={val !== undefined && val !== null ? val : ''} 
                             onChange={(e) => handleInputChange(shift, col.key, e.target.value, col.isCustom, col.id)}
                             onFocus={(e) => e.target.select()}
                             className="absolute inset-0 w-full h-full text-center text-sm font-bold text-gray-800 bg-transparent outline-none placeholder:text-[8px] placeholder:text-gray-400 focus:bg-orange-100 focus:ring-inset focus:ring-2 focus:ring-orange-500 transition-colors"
@@ -634,7 +670,7 @@ const UnPouredMouldDetails = ({ isAdminMode = false, adminDate = null, adminDisa
 
           <div id="checklist-footer" className="bg-slate-100 p-8 border-t border-gray-200 bottom-0 z-20 flex justify-end gap-6 rounded-b-xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
             <button onClick={generatePDF} className="bg-white border-2 border-gray-900 text-gray-900 hover:bg-gray-200 font-bold py-3 px-6 rounded-lg shadow-md uppercase flex items-center gap-2 mt-auto transition-colors"><FileDown size={20} /> PDF</button>
-            <button onClick={handleSave} disabled={loading} className="bg-gray-900 hover:bg-orange-600 text-white font-bold py-3 px-12 rounded-lg shadow-lg uppercase mt-auto transition-colors flex items-center gap-3">{loading ? <Loader className="animate-spin w-5 h-5" /> : <Save className="w-5 h-5" />}{loading ? 'Saving...' : 'Save All Shifts'}</button>
+            <button onClick={handleSave} disabled={loading} className="bg-gray-900 hover:bg-orange-600 text-white font-bold py-3 px-12 rounded-lg shadow-lg uppercase mt-auto transition-colors flex items-center gap-3">{loading ? <Loader className="animate-spin w-5 h-5" /> : <Save className="w-5 h-5" />}{loading ? 'Saving...' : 'Save Shifts Data'}</button>
           </div>
 
         </div>

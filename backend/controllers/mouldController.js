@@ -28,30 +28,31 @@ const mouldController = {
       transRes.recordset.forEach(row => {
           if (shiftData[row.Shift]) {
               const s = shiftData[row.Shift];
-              s.patternChange = row.PatternChange === 0 ? '' : row.PatternChange;
-              s.heatCodeChange = row.HeatCodeChange === 0 ? '' : row.HeatCodeChange;
-              s.mouldBroken = row.MouldBroken === 0 ? '' : row.MouldBroken;
-              s.amcCleaning = row.AmcCleaning === 0 ? '' : row.AmcCleaning;
-              s.mouldCrush = row.MouldCrush === 0 ? '' : row.MouldCrush;
-              s.coreFalling = row.CoreFalling === 0 ? '' : row.CoreFalling;
-              s.sandDelay = row.SandDelay === 0 ? '' : row.SandDelay;
-              s.drySand = row.DrySand === 0 ? '' : row.DrySand;
-              s.nozzleChange = row.NozzleChange === 0 ? '' : row.NozzleChange;
-              s.nozzleLeakage = row.NozzleLeakage === 0 ? '' : row.NozzleLeakage;
-              s.spoutPocking = row.SpoutPocking === 0 ? '' : row.SpoutPocking;
-              s.stRod = row.StRod === 0 ? '' : row.StRod;
-              s.qcVent = row.QcVent === 0 ? '' : row.QcVent;
-              s.outMould = row.OutMould === 0 ? '' : row.OutMould;
-              s.lowMg = row.LowMg === 0 ? '' : row.LowMg;
-              s.gradeChange = row.GradeChange === 0 ? '' : row.GradeChange;
-              s.msiProblem = row.MsiProblem === 0 ? '' : row.MsiProblem;
-              s.brakeDown = row.BrakeDown === 0 ? '' : row.BrakeDown;
-              s.wom = row.Wom === 0 ? '' : row.Wom;
-              s.devTrail = row.DevTrail === 0 ? '' : row.DevTrail;
-              s.powerCut = row.PowerCut === 0 ? '' : row.PowerCut;
-              s.plannedOff = row.PlannedOff === 0 ? '' : row.PlannedOff;
-              s.vatCleaning = row.VatCleaning === 0 ? '' : row.VatCleaning;
-              s.others = row.Others === 0 ? '' : row.Others;
+              // 🔥 UPDATED: If the DB value is 0, send a '-' back to the frontend
+              s.patternChange = row.PatternChange === 0 ? '-' : row.PatternChange;
+              s.heatCodeChange = row.HeatCodeChange === 0 ? '-' : row.HeatCodeChange;
+              s.mouldBroken = row.MouldBroken === 0 ? '-' : row.MouldBroken;
+              s.amcCleaning = row.AmcCleaning === 0 ? '-' : row.AmcCleaning;
+              s.mouldCrush = row.MouldCrush === 0 ? '-' : row.MouldCrush;
+              s.coreFalling = row.CoreFalling === 0 ? '-' : row.CoreFalling;
+              s.sandDelay = row.SandDelay === 0 ? '-' : row.SandDelay;
+              s.drySand = row.DrySand === 0 ? '-' : row.DrySand;
+              s.nozzleChange = row.NozzleChange === 0 ? '-' : row.NozzleChange;
+              s.nozzleLeakage = row.NozzleLeakage === 0 ? '-' : row.NozzleLeakage;
+              s.spoutPocking = row.SpoutPocking === 0 ? '-' : row.SpoutPocking;
+              s.stRod = row.StRod === 0 ? '-' : row.StRod;
+              s.qcVent = row.QcVent === 0 ? '-' : row.QcVent;
+              s.outMould = row.OutMould === 0 ? '-' : row.OutMould;
+              s.lowMg = row.LowMg === 0 ? '-' : row.LowMg;
+              s.gradeChange = row.GradeChange === 0 ? '-' : row.GradeChange;
+              s.msiProblem = row.MsiProblem === 0 ? '-' : row.MsiProblem;
+              s.brakeDown = row.BrakeDown === 0 ? '-' : row.BrakeDown;
+              s.wom = row.Wom === 0 ? '-' : row.Wom;
+              s.devTrail = row.DevTrail === 0 ? '-' : row.DevTrail;
+              s.powerCut = row.PowerCut === 0 ? '-' : row.PowerCut;
+              s.plannedOff = row.PlannedOff === 0 ? '-' : row.PlannedOff;
+              s.vatCleaning = row.VatCleaning === 0 ? '-' : row.VatCleaning;
+              s.others = row.Others === 0 ? '-' : row.Others;
               s.operatorSignature = row.OperatorSignature || '';
           }
       });
@@ -63,7 +64,8 @@ const mouldController = {
       
       customRes.recordset.forEach(row => {
           if (shiftData[row.Shift]) {
-             shiftData[row.Shift].customValues[row.columnId] = row.value === 0 ? '' : row.value;
+             // 🔥 UPDATED: Also send '-' for custom columns
+             shiftData[row.Shift].customValues[row.columnId] = row.value === 0 ? '-' : row.value;
           }
       });
 
@@ -153,7 +155,6 @@ const mouldController = {
         const result = await sql.query(query);
         const cResult = await sql.query(cQuery);
 
-        // 🔥 FETCH QF HISTORY FOR BULK EXPORT 🔥
         let qfHistory = [];
         try {
            const qfRes = await sql.query`SELECT qfValue, date FROM UnpouredMouldQFvalues WHERE formName = 'unpoured-mould-details' ORDER BY date DESC, id DESC`;
@@ -170,7 +171,6 @@ const mouldController = {
             return { ...r, customValues: cVals };
         });
 
-        // Pass the qfHistory along with the records to the frontend
         res.json({ records: mergedRecords, qfHistory });
     } catch (error) {
         console.error("Error fetching bulk data:", error);
@@ -236,7 +236,6 @@ const mouldController = {
               LEFT JOIN ShiftCount sc ON d.disa = sc.disa
           `;
 
-          // 🔥 FETCH QF HISTORY FOR SINGLE PDF EXPORT 🔥
           let qfHistory = [];
           try {
              const qfRes = await sql.query`SELECT qfValue, date FROM UnpouredMouldQFvalues WHERE formName = 'unpoured-mould-details' ORDER BY date DESC, id DESC`;
@@ -274,7 +273,6 @@ const mouldController = {
               };
           });
 
-          // Attach qfHistory to the response
           res.status(200).json({ summary: responseData, qfHistory });
       } catch (error) {
           console.error("Error fetching summary data:", error);
