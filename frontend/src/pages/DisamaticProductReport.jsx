@@ -181,21 +181,20 @@ const DisamaticProductReport = () => {
     return initialFormState;
   });
 
-  // --- Update the productions state to include patternCode and castedWeight ---
-const [productions, setProductions] = useState([
-  { 
-    componentName: "", 
-    patternCode: "", 
-    castedWeight: "", 
-    pouredWeight: "", 
-    mouldCounterNo: "", 
-    produced: "", 
-    poured: "", 
-    cycleTime: "", 
-    mouldsPerHour: "", 
-    remarks: "" 
-  }
-]);
+  const [productions, setProductions] = useState([
+    { 
+      componentName: "", 
+      patternCode: "", 
+      castedWeight: "", 
+      pouredWeight: "", 
+      mouldCounterNo: "", 
+      produced: "", 
+      poured: "", 
+      cycleTime: "", 
+      mouldsPerHour: "", 
+      remarks: "" 
+    }
+  ]);
   const [resetKey, setResetKey] = useState(0);
 
   const [incharges, setIncharges] = useState([]);
@@ -213,20 +212,16 @@ const [productions, setProductions] = useState([
   const [patternTemps, setPatternTemps] = useState([{ componentName: "", pp: "", sp: "", remarks: "" }]);
   const [supervisors, setSupervisors] = useState([]);
 
-  // Use a ref to prevent double-toasting on the very first mount
   const isFirstRender = useRef(true);
 
   useEffect(() => {
     localStorage.setItem("disaFormDraft", JSON.stringify(formData));
   }, [formData]);
 
-  // 🔥 CENTRALIZED FETCH LOGIC 🔥
-  // Listens to Date, Shift, and DISA specifically. Fetches data when any of the three changes.
   useEffect(() => {
     const fetchPersonnelAndCounter = async () => {
       if (formData.disa && formData.disa !== "-" && formData.date && formData.shift) {
         try {
-          // 1. Fetch Personnel
           const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/forms/last-personnel`, {
             params: { disa: formData.disa, date: formData.date, shift: formData.shift }
           });
@@ -241,7 +236,6 @@ const [productions, setProductions] = useState([
             }));
             if (!isFirstRender.current) toast.success(`Personnel auto-filled for DISA-${formData.disa}`);
           } else {
-            // Reset personnel fields if no previous data found
             setFormData((prev) => ({
               ...prev,
               incharge: "", member: "", ppOperator: "", supervisorName: ""
@@ -249,14 +243,12 @@ const [productions, setProductions] = useState([
             if (!isFirstRender.current) toast.info(`First entry for DISA-${formData.disa} in this shift.`);
           }
 
-          // 2. Fetch Last Mould Counter
           const counterRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/forms/last-mould-counter`, {
             params: { disa: formData.disa }
           });
           const fetchedCounter = Number(counterRes.data.lastMouldCounter) || 0;
           setPreviousMouldCounter(fetchedCounter);
           
-          // 3. Recalculate production based on new fetched counter
           setProductions(prevList => {
             let prev = fetchedCounter || 0; 
             return prevList.map((item) => {
@@ -266,18 +258,15 @@ const [productions, setProductions] = useState([
               let produced = 0;
               let displayCounter = String(item.mouldCounterNo);
 
-              // Wrap-around logic (> 600000)
               if (currentInput > 600000) {
                 const remainder = currentInput % 600000;
                 produced = (600000 - prev) + remainder;
                 displayCounter = String(remainder);
                 prev = remainder;
               } else if (currentInput > 0 && currentInput < prev) {
-                // Manual wrap case
                 produced = (600000 - prev) + currentInput;
                 prev = currentInput;
               } else {
-                // Normal case
                 produced = currentInput ? Math.max(0, currentInput - prev) : 0;
                 prev = currentInput;
               }
@@ -305,12 +294,9 @@ const [productions, setProductions] = useState([
     axios.get(`${process.env.REACT_APP_API_URL}/api/incharges`).then((res) => setIncharges(res.data));
     axios.get(`${process.env.REACT_APP_API_URL}/api/employees`).then((res) => setEmployees(res.data));
     
-    // 🔥 UPDATED: Fetch from users endpoint and filter by PP Operator role
     axios.get(`${process.env.REACT_APP_API_URL}/api/users`)
       .then((res) => {
-        // Added .trim() defensively to ensure no trailing spaces cause the filter to fail
         const ppOps = res.data.filter(user => user.role && user.role.trim().toLowerCase() === 'pp operator');
-        
         setOperators(ppOps);
       })
       .catch(err => console.error("Failed to fetch PP Operators", err));
@@ -320,7 +306,6 @@ const [productions, setProductions] = useState([
     axios.get(`${process.env.REACT_APP_API_URL}/api/mould-hardness-remarks`).then((res) => setMouldRemarksList(res.data));
   }, []);
 
-  // Updated handleChange: Clears personnel on Date/Shift change to force fresh fetch via useEffect
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => {
@@ -335,7 +320,6 @@ const [productions, setProductions] = useState([
     });
   };
 
-  // 🔥 FIX: Removed async/await logic. Now only updates state. The useEffect handles the fetch.
   const handleDisaChange = (e) => {
     const selectedDisa = e.target.value;
     setFormData((prev) => ({ 
@@ -361,16 +345,21 @@ const [productions, setProductions] = useState([
     if (delays.length === 1) return;
     setDelays(delays.filter((_, i) => i !== index));
   };
+
+  // 🔥 UPDATED DELAY CALCULATION 🔥
   const updateDelay = (index, field, value) => {
     const updated = [...delays];
     updated[index][field] = value;
     
     if (updated[index].startTime && updated[index].endTime && updated[index].startTime !== "-" && updated[index].endTime !== "-") {
-      const startParts = updated[index].startTime.split(':');
-      const endParts = updated[index].endTime.split(':');
+      // Replace dot with colon to support both HH:MM and HH.MM formats
+      const normalizedStart = String(updated[index].startTime).replace('.', ':');
+      const normalizedEnd = String(updated[index].endTime).replace('.', ':');
+
+      const startParts = normalizedStart.split(':');
+      const endParts = normalizedEnd.split(':');
       
       if(startParts.length === 2 && endParts.length === 2) {
-        // Automatically pad single digits with a leading '0' (e.g., "2:00" becomes "02:00")
         const formattedStart = `${startParts[0].padStart(2, '0')}:${startParts[1].padStart(2, '0')}`;
         const formattedEnd = `${endParts[0].padStart(2, '0')}:${endParts[1].padStart(2, '0')}`;
         
@@ -388,6 +377,7 @@ const [productions, setProductions] = useState([
     }
     setDelays(updated);
   };
+
   const addMouldHardness = () => setMouldHardness([...mouldHardness, { componentName: "", penetrationPP: "", penetrationSP: "", bScalePP: "", bScaleSP: "", remarks: "-" }]);
   const removeMouldHardness = (index) => {
     if (mouldHardness.length === 1) return;
@@ -420,84 +410,78 @@ const [productions, setProductions] = useState([
     recalculateChain(updated);
   };
 
-const updateProduction = (index, field, value, itemObj = null) => {
-  const updated = [...productions];
+  const updateProduction = (index, field, value, itemObj = null) => {
+    const updated = [...productions];
 
-  if (field === "componentName" || field === "patternCode") {
-    // itemObj is the full database record from the select dropdown
-    // If selecting by Component Name, itemObj.description is the name.
-    // If selecting by Pattern Code, itemObj.code is the code.
-    updated[index].componentName = itemObj?.description || value;
-    updated[index].patternCode = itemObj?.code || value;
-    updated[index].pouredWeight = itemObj?.pouredWeight || "";
-    updated[index].castedWeight = itemObj?.castedWeight || "";
-    setProductions(updated);
-  }
-  else if (field === "mouldCounterNo" || field === "prevCount") {
-    updated[index][field] = value;
-    if (index === 0 && field === "prevCount") {
-      recalculateChain(updated, Number(value));
-    } else {
-      recalculateChain(updated);
+    if (field === "componentName" || field === "patternCode") {
+      updated[index].componentName = itemObj?.description || value;
+      updated[index].patternCode = itemObj?.code || value;
+      updated[index].pouredWeight = itemObj?.pouredWeight || "";
+      updated[index].castedWeight = itemObj?.castedWeight || "";
+      setProductions(updated);
     }
-  } 
-  else if (field === "cycleTime") {
-    updated[index][field] = value;
-    if (value === "-" || value.trim() === "") {
-      updated[index].mouldsPerHour = "-";
-    } else {
-      const c = Number(value);
-      updated[index].mouldsPerHour = (c > 0 && !isNaN(c)) ? Math.round(3600 / c) : "-"; 
-    }
-    setProductions(updated);
-  } 
-  else {
-    updated[index][field] = value;
-    setProductions(updated);
-  }
-};
-
-  // 🔥 Integrated Recalculate Logic with Wrap-Around support
-const recalculateChain = (list, baseCounter = previousMouldCounter) => {
-  let prev = Number(baseCounter) || 0; 
-  const newList = list.map((item, idx) => {
-    // If a manual prevCount was entered for this specific row (other than the first row calculation), use it
-    if (item.prevCount !== undefined && item.prevCount !== null && item.prevCount !== "") {
-        prev = Number(item.prevCount);
-    }
-
-    if (item.mouldCounterNo === "-" || String(item.mouldCounterNo).trim() === "") {
-        return { ...item, produced: "-" };
-    }
-    
-    let currentInput = Number(item.mouldCounterNo) || 0;
-    let produced = 0;
-    let displayCounter = String(item.mouldCounterNo);
-
-    // Wrap-around logic
-    if (currentInput > 600000) {
-      const remainder = currentInput % 600000;
-      produced = (600000 - prev) + remainder;
-      displayCounter = String(remainder); 
-      prev = remainder;
+    else if (field === "mouldCounterNo" || field === "prevCount") {
+      updated[index][field] = value;
+      if (index === 0 && field === "prevCount") {
+        recalculateChain(updated, Number(value));
+      } else {
+        recalculateChain(updated);
+      }
     } 
-    else if (currentInput > 0 && currentInput < prev) {
-      produced = (600000 - prev) + currentInput;
-      prev = currentInput;
+    else if (field === "cycleTime") {
+      updated[index][field] = value;
+      if (value === "-" || value.trim() === "") {
+        updated[index].mouldsPerHour = "-";
+      } else {
+        const c = Number(value);
+        updated[index].mouldsPerHour = (c > 0 && !isNaN(c)) ? Math.round(3600 / c) : "-"; 
+      }
+      setProductions(updated);
     } 
     else {
-      produced = currentInput ? Math.max(0, currentInput - prev) : 0;
-      prev = currentInput;
+      updated[index][field] = value;
+      setProductions(updated);
     }
+  };
 
-    return { 
-      ...item, 
-      mouldCounterNo: displayCounter, 
-      produced: isNaN(produced) ? "-" : produced 
-    };
-  });
-  setProductions(newList);
-};
+  const recalculateChain = (list, baseCounter = previousMouldCounter) => {
+    let prev = Number(baseCounter) || 0; 
+    const newList = list.map((item) => {
+      if (item.prevCount !== undefined && item.prevCount !== null && item.prevCount !== "") {
+          prev = Number(item.prevCount);
+      }
+
+      if (item.mouldCounterNo === "-" || String(item.mouldCounterNo).trim() === "") {
+          return { ...item, produced: "-" };
+      }
+      
+      let currentInput = Number(item.mouldCounterNo) || 0;
+      let produced = 0;
+      let displayCounter = String(item.mouldCounterNo);
+
+      if (currentInput > 600000) {
+        const remainder = currentInput % 600000;
+        produced = (600000 - prev) + remainder;
+        displayCounter = String(remainder); 
+        prev = remainder;
+      } 
+      else if (currentInput > 0 && currentInput < prev) {
+        produced = (600000 - prev) + currentInput;
+        prev = currentInput;
+      } 
+      else {
+        produced = currentInput ? Math.max(0, currentInput - prev) : 0;
+        prev = currentInput;
+      }
+
+      return { 
+        ...item, 
+        mouldCounterNo: displayCounter, 
+        produced: isNaN(produced) ? "-" : produced 
+      };
+    });
+    setProductions(newList);
+  };
 
   const isInvalid = (val) => val === undefined || val === null || val.toString().trim() === "";
 
@@ -651,7 +635,6 @@ const recalculateChain = (list, baseCounter = previousMouldCounter) => {
             <div className="grid grid-cols-3 gap-6">
               <SearchableSelect key={`incharge-${resetKey}`} label="Incharge" options={incharges} displayKey="name" value={formData.incharge} onSelect={(item) => setFormData({ ...formData, incharge: item.name || item.name })} />
               
-              {/* 🔥 UPDATED: P/P Operator now uses username */}
               <SearchableSelect 
                 key={`ppOperator-${resetKey}`} 
                 label="P/P Operator" 
@@ -680,7 +663,7 @@ const recalculateChain = (list, baseCounter = previousMouldCounter) => {
                     
                     <div className="flex flex-col gap-2">
                       <div>
-                        <label className="font-medium text-sm text-gray-700 block mb-1">Mould Counter No.</label>
+                        <label className="font-medium text-sm text-gray-700 block mb-1">Open Mould Counter No.</label>
                         <input type="text" value={String(prod.mouldCounterNo)} onChange={(e) => updateProduction(index, "mouldCounterNo", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
                       </div>
                       <div>
@@ -695,7 +678,6 @@ const recalculateChain = (list, baseCounter = previousMouldCounter) => {
                       </div>
                     </div>
                     
-                    {/* Replace the existing Component Name div with this flex-col block */}
                     <div className="flex flex-col gap-4">
                     {/* Component Name Selection */}
                     <SearchableSelect 
@@ -717,7 +699,7 @@ const recalculateChain = (list, baseCounter = previousMouldCounter) => {
                       onSelect={(item) => updateProduction(index, "patternCode", item.code, item)} 
                     />
                     
-                    {/* Styled Weights Row (matches your image) */}
+                    {/* Styled Weights Row */}
                     <div className="flex justify-between items-center px-1">
                       <span className="text-sm font-bold text-blue-700">
                         Poured: {prod.pouredWeight ? `${prod.pouredWeight} kg` : "-"}
@@ -728,7 +710,7 @@ const recalculateChain = (list, baseCounter = previousMouldCounter) => {
                     </div>
                   </div>
                     <div>
-                      <label className="font-medium text-sm text-gray-500">Produced (Updates Previous Form)</label>
+                      <label className="font-medium text-sm text-gray-500">Produced </label>
                       <input type="text" value={String(prod.produced)} readOnly className="w-full border border-gray-300 p-2 rounded bg-gray-200 cursor-not-allowed text-gray-600" />
                     </div>
                     <div>
@@ -797,8 +779,8 @@ const recalculateChain = (list, baseCounter = previousMouldCounter) => {
                 <thead className="bg-gray-100 text-gray-700">
                   <tr>
                     <th className="border border-gray-300 p-2 text-left w-1/3">Reason</th>
-                    <th className="border border-gray-300 p-2 w-48">Start Time (HH:MM)</th>
-                    <th className="border border-gray-300 p-2 w-48">End Time (HH:MM)</th>
+                    <th className="border border-gray-300 p-2 w-48">Start Time (HH.MM)</th>
+                    <th className="border border-gray-300 p-2 w-48">End Time (HH.MM)</th>
                     <th className="border border-gray-300 p-2">Duration (Mins)</th>
                   </tr>
                 </thead>

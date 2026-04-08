@@ -20,6 +20,7 @@ const mouldQualityRoutes = require('./routes/mouldQualityRoutes');
 const verifyToken = require('./middleware/authMiddleware');
 const qfRoutes = require("./routes/QFRoutes");
 const componentRoutes = require("./routes/componentRoutes");
+const delayRoutes = require("./routes/delayRoutes");
 
 const app = express();
 
@@ -54,8 +55,9 @@ app.use("/api/components", componentRoutes);
 app.use("/api", dailyPerformanceRoutes);
 app.use("/api/config", configRoutes);
 app.use('/api/mould-quality', mouldQualityRoutes);
-// 🔥 ADDED QF ROUTES ENDPOINT
 app.use('/api/settings', qfRoutes);
+app.use('/api/delays', delayRoutes);
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

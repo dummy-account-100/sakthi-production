@@ -4,7 +4,7 @@ import axios from 'axios';
 import { ArrowLeft } from 'lucide-react';
 import {
     FileDown, Calendar, Users, X, Loader, AlertTriangle, CheckCircle,
-    Settings, Edit, Trash2, UserPlus, Eye, BookOpen,
+    Settings, Edit, Trash2, UserPlus, Eye, BookOpen, Clock,
     BarChart3, Factory, Layers, Cpu, ListChecks, FileSearch, ShieldCheck, 
     ShieldAlert, SlidersHorizontal, Activity, ClipboardCheck, Package, PlusSquare
 } from 'lucide-react';
@@ -80,18 +80,22 @@ const AdminDashboard = () => {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [newUser, setNewUser] = useState({ username: "", employeeId: "", password: "", role: "" });
 
-    // === NEW COMPONENT STATES ===
+    // === COMPONENTS STATES ===
     const [components, setComponents] = useState([]);
     const [loadingComponents, setLoadingComponents] = useState(false);
-
     const [isEditCompModalOpen, setIsEditCompModalOpen] = useState(false);
-    // [EDIT] Added isActive to default state
     const [editComponent, setEditComponent] = useState({ code: "", description: "", pouredWeight: "", cavity: "", castedWeight: "", isActive: 'Active' });
-
     const [isAddCompModalOpen, setIsAddCompModalOpen] = useState(false);
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, codeToDelete: null });
-    // [EDIT] Added isActive to default state
     const [newComponent, setNewComponent] = useState({ code: "", description: "", pouredWeight: "", cavity: "", castedWeight: "", isActive: 'Active' });
+
+    // === DELAYS STATES ===
+    const [delays, setDelays] = useState([]);
+    const [loadingDelays, setLoadingDelays] = useState(false);
+    const [isEditDelayModalOpen, setIsEditDelayModalOpen] = useState(false);
+    const [editDelay, setEditDelay] = useState({ id: "", reasonName: "" });
+    const [isAddDelayModalOpen, setIsAddDelayModalOpen] = useState(false);
+    const [newDelay, setNewDelay] = useState({ reasonName: "" });
 
     // 🔥 State for QF Settings Manager
     const [qfSettings, setQfSettings] = useState([]);
@@ -112,7 +116,7 @@ const AdminDashboard = () => {
         { name: "Manage QF Values", id: "qf-settings", isSpecial: true, icon: BookOpen },
         { name: "Add / Manage Users", id: "users", isSpecial: true, icon: Users },
         { name: "Add / Manage Components", id: "components", isSpecial: true, icon: Package }, 
-        
+        { name: "Add / Manage Delays", id: "delays", isSpecial: true, icon: Clock },
     ];
 
     const hideManageFormIds = ['disamatic-report', 'performance', 'error-proof', 'mould-quality'];
@@ -121,6 +125,7 @@ const AdminDashboard = () => {
         if (activeView === 'users') fetchUsers();
         if (activeView === 'qf-settings') fetchQfSettings();
         if (activeView === 'components') fetchComponents();
+        if (activeView === 'delays') fetchDelays();
     }, [activeView]);
 
     const fetchUsers = async () => {
@@ -426,16 +431,14 @@ const AdminDashboard = () => {
     };
 
     // ==========================================
-    // 🔥 COMPONENT HANDLERS (INTEGRATED `isActive`)
+    // 🔥 COMPONENT HANDLERS
     // ==========================================
     const fetchComponents = async () => {
         setLoadingComponents(true);
         try {
-            // [EDIT] Added timestamp for cache-busting
             const timestamp = new Date().getTime();
             const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/components?t=${timestamp}`);
             
-            // [EDIT] Added normalization for boolean/string/int mismatch safety
             const normalized = response.data.map(c => ({
                 ...c,
                 isActive: (c.isActive === true || c.isActive === 1 || String(c.isActive).trim().toLowerCase() === 'active')
@@ -456,7 +459,6 @@ const AdminDashboard = () => {
             await axios.post(`${process.env.REACT_APP_API_URL}/api/components/add`, newComponent);
             setNotification({ show: true, type: 'success', message: 'Component added successfully!' });
             setIsAddCompModalOpen(false);
-            // [EDIT] Reset state now includes isActive
             setNewComponent({ code: "", description: "", pouredWeight: "", cavity: "", castedWeight: "", isActive: 'Active' });
             fetchComponents();
         } catch (error) {
@@ -468,12 +470,14 @@ const AdminDashboard = () => {
     const handleUpdateComponent = async (e) => {
         e.preventDefault();
         try {
-            await axios.put(`${process.env.REACT_APP_API_URL}/api/components/${encodeURIComponent(editComponent.code)}`, {
+            // 🔥 CRITICAL FIX: Use originalCode in the URL, NOT the new code
+            await axios.put(`${process.env.REACT_APP_API_URL}/api/components/${encodeURIComponent(editComponent.originalCode)}`, {
+                code: editComponent.code,
                 description: editComponent.description,
                 pouredWeight: editComponent.pouredWeight,
                 cavity: editComponent.cavity,
                 castedWeight: editComponent.castedWeight,
-                isActive: editComponent.isActive // [EDIT] Included in payload
+                isActive: editComponent.isActive
             });
             setNotification({ show: true, type: 'success', message: 'Component updated successfully!' });
             setIsEditCompModalOpen(false);
@@ -483,13 +487,10 @@ const AdminDashboard = () => {
             setNotification({ show: true, type: 'error', message: errorMsg });
         }
     };
-
-    // [EDIT] New function to handle status toggling
     const handleToggleComponentStatus = async (code, currentStatus) => {
         const isCurrentlyActive = currentStatus === 'Active';
         const newStatus = isCurrentlyActive ? 'Inactive' : 'Active';
 
-        // Optimistic UI update
         setComponents(prevComponents => prevComponents.map(comp => 
             comp.code === code ? { ...comp, isActive: newStatus } : comp
         ));
@@ -500,7 +501,6 @@ const AdminDashboard = () => {
             });
             setNotification({ show: true, type: 'success', message: 'Status updated!' });
         } catch (error) {
-            // Rollback on failure
             setComponents(prevComponents => prevComponents.map(comp => 
                 comp.code === code ? { ...comp, isActive: currentStatus } : comp
             ));
@@ -514,7 +514,7 @@ const AdminDashboard = () => {
 
     const executeDeleteComponent = async () => {
         const code = deleteModal.codeToDelete;
-        setDeleteModal({ isOpen: false, codeToDelete: null }); // Close modal immediately
+        setDeleteModal({ isOpen: false, codeToDelete: null }); 
         
         try {
             await axios.delete(`${process.env.REACT_APP_API_URL}/api/components/${encodeURIComponent(code)}`);
@@ -524,6 +524,59 @@ const AdminDashboard = () => {
             setNotification({ show: true, type: 'error', message: 'Failed to delete component' });
         }
     };
+
+    // ==========================================
+    // 🔥 DELAY HANDLERS
+    // ==========================================
+    const fetchDelays = async () => {
+        setLoadingDelays(true);
+        try {
+            const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/delays`);
+            setDelays(response.data);
+        } catch (error) {
+            setNotification({ show: true, type: 'error', message: 'Failed to load delays' });
+        }
+        setLoadingDelays(false);
+    };
+
+    const handleAddDelay = async (e) => {
+        e.preventDefault();
+        try {
+            await axios.post(`${process.env.REACT_APP_API_URL}/api/delays/add`, newDelay);
+            setNotification({ show: true, type: 'success', message: 'Delay reason added successfully!' });
+            setIsAddDelayModalOpen(false);
+            setNewDelay({ reasonName: "" });
+            fetchDelays();
+        } catch (error) {
+            setNotification({ show: true, type: 'error', message: 'Failed to add delay' });
+        }
+    };
+
+    const handleUpdateDelay = async (e) => {
+        e.preventDefault();
+        try {
+            await axios.put(`${process.env.REACT_APP_API_URL}/api/delays/${editDelay.id}`, {
+                reasonName: editDelay.reasonName
+            });
+            setNotification({ show: true, type: 'success', message: 'Delay updated successfully!' });
+            setIsEditDelayModalOpen(false);
+            fetchDelays();
+        } catch (error) {
+            setNotification({ show: true, type: 'error', message: 'Failed to update delay' });
+        }
+    };
+
+    const handleDeleteDelay = async (id) => {
+        
+        try {
+            await axios.delete(`${process.env.REACT_APP_API_URL}/api/delays/${id}`);
+            setNotification({ show: true, type: 'success', message: 'Delay deleted successfully!' });
+            fetchDelays();
+        } catch (error) {
+            setNotification({ show: true, type: 'error', message: 'Failed to delete delay' });
+        }
+    };
+
 
     if (adminEditView) {
         return (
@@ -619,186 +672,202 @@ const AdminDashboard = () => {
             </div>
         );
     }
-    // ==========================================
-    // 🔥 MANAGE COMPONENTS UI
-    // ==========================================
-    if (activeView === 'components') {
-        return (
-            <div className="relative w-full min-h-screen bg-[#2d2d2d] flex flex-col font-sans">
-                <Header />
-                <NotificationToast data={notification} onClose={() => setNotification(prev => ({ ...prev, show: false }))} />
+    
+ // ==========================================
+// 🔥 MANAGE COMPONENTS UI
+// ==========================================
+if (activeView === 'components') {
+    return (
+        <div className="relative w-full min-h-screen bg-[#2d2d2d] flex flex-col font-sans">
+            <Header />
+            <NotificationToast data={notification} onClose={() => setNotification(prev => ({ ...prev, show: false }))} />
 
-                <div className="flex-1 flex flex-col items-center py-10 px-6 relative z-10">
-                    <button onClick={() => setActiveView('grid')} className="self-start mb-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors bg-[#383838] hover:bg-[#4a4a4a] px-5 py-2.5 rounded-xl border border-[#4a4a4a] hover:border-gray-300 shadow-md font-bold uppercase tracking-wider text-xs">
-                        <ArrowLeft size={16} /> Back to Dashboard
-                    </button>
+            <div className="flex-1 flex flex-col items-center py-10 px-6 relative z-10">
+                <button onClick={() => setActiveView('grid')} className="self-start mb-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors bg-[#383838] hover:bg-[#4a4a4a] px-5 py-2.5 rounded-xl border border-[#4a4a4a] hover:border-gray-300 shadow-md font-bold uppercase tracking-wider text-xs">
+                    <ArrowLeft size={16} /> Back to Dashboard
+                </button>
 
-                    <div className="bg-[#383838] border border-[#4a4a4a] w-full max-w-6xl rounded-2xl p-8 shadow-[0_15px_40px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in-95">
-                        <div className="flex justify-between items-center border-b border-[#4a4a4a] pb-6 mb-6">
-                            <div className="flex items-center gap-4">
-                                <div className="bg-blue-900/20 p-3 rounded-xl border border-blue-500/30 shadow-inner">
-                                    <Package size={28} className="text-blue-400" />
-                                </div>
-                                <div>
-                                    <h1 className="text-2xl font-black text-white uppercase tracking-widest leading-tight">Database Components</h1>
-                                    <p className="text-[11px] text-gray-400 font-bold mt-1 uppercase tracking-[0.2em]">Manage Parts & Weights</p>
-                                </div>
+                <div className="bg-[#383838] border border-[#4a4a4a] w-full max-w-6xl rounded-2xl p-8 shadow-[0_15px_40px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in-95">
+                    <div className="flex justify-between items-center border-b border-[#4a4a4a] pb-6 mb-6">
+                        <div className="flex items-center gap-4">
+                            <div className="bg-blue-900/20 p-3 rounded-xl border border-blue-500/30 shadow-inner">
+                                <Package size={28} className="text-blue-400" />
                             </div>
-                            <button onClick={() => setIsAddCompModalOpen(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-colors shadow-[0_4px_15px_rgba(37,99,235,0.3)] hover:shadow-[0_4px_25px_rgba(37,99,235,0.5)] flex items-center gap-2 border border-blue-400">
-                                <PlusSquare size={16} /> Add Component
-                            </button>
+                            <div>
+                                <h1 className="text-2xl font-black text-white uppercase tracking-widest leading-tight">Database Components</h1>
+                                <p className="text-[11px] text-gray-400 font-bold mt-1 uppercase tracking-[0.2em]">Manage Parts & Weights</p>
+                            </div>
                         </div>
-
-                        <div className="overflow-x-auto rounded-xl border border-[#4a4a4a] shadow-inner bg-[#2d2d2d]">
-                            {loadingComponents ? (
-                                <div className="flex justify-center items-center py-20">
-                                    <Loader className="animate-spin text-blue-500 w-10 h-10" />
-                                </div>
-                            ) : (
-                                <table className="w-full text-left border-collapse whitespace-nowrap">
-                                    <thead className="bg-[#1A2634] text-gray-300 border-b border-[#4a4a4a]">
-                                        <tr>
-                                            <th className="p-4 uppercase tracking-widest text-[10px] font-black w-48">Code</th>
-                                            <th className="p-4 uppercase tracking-widest text-[10px] font-black">Description</th>
-                                            <th className="p-4 uppercase tracking-widest text-[10px] font-black text-center">Poured Wt</th>
-                                            <th className="p-4 uppercase tracking-widest text-[10px] font-black text-center">Cavity</th>
-                                            <th className="p-4 uppercase tracking-widest text-[10px] font-black text-center">Casted Wt</th>
-                                            {/* [EDIT] Added Status Column Header */}
-                                            <th className="p-4 uppercase tracking-widest text-[10px] font-black text-center">Status</th>
-                                            <th className="p-4 uppercase tracking-widest text-[10px] font-black text-center w-28">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-[#4a4a4a]">
-                                        {components.length > 0 ? (
-                                            components.map((c) => (
-                                                <tr key={c.code} className="hover:bg-white/5 transition-colors group">
-                                                    <td className="p-4 font-black text-blue-400 font-mono text-sm tracking-wider">{c.code}</td>
-                                                    <td className="p-4 font-bold text-gray-200 text-sm whitespace-normal min-w-[200px]">{c.description}</td>
-                                                    <td className="p-4 text-center text-gray-400 font-mono">{c.pouredWeight ? Number(c.pouredWeight).toFixed(3) : '-'}</td>
-                                                    <td className="p-4 text-center text-gray-400 font-mono">{c.cavity || '-'}</td>
-                                                    <td className="p-4 text-center text-gray-400 font-mono">{c.castedWeight ? Number(c.castedWeight).toFixed(3) : '-'}</td>
-                                                    {/* [EDIT] Added Status Toggle Button Column */}
-                                                    <td className="p-4 text-center">
-                                                        <button
-                                                            onClick={() => handleToggleComponentStatus(c.code, c.isActive)}
-                                                            className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors w-24 inline-block text-center shadow-inner ${
-                                                                c.isActive === 'Active'
-                                                                ? 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30' 
-                                                                : 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
-                                                            }`}
-                                                        >
-                                                            {c.isActive === 'Active' ? 'Active' : 'Inactive'}
-                                                        </button>
-                                                    </td>
-                                                    <td className="p-4">
-                                                        <div className="flex justify-center gap-3">
-                                                            <button onClick={() => { setEditComponent({ ...c }); setIsEditCompModalOpen(true); }} className="bg-[#222] border border-[#4a4a4a] p-2 rounded-lg text-blue-400 hover:text-white hover:bg-blue-600 hover:border-blue-500 transition-all shadow-sm"><Edit size={16} /></button>
-                                                            <button onClick={() => confirmDeleteComponent(c.code)} className="bg-[#222] border border-[#4a4a4a] p-2 rounded-lg text-red-500 hover:text-white hover:bg-red-600 hover:border-red-500 transition-all shadow-sm"><Trash2 size={16} /></button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                {/* [EDIT] Increased colspan to 7 to match new header count */}
-                                                <td colSpan="7" className="text-center p-12 text-gray-500 font-black uppercase tracking-widest">No components found.</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
+                        <button onClick={() => setIsAddCompModalOpen(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-colors shadow-[0_4px_15px_rgba(37,99,235,0.3)] hover:shadow-[0_4px_25px_rgba(37,99,235,0.5)] flex items-center gap-2 border border-blue-400">
+                            <PlusSquare size={16} /> Add Component
+                        </button>
                     </div>
 
-                    {/* Modals for Add/Edit Component */}
-                    {(isAddCompModalOpen || isEditCompModalOpen) && (
-                        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                            <div className="bg-[#383838] border border-[#4a4a4a] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] w-full max-w-lg overflow-hidden scale-in">
-                                <div className={`bg-[#1A2634] px-6 py-5 flex justify-between items-center border-b-2 border-blue-500`}>
-                                    <h3 className="text-white font-black uppercase tracking-widest text-sm flex items-center gap-3">
-                                        {isAddCompModalOpen ? <><PlusSquare size={18} className="text-blue-500" /> Add Component</> : <><Edit size={18} className="text-blue-500" /> Modify Component</>}
-                                    </h3>
-                                    <button onClick={() => isAddCompModalOpen ? setIsAddCompModalOpen(false) : setIsEditCompModalOpen(false)} className="text-gray-400 hover:text-white bg-black/20 hover:bg-black/40 p-1.5 rounded-lg transition-colors"><X size={18} /></button>
-                                </div>
-                                <form onSubmit={isAddCompModalOpen ? handleAddComponent : handleUpdateComponent} className="p-7 flex flex-col gap-4">
-                                    <div>
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Component Code</label>
-                                        <input type="text" required disabled={isEditCompModalOpen} value={isAddCompModalOpen ? newComponent.code : editComponent.code} onChange={(e) => isAddCompModalOpen ? setNewComponent({ ...newComponent, code: e.target.value }) : setEditComponent({ ...editComponent, code: e.target.value })} className="w-full bg-[#222] border border-[#4a4a4a] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-white shadow-inner font-mono disabled:opacity-50" placeholder="e.g. MAR-S-091-..." />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Description</label>
-                                        <input type="text" required value={isAddCompModalOpen ? newComponent.description : editComponent.description} onChange={(e) => isAddCompModalOpen ? setNewComponent({ ...newComponent, description: e.target.value }) : setEditComponent({ ...editComponent, description: e.target.value })} className="w-full bg-[#222] border border-[#4a4a4a] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-white shadow-inner" placeholder="Enter description" />
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Poured Wt</label>
-                                            <input type="number" step="0.001" value={isAddCompModalOpen ? newComponent.pouredWeight : editComponent.pouredWeight} onChange={(e) => isAddCompModalOpen ? setNewComponent({ ...newComponent, pouredWeight: e.target.value }) : setEditComponent({ ...editComponent, pouredWeight: e.target.value })} className="w-full bg-[#222] border border-[#4a4a4a] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-white shadow-inner font-mono" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Cavity</label>
-                                            <input type="number" value={isAddCompModalOpen ? newComponent.cavity : editComponent.cavity} onChange={(e) => isAddCompModalOpen ? setNewComponent({ ...newComponent, cavity: e.target.value }) : setEditComponent({ ...editComponent, cavity: e.target.value })} className="w-full bg-[#222] border border-[#4a4a4a] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-white shadow-inner font-mono" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Casted Wt</label>
-                                            <input type="number" step="0.001" value={isAddCompModalOpen ? newComponent.castedWeight : editComponent.castedWeight} onChange={(e) => isAddCompModalOpen ? setNewComponent({ ...newComponent, castedWeight: e.target.value }) : setEditComponent({ ...editComponent, castedWeight: e.target.value })} className="w-full bg-[#222] border border-[#4a4a4a] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-white shadow-inner font-mono" />
-                                        </div>
-                                    </div>
-                                    {/* [EDIT] Added Component Status Select Input */}
-                                    <div>
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Component Status</label>
-                                        <select 
-                                            value={isAddCompModalOpen ? newComponent.isActive : editComponent.isActive} 
-                                            onChange={(e) => {
-                                                const val = e.target.value; 
-                                                isAddCompModalOpen ? setNewComponent({ ...newComponent, isActive: val }) : setEditComponent({ ...editComponent, isActive: val });
-                                            }} 
-                                            className="w-full bg-[#222] border border-[#4a4a4a] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-white shadow-inner appearance-none"
-                                        >
-                                            <option value="Active">Active</option>
-                                            <option value="Inactive">Inactive</option>
-                                        </select>
-                                    </div>
-                                    <div className="flex gap-3 mt-4 pt-4 border-t border-[#4a4a4a]">
-                                        <button type="button" onClick={() => isAddCompModalOpen ? setIsAddCompModalOpen(false) : setIsEditCompModalOpen(false)} className="flex-1 bg-[#222] border border-[#4a4a4a] hover:bg-[#4a4a4a] text-gray-300 font-black text-xs uppercase tracking-widest py-3.5 rounded-xl transition-colors">Cancel</button>
-                                        <button type="submit" className="flex-1 text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-xl transition-all shadow-lg border bg-blue-600 hover:bg-blue-500 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.3)]">
-                                            {isAddCompModalOpen ? 'Save Component' : 'Update Record'}
-                                        </button>
-                                    </div>
-                                </form>
+                    <div className="overflow-x-auto rounded-xl border border-[#4a4a4a] shadow-inner bg-[#2d2d2d]">
+                        {loadingComponents ? (
+                            <div className="flex justify-center items-center py-20">
+                                <Loader className="animate-spin text-blue-500 w-10 h-10" />
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <table className="w-full text-left border-collapse whitespace-nowrap">
+                                <thead className="bg-[#1A2634] text-gray-300 border-b border-[#4a4a4a]">
+                                    <tr>
+                                        <th className="p-4 uppercase tracking-widest text-[10px] font-black w-48">Code</th>
+                                        <th className="p-4 uppercase tracking-widest text-[10px] font-black">Description</th>
+                                        <th className="p-4 uppercase tracking-widest text-[10px] font-black text-center">Poured Wt</th>
+                                        <th className="p-4 uppercase tracking-widest text-[10px] font-black text-center">Cavity</th>
+                                        <th className="p-4 uppercase tracking-widest text-[10px] font-black text-center">Casted Wt</th>
+                                        <th className="p-4 uppercase tracking-widest text-[10px] font-black text-center">Status</th>
+                                        <th className="p-4 uppercase tracking-widest text-[10px] font-black text-center w-28">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[#4a4a4a]">
+                                    {components.length > 0 ? (
+                                        components.map((c) => (
+                                            <tr key={c.code} className="hover:bg-white/5 transition-colors group">
+                                                <td className="p-4 font-black text-blue-400 font-mono text-sm tracking-wider">{c.code}</td>
+                                                <td className="p-4 font-bold text-gray-200 text-sm whitespace-normal min-w-[200px]">{c.description}</td>
+                                                <td className="p-4 text-center text-gray-400 font-mono">{c.pouredWeight ? Number(c.pouredWeight).toFixed(3) : '-'}</td>
+                                                <td className="p-4 text-center text-gray-400 font-mono">{c.cavity || '-'}</td>
+                                                <td className="p-4 text-center text-gray-400 font-mono">{c.castedWeight ? Number(c.castedWeight).toFixed(3) : '-'}</td>
+                                                <td className="p-4 text-center">
+                                                    <button
+                                                        onClick={() => handleToggleComponentStatus(c.code, c.isActive)}
+                                                        className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors w-24 inline-block text-center shadow-inner ${c.isActive === 'Active'
+                                                                ? 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
+                                                                : 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
+                                                            }`}
+                                                    >
+                                                        {c.isActive === 'Active' ? 'Active' : 'Inactive'}
+                                                    </button>
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="flex justify-center gap-3">
+                                                        <button 
+                                                            // 🔥 CRITICAL FIX: Save the original code so the backend knows which record to update
+                                                            onClick={() => { 
+                                                                setEditComponent({ ...c, originalCode: c.code }); 
+                                                                setIsEditCompModalOpen(true); 
+                                                            }} 
+                                                            className="bg-[#222] border border-[#4a4a4a] p-2 rounded-lg text-blue-400 hover:text-white hover:bg-blue-600 hover:border-blue-500 transition-all shadow-sm"
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button onClick={() => confirmDeleteComponent(c.code)} className="bg-[#222] border border-[#4a4a4a] p-2 rounded-lg text-red-500 hover:text-white hover:bg-red-600 hover:border-red-500 transition-all shadow-sm"><Trash2 size={16} /></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="7" className="text-center p-12 text-gray-500 font-black uppercase tracking-widest">No components found.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
                 </div>
-                {/* CUSTOM DELETE CONFIRMATION MODAL */}
-                    {deleteModal.isOpen && (
-                        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                            <div className="bg-[#383838] border border-red-500/50 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.9)] w-full max-w-sm overflow-hidden scale-in">
-                                <div className="bg-[#2A0D0D] px-6 py-5 border-b-2 border-red-500 flex justify-center items-center">
-                                    <h3 className="text-white font-black uppercase tracking-widest text-sm flex items-center gap-3">
-                                        <AlertTriangle size={20} className="text-red-500" /> Confirm Deletion
-                                    </h3>
+
+                {/* Modals for Add/Edit Component */}
+                {(isAddCompModalOpen || isEditCompModalOpen) && (
+                    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                        <div className="bg-[#383838] border border-[#4a4a4a] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] w-full max-w-lg overflow-hidden scale-in">
+                            <div className={`bg-[#1A2634] px-6 py-5 flex justify-between items-center border-b-2 border-blue-500`}>
+                                <h3 className="text-white font-black uppercase tracking-widest text-sm flex items-center gap-3">
+                                    {isAddCompModalOpen ? <><PlusSquare size={18} className="text-blue-500" /> Add Component</> : <><Edit size={18} className="text-blue-500" /> Modify Component</>}
+                                </h3>
+                                <button onClick={() => isAddCompModalOpen ? setIsAddCompModalOpen(false) : setIsEditCompModalOpen(false)} className="text-gray-400 hover:text-white bg-black/20 hover:bg-black/40 p-1.5 rounded-lg transition-colors"><X size={18} /></button>
+                            </div>
+                            <form onSubmit={isAddCompModalOpen ? handleAddComponent : handleUpdateComponent} className="p-7 flex flex-col gap-4">
+                                
+                                {/* 🔥 CRITICAL FIX: Removed disabled attribute and simplified the input logic to allow editing */}
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Component Code</label>
+                                    <input 
+                                        type="text" 
+                                        required  
+                                        value={isAddCompModalOpen ? newComponent.code : editComponent.code} 
+                                        onChange={(e) => isAddCompModalOpen ? setNewComponent({ ...newComponent, code: e.target.value }) : setEditComponent({ ...editComponent, code: e.target.value })} 
+                                        className="w-full bg-[#222] border border-[#4a4a4a] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-white shadow-inner font-mono" 
+                                        placeholder="e.g. MAR-S-091-..." 
+                                    />
                                 </div>
-                                <div className="p-7 text-center">
-                                    <p className="text-gray-300 font-bold mb-6">
-                                        Are you sure you want to delete this component?
-                                        <span className="text-red-400 font-mono block mt-3 text-lg">{deleteModal.codeToDelete}</span>
-                                        <span className="text-xs text-gray-500 uppercase tracking-widest mt-3 block">This action cannot be undone.</span>
-                                    </p>
-                                    <div className="flex gap-3">
-                                        <button onClick={() => setDeleteModal({ isOpen: false, codeToDelete: null })} className="flex-1 bg-[#222] border border-[#4a4a4a] hover:bg-[#4a4a4a] text-gray-300 font-black text-xs uppercase tracking-widest py-3.5 rounded-xl transition-colors">
-                                            Cancel
-                                        </button>
-                                        <button onClick={executeDeleteComponent} className="flex-1 bg-red-600 hover:bg-red-500 border border-red-500 text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(220,38,38,0.3)]">
-                                            Delete Component
-                                        </button>
+                                
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Description</label>
+                                    <input type="text" required value={isAddCompModalOpen ? newComponent.description : editComponent.description} onChange={(e) => isAddCompModalOpen ? setNewComponent({ ...newComponent, description: e.target.value }) : setEditComponent({ ...editComponent, description: e.target.value })} className="w-full bg-[#222] border border-[#4a4a4a] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-white shadow-inner" placeholder="Enter description" />
+                                </div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Poured Wt</label>
+                                        <input type="number" step="0.001" value={isAddCompModalOpen ? newComponent.pouredWeight : editComponent.pouredWeight} onChange={(e) => isAddCompModalOpen ? setNewComponent({ ...newComponent, pouredWeight: e.target.value }) : setEditComponent({ ...editComponent, pouredWeight: e.target.value })} className="w-full bg-[#222] border border-[#4a4a4a] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-white shadow-inner font-mono" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Cavity</label>
+                                        <input type="number" value={isAddCompModalOpen ? newComponent.cavity : editComponent.cavity} onChange={(e) => isAddCompModalOpen ? setNewComponent({ ...newComponent, cavity: e.target.value }) : setEditComponent({ ...editComponent, cavity: e.target.value })} className="w-full bg-[#222] border border-[#4a4a4a] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-white shadow-inner font-mono" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Casted Wt</label>
+                                        <input type="number" step="0.001" value={isAddCompModalOpen ? newComponent.castedWeight : editComponent.castedWeight} onChange={(e) => isAddCompModalOpen ? setNewComponent({ ...newComponent, castedWeight: e.target.value }) : setEditComponent({ ...editComponent, castedWeight: e.target.value })} className="w-full bg-[#222] border border-[#4a4a4a] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-white shadow-inner font-mono" />
                                     </div>
                                 </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Component Status</label>
+                                    <select
+                                        value={isAddCompModalOpen ? newComponent.isActive : editComponent.isActive}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            isAddCompModalOpen ? setNewComponent({ ...newComponent, isActive: val }) : setEditComponent({ ...editComponent, isActive: val });
+                                        }}
+                                        className="w-full bg-[#222] border border-[#4a4a4a] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-bold text-white shadow-inner appearance-none"
+                                    >
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                                <div className="flex gap-3 mt-4 pt-4 border-t border-[#4a4a4a]">
+                                    <button type="button" onClick={() => isAddCompModalOpen ? setIsAddCompModalOpen(false) : setIsEditCompModalOpen(false)} className="flex-1 bg-[#222] border border-[#4a4a4a] hover:bg-[#4a4a4a] text-gray-300 font-black text-xs uppercase tracking-widest py-3.5 rounded-xl transition-colors">Cancel</button>
+                                    <button type="submit" className="flex-1 text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-xl transition-all shadow-lg border bg-blue-600 hover:bg-blue-500 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.3)]">
+                                        {isAddCompModalOpen ? 'Save Component' : 'Update Record'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+            </div>
+            {/* CUSTOM DELETE CONFIRMATION MODAL */}
+            {deleteModal.isOpen && (
+                <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#383838] border border-red-500/50 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.9)] w-full max-w-sm overflow-hidden scale-in">
+                        <div className="bg-[#2A0D0D] px-6 py-5 border-b-2 border-red-500 flex justify-center items-center">
+                            <h3 className="text-white font-black uppercase tracking-widest text-sm flex items-center gap-3">
+                                <AlertTriangle size={20} className="text-red-500" /> Confirm Deletion
+                            </h3>
+                        </div>
+                        <div className="p-7 text-center">
+                            <p className="text-gray-300 font-bold mb-6">
+                                Are you sure you want to delete this component?
+                                <span className="text-red-400 font-mono block mt-3 text-lg">{deleteModal.codeToDelete}</span>
+                                <span className="text-xs text-gray-500 uppercase tracking-widest mt-3 block">This action cannot be undone.</span>
+                            </p>
+                            <div className="flex gap-3">
+                                <button onClick={() => setDeleteModal({ isOpen: false, codeToDelete: null })} className="flex-1 bg-[#222] border border-[#4a4a4a] hover:bg-[#4a4a4a] text-gray-300 font-black text-xs uppercase tracking-widest py-3.5 rounded-xl transition-colors">
+                                    Cancel
+                                </button>
+                                <button onClick={executeDeleteComponent} className="flex-1 bg-red-600 hover:bg-red-500 border border-red-500 text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(220,38,38,0.3)]">
+                                    Delete Component
+                                </button>
                             </div>
                         </div>
-                    )}
-            </div>
-        );
-    }
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+    
     // ==========================================
     // 🔥 MANAGE USERS UI
     // ==========================================
@@ -927,6 +996,111 @@ const AdminDashboard = () => {
                                         <button type="button" onClick={() => isAddModalOpen ? setIsAddModalOpen(false) : setIsEditModalOpen(false)} className="flex-1 bg-[#222] border border-[#4a4a4a] hover:bg-[#4a4a4a] text-gray-300 font-black text-xs uppercase tracking-widest py-3.5 rounded-xl transition-colors">Cancel</button>
                                         <button type="submit" className={`flex-1 text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-xl transition-all shadow-lg border ${isAddModalOpen ? 'bg-[#ff9100] hover:bg-orange-500 border-[#ffaa33] shadow-[0_0_15px_rgba(255,145,0,0.3)]' : 'bg-blue-600 hover:bg-blue-500 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.3)]'}`}>
                                             {isAddModalOpen ? 'Authorize User' : 'Save Update'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    // ==========================================
+    // 🔥 MANAGE DELAYS UI
+    // ==========================================
+    if (activeView === 'delays') {
+        return (
+            <div className="relative w-full min-h-screen bg-[#2d2d2d] flex flex-col font-sans">
+                <Header />
+                <NotificationToast data={notification} onClose={() => setNotification(prev => ({ ...prev, show: false }))} />
+
+                <div className="flex-1 flex flex-col items-center py-10 px-6 relative z-10">
+                    <button onClick={() => setActiveView('grid')} className="self-start mb-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors bg-[#383838] hover:bg-[#4a4a4a] px-5 py-2.5 rounded-xl border border-[#4a4a4a] shadow-md font-bold uppercase tracking-wider text-xs">
+                        <ArrowLeft size={16} /> Back to Dashboard
+                    </button>
+
+                    <div className="bg-[#383838] border border-[#4a4a4a] w-full max-w-5xl rounded-2xl p-8 shadow-[0_15px_40px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in-95">
+                        <div className="flex justify-between items-center border-b border-[#4a4a4a] pb-6 mb-6">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-purple-900/20 p-3 rounded-xl border border-purple-500/30 shadow-inner">
+                                    <Clock size={28} className="text-purple-400" />
+                                </div>
+                                <div>
+                                    <h1 className="text-2xl font-black text-white uppercase tracking-widest leading-tight">Delay Reasons</h1>
+                                    <p className="text-[11px] text-gray-400 font-bold mt-1 uppercase tracking-[0.2em]">Manage Production Delays</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsAddDelayModalOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-colors shadow-[0_4px_15px_rgba(147,51,234,0.3)] flex items-center gap-2 border border-purple-400">
+                                <PlusSquare size={16} /> Add Delay
+                            </button>
+                        </div>
+
+                        <div className="overflow-hidden rounded-xl border border-[#4a4a4a] shadow-inner bg-[#2d2d2d]">
+                            {loadingDelays ? (
+                                <div className="flex justify-center items-center py-20">
+                                    <Loader className="animate-spin text-purple-500 w-10 h-10" />
+                                </div>
+                            ) : (
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="bg-[#1A2634] text-gray-300 border-b border-[#4a4a4a]">
+                                        <tr>
+                                            <th className="p-4 w-24 text-center uppercase tracking-widest text-[10px] font-black">ID</th>
+                                            <th className="p-4 uppercase tracking-widest text-[10px] font-black">Reason Name</th>
+                                            
+                                            <th className="p-4 w-32 text-center uppercase tracking-widest text-[10px] font-black">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[#4a4a4a]">
+                                        {delays.length > 0 ? (
+                                            delays.map((d) => (
+                                                <tr key={d.id} className="hover:bg-white/5 transition-colors group">
+                                                    <td className="p-4 text-center font-black text-purple-400 font-mono tracking-wider">{d.id}</td>
+                                                    <td className="p-4 font-bold text-gray-200 text-sm">{d.reasonName}</td>
+                                                    
+                                                    <td className="p-4">
+                                                        <div className="flex justify-center gap-3">
+                                                            <button onClick={() => { setEditDelay({ id: d.id, reasonName: d.reasonName }); setIsEditDelayModalOpen(true); }} className="bg-[#222] border border-[#4a4a4a] p-2 rounded-lg text-blue-400 hover:text-white hover:bg-blue-600 transition-all">
+                                                                <Edit size={16} />
+                                                            </button>
+                                                            <button onClick={() => handleDeleteDelay(d.id)} className="bg-[#222] border border-[#4a4a4a] p-2 rounded-lg text-red-500 hover:text-white hover:bg-red-600 transition-all">
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan="4" className="text-center p-12 text-gray-500 font-black uppercase tracking-widest">No delay reasons found.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Modals for Add/Edit Delay */}
+                    {(isAddDelayModalOpen || isEditDelayModalOpen) && (
+                        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                            <div className="bg-[#383838] border border-[#4a4a4a] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] w-full max-w-md overflow-hidden scale-in">
+                                <div className={`bg-[#1A2634] px-6 py-5 flex justify-between items-center border-b-2 border-purple-500`}>
+                                    <h3 className="text-white font-black uppercase tracking-widest text-sm flex items-center gap-3">
+                                        {isAddDelayModalOpen ? <><PlusSquare size={18} className="text-purple-500" /> Add Delay</> : <><Edit size={18} className="text-purple-500" /> Modify Delay</>}
+                                    </h3>
+                                    <button onClick={() => isAddDelayModalOpen ? setIsAddDelayModalOpen(false) : setIsEditDelayModalOpen(false)} className="text-gray-400 hover:text-white bg-black/20 p-1.5 rounded-lg transition-colors"><X size={18} /></button>
+                                </div>
+                                <form onSubmit={isAddDelayModalOpen ? handleAddDelay : handleUpdateDelay} className="p-7 flex flex-col gap-5">
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Reason Name</label>
+                                        <input type="text" required value={isAddDelayModalOpen ? newDelay.reasonName : editDelay.reasonName} onChange={(e) => isAddDelayModalOpen ? setNewDelay({ reasonName: e.target.value }) : setEditDelay({ ...editDelay, reasonName: e.target.value })} className="w-full bg-[#222] border border-[#4a4a4a] p-3 rounded-xl focus:outline-none focus:border-purple-500 transition-colors font-bold text-white shadow-inner" placeholder="e.g. Power Failure" />
+                                    </div>
+                                    <div className="flex gap-3 mt-4 pt-4 border-t border-[#4a4a4a]">
+                                        <button type="button" onClick={() => isAddDelayModalOpen ? setIsAddDelayModalOpen(false) : setIsEditDelayModalOpen(false)} className="flex-1 bg-[#222] border border-[#4a4a4a] text-gray-300 font-black text-xs uppercase tracking-widest py-3.5 rounded-xl transition-colors hover:bg-[#4a4a4a]">Cancel</button>
+                                        <button type="submit" className="flex-1 text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-xl transition-all shadow-lg border bg-purple-600 hover:bg-purple-500 border-purple-400">
+                                            {isAddDelayModalOpen ? 'Save Delay' : 'Update Record'}
                                         </button>
                                     </div>
                                 </form>

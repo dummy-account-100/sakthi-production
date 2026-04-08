@@ -64,25 +64,39 @@ exports.addComponent = async (req, res) => {
 // 3. UPDATE COMPONENT
 exports.updateComponent = async (req, res) => {
   try {
-    const { code } = req.params;
-    const { description, pouredWeight, cavity, castedWeight, isActive } = req.body;
+    // 1. Get the original code from the URL (e.g., /api/components/OLD_CODE)
+    const { code: originalCode } = req.params; 
+    
+    // 2. Get the new code and other fields from the body
+    const { code: newCode, description, pouredWeight, cavity, castedWeight, isActive } = req.body;
 
+    // Validate that both required fields are present
+    if (!newCode) return res.status(400).json({ error: "Component code is required." });
     if (!description) return res.status(400).json({ error: "Description is required." });
 
     const activeValue = normalizeIsActive(isActive);
 
+    // 3. Update the table: SET the new code WHERE it matches the original code
     await sql.query`
       UPDATE Component 
-      SET description = ${description}, 
+      SET code = ${newCode}, 
+          description = ${description}, 
           pouredWeight = ${pouredWeight || null}, 
           cavity = ${cavity || null}, 
           castedWeight = ${castedWeight || null},
           isActive = ${activeValue}
-      WHERE code = ${code}
+      WHERE code = ${originalCode}
     `;
 
     res.status(200).json({ message: "Component updated successfully!" });
   } catch (error) {
+    console.error(error);
+    
+    // If the new code already belongs to another component, SQL will throw a duplicate key error
+    if (error.message && (error.message.includes('PRIMARY KEY') || error.message.includes('UNIQUE KEY'))) {
+      return res.status(400).json({ error: "This component code already exists." });
+    }
+
     res.status(500).json({ error: "Failed to update component." });
   }
 };
