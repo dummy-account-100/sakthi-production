@@ -42,38 +42,6 @@ docker compose build --no-cache
 docker compose up -d
 ```
 
----
-
-## Step 5 — Create Database 
-
-
-### 5.1 Enter MSSQL container
-
-```bash
-docker ps
-```
-
-Find the container name, then:
-
-
-
-```bash
-docker exec -it sakthi-db-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "AppUser@123" -C -No
-```
-
-### 5.2 Create Database
-
-Inside sqlcmd:
-
-CREATE DATABASE FormDb1;
-GO;
-
-type "exit" to leave the container shell
-
-then copy the file from the mssql/init.sql and paste using this cmd in the root directory:
-
-docker exec -i sakthi-db-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "AppUser@123" -C -No < mssql/init.sql
-
 ## Step 6 — Access Application
 
 Open browser:
@@ -99,8 +67,10 @@ backend env:
 PORT=5000
 DB_SERVER=db
 DB_PORT=1433
-DB_USER=sa
+DB_USER=appuser
 DB_PASSWORD=AppUser@123
 DB_DATABASE=FormDb1
+DB_ENCRYPT=true
+DB_TRUST_CERT=true
 JWT_SECRET=super_secret_jwt_key_2026
 NODE_ENV=production

@@ -54,7 +54,7 @@ exports.getMasterConfig = async (req, res) => {
             }));
         } else if (type === 'dmm-setting-parameters') {
             standardData = result.recordset.map(row => ({
-                id: row.MasterId,
+                id: row.MasterId || row.id, 
                 slNo: row.SlNo,
                 columnKey: row.ColumnKey || '',
                 columnLabel: row.ColumnLabel || '',
@@ -143,9 +143,12 @@ exports.saveMasterConfig = async (req, res) => {
                 // UPDATE OR SOFT DELETE EXISTING ROW
                 const request = new sql.Request(transaction);
 
+                // For dmm-setting-parameters, ID might be 'id', others use 'MasterId'
+                const primaryKeyColumn = type === 'dmm-setting-parameters' ? 'id' : 'MasterId';
+
                 if (item.isDeleted) {
                     // 🔥 FIX 2: Soft delete instead of Hard delete. This prevents the EREQUEST constraint crash!
-                    await request.query(`UPDATE ${tableName} SET IsDeleted = 1 WHERE MasterId = ${item.id}`);
+                    await request.query(`UPDATE ${tableName} SET IsDeleted = 1 WHERE ${primaryKeyColumn} = ${item.id}`);
                 } else {
                     if (type === 'disa-operator') {
                         await request.query(`
@@ -188,7 +191,7 @@ exports.saveMasterConfig = async (req, res) => {
                                 ColumnLabel = '${item.columnLabel.replace(/'/g, "''")}',
                                 InputType = '${item.inputType}',
                                 ColumnWidth = '${item.columnWidth}'
-                            WHERE MasterId = ${item.id}
+                            WHERE id = ${item.id}
                         `);
                     } else if (type === 'disa-setting-adjustment') {
                         await request.query(`

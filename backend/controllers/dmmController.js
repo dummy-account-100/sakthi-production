@@ -6,11 +6,19 @@ exports.getDetails = async (req, res) => {
 
     const operatorsRes = await sql.query`SELECT username AS OperatorName FROM dbo.Users WHERE role IN ('operator', 'supervisor') ORDER BY username`;
     const supervisorsRes = await sql.query`SELECT username AS supervisorName FROM dbo.Users WHERE role = 'supervisor' ORDER BY username`;
-    // 🔥 NEW: Fetch HOF Users
     const hofRes = await sql.query`SELECT username AS OperatorName FROM dbo.Users WHERE role = 'hof' ORDER BY username`;
 
+    // 🔥 FIX: Explicitly selecting columns to guarantee exact key casing for React
     const recordsRes = await sql.query`
-      SELECT * FROM DmmSettingParameters 
+      SELECT 
+        id, RecordDate, DisaMachine, Shift, OperatorName, SupervisorName,
+        IsIdle, RowIndex, SupervisorSignature, AssignedHOF,
+        Customer, ItemDescription, Time, PpThickness, PpHeight,
+        SpThickness, SpHeight, CoreMaskThickness, CoreMaskOut, CoreMaskIn, 
+        SandShotPressure, CorrectionShotTime, SqueezePressure,
+        PpStripAccel, PpStripDist, SpStripAccel, SpStripDist,
+        MouldThickness, CloseUpForce, Remarks
+      FROM DmmSettingParameters 
       WHERE RecordDate = ${date} AND DisaMachine = ${disa}
       ORDER BY Shift ASC, RowIndex ASC
     `;
@@ -18,7 +26,6 @@ exports.getDetails = async (req, res) => {
     const records = recordsRes.recordset || [];
     const recordIds = records.map(r => r.id).filter(id => id != null);
     
-    // Extract existing HOF if already assigned
     const assignedHOF = records.length > 0 ? records[0].AssignedHOF : '';
 
     let customValuesMap = {};
@@ -68,8 +75,8 @@ exports.getDetails = async (req, res) => {
     res.json({
       operators: operatorsRes.recordset,
       supervisors: supervisorsRes.recordset,
-      hofs: hofRes.recordset, // 🔥 Added
-      assignedHOF, // 🔥 Added
+      hofs: hofRes.recordset,
+      assignedHOF,
       shiftsData,
       shiftsMeta,
       qfHistory
@@ -82,7 +89,7 @@ exports.getDetails = async (req, res) => {
 
 exports.saveDetails = async (req, res) => {
   try {
-    const { date, disa, shiftsData, shiftsMeta, shiftsToSave, assignedHOF } = req.body; // 🔥 Added assignedHOF
+    const { date, disa, shiftsData, shiftsMeta, shiftsToSave, assignedHOF } = req.body;
     const targetShifts = Array.isArray(shiftsToSave) ? shiftsToSave : [1, 2, 3];
 
     const transaction = new sql.Transaction();
@@ -122,13 +129,13 @@ exports.saveDetails = async (req, res) => {
           const row = rowsToSave[i];
           const insertReq = new sql.Request(transaction);
 
-          // 🔥 UPDATED: Added AssignedHOF to INSERT
+          // 🔥 FIXED INSERT QUERY
           const insertRes = await insertReq.query`
             INSERT INTO DmmSettingParameters (
               RecordDate, DisaMachine, Shift, OperatorName, SupervisorName,
               IsIdle, RowIndex, SupervisorSignature, AssignedHOF,
               Customer, ItemDescription, Time, PpThickness, PpHeight,
-              SpThickness, SpHeight, CoreMaskOut, CoreMaskIn,
+              SpThickness, SpHeight, CoreMaskThickness, CoreMaskOut, CoreMaskIn,
               SandShotPressure, CorrectionShotTime, SqueezePressure,
               PpStripAccel, PpStripDist, SpStripAccel, SpStripDist,
               MouldThickness, CloseUpForce, Remarks
@@ -140,7 +147,8 @@ exports.saveDetails = async (req, res) => {
               ${existingSignature}, ${assignedHOF || null},
               ${row.Customer || ''}, ${row.ItemDescription || ''},
               ${row.Time || ''}, ${row.PpThickness || ''}, ${row.PpHeight || ''},
-              ${row.SpThickness || ''}, ${row.SpHeight || ''},
+              ${row.SpThickness || ''}, ${row.SpHeight || ''}, 
+              ${row.CoreMaskThickness || ''}, 
               ${row.CoreMaskOut || ''}, ${row.CoreMaskIn || ''},
               ${row.SandShotPressure || ''}, ${row.CorrectionShotTime || ''},
               ${row.SqueezePressure || ''}, ${row.PpStripAccel || ''},
@@ -166,7 +174,6 @@ exports.saveDetails = async (req, res) => {
         }
       }
 
-      // 🔥 CRITICAL: Update AssignedHOF for ALL shifts on this date/machine, not just targetShifts, to ensure the form links completely to HOF Dashboard.
       if (assignedHOF) {
         const updateHofReq = new sql.Request(transaction);
         await updateHofReq.query`UPDATE DmmSettingParameters SET AssignedHOF = ${assignedHOF} WHERE RecordDate = ${date} AND DisaMachine = ${disa}`;
@@ -198,15 +205,32 @@ exports.getBulkData = async (req, res) => {
 
     let records = [];
     if (fromDate && toDate) {
+      // 🔥 FIX: Explicit Select for Bulk Output too
       const recordsRes = await sql.query`
-                SELECT * FROM DmmSettingParameters
+                SELECT 
+                  id, RecordDate, DisaMachine, Shift, OperatorName, SupervisorName,
+                  IsIdle, RowIndex, SupervisorSignature, AssignedHOF,
+                  Customer, ItemDescription, Time, PpThickness, PpHeight,
+                  SpThickness, SpHeight, CoreMaskThickness, CoreMaskOut, CoreMaskIn, 
+                  SandShotPressure, CorrectionShotTime, SqueezePressure,
+                  PpStripAccel, PpStripDist, SpStripAccel, SpStripDist,
+                  MouldThickness, CloseUpForce, Remarks
+                FROM DmmSettingParameters
                 WHERE RecordDate >= ${fromDate} AND RecordDate <= ${toDate}
                 ORDER BY RecordDate ASC, Shift ASC, RowIndex ASC
             `;
       records = recordsRes.recordset || [];
     } else {
       const recordsRes = await sql.query`
-                SELECT * FROM DmmSettingParameters
+                SELECT 
+                  id, RecordDate, DisaMachine, Shift, OperatorName, SupervisorName,
+                  IsIdle, RowIndex, SupervisorSignature, AssignedHOF,
+                  Customer, ItemDescription, Time, PpThickness, PpHeight,
+                  SpThickness, SpHeight, CoreMaskThickness, CoreMaskOut, CoreMaskIn, 
+                  SandShotPressure, CorrectionShotTime, SqueezePressure,
+                  PpStripAccel, PpStripDist, SpStripAccel, SpStripDist,
+                  MouldThickness, CloseUpForce, Remarks
+                FROM DmmSettingParameters
                 ORDER BY RecordDate ASC, Shift ASC, RowIndex ASC
             `;
       records = recordsRes.recordset || [];
@@ -284,9 +308,6 @@ exports.signSupervisorReport = async (req, res) => {
   } catch (err) { res.status(500).send('Failed to sign report'); }
 };
 
-// ========================================== 
-// 🔥 NEW API: HOF DASHBOARD VERIFICATION 🔥
-// ==========================================
 exports.getReportsByHOF = async (req, res) => {
   try {
     const { name } = req.params;
