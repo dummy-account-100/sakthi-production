@@ -91,6 +91,7 @@ const baseColumns = [
   { key: 'PpHeight', label: 'PP\nHEIGHT\n(mm)', width: 'w-20', inputType: 'number' },
   { key: 'SpThickness', label: 'SP\nTHICKNESS\n(mm)', width: 'w-20', inputType: 'number' },
   { key: 'SpHeight', label: 'SP\nHEIGHT\n(mm)', width: 'w-20', inputType: 'number' },
+  { key: 'CoreMaskThickness', label: 'CORE MASK\nTHICKNESS\n(mm)', width: 'w-24', inputType: 'number' },
   { key: 'CoreMaskOut', label: 'CORE MASK\nHEIGHT\n(OUTSIDE) mm', width: 'w-24', inputType: 'number' },
   { key: 'CoreMaskIn', label: 'CORE MASK\nHEIGHT\n(INSIDE) mm', width: 'w-24', inputType: 'number' },
   { key: 'SandShotPressure', label: 'SAND SHOT\nPRESSURE\nBAR', width: 'w-24', inputType: 'number', step: '0.01' },

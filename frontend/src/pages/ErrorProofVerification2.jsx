@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { AlertTriangle, Save, FileDown, UserCheck, ShieldCheck, X, CheckCircle, Loader } from 'lucide-react';
+import { AlertTriangle, Save, FileDown, UserCheck, ShieldCheck, X, CheckCircle, Loader, Lock, Send } from 'lucide-react';
 import SignatureCanvas from "react-signature-canvas";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -12,28 +12,6 @@ import logo from '../Assets/logo.png';
 const API_BASE = process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL !== "undefined" 
                  ? process.env.REACT_APP_API_URL 
                  : "/api";
-
-const ToastNotification = ({ data, onClose }) => {
-  useEffect(() => {
-    if (data.show && data.type !== 'loading') {
-      const timer = setTimeout(onClose, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [data, onClose]);
-
-  if (!data.show) return null;
-
-  const isError = data.type === 'error';
-  const isLoading = data.type === 'loading';
-
-  return (
-    <div className={`fixed top-6 right-6 z-[200] flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl transition-all duration-300 animate-in slide-in-from-right-8 ${isLoading ? 'bg-blue-50 border-l-4 border-blue-600 text-blue-800' : isError ? 'bg-red-50 border-l-4 border-red-600 text-red-800' : 'bg-green-50 border-l-4 border-green-600 text-green-800'}`}>
-      {isLoading ? <Loader className="animate-spin" size={20} /> : isError ? <AlertTriangle size={20} /> : <CheckCircle size={20} />}
-      <p className="font-bold text-sm">{data.message}</p>
-      {!isLoading && <button onClick={onClose} className="ml-4 opacity-50 hover:opacity-100"><X size={16} /></button>}
-    </div>
-  );
-};
 
 const HeaderSearchableSelect = ({ options, displayKey, onSelect, value, placeholder }) => {
   const [search, setSearch] = useState(value || "");
@@ -69,67 +47,92 @@ const HeaderSearchableSelect = ({ options, displayKey, onSelect, value, placehol
 };
 
 const ErrorProofVerification2 = () => {
-  const [headerData, setHeaderData] = useState({ disaMachine: 'DISA - I', reviewedBy: '', approvedBy: '', assignedHOF: '', operatorSignature: '', hofSignature: '' });
+  const [headerData, setHeaderData] = useState({ disaMachine: 'DISA - I', reviewedBy: '', approvedBy: '', assignedHOF: '', operatorSignature: '', hofSignature: '', isHofSent: false });
   const [verifications, setVerifications] = useState([]);
   const [reactionPlans, setReactionPlans] = useState([]);
   const opSigCanvas = useRef({});
+
+  // 🔥 NEW: Tracking submitted/locked shifts
+  const [submittedShifts, setSubmittedShifts] = useState(new Set());
 
   const [hofList, setHofList] = useState([]);
   const [operatorList, setOperatorList] = useState([]);
   const [supervisorList, setSupervisorList] = useState([]);
   
-  // 🔥 Store QF History
   const [qfHistory, setQfHistory] = useState([]);
 
   const [recordDate, setRecordDate] = useState(new Date().toISOString().split('T')[0]);
   const currentDate = new Date(recordDate).toLocaleDateString('en-GB').replace(/\//g, '-');
 
-
   const fetchData = useCallback(async () => {
-  if (!headerData?.disaMachine || !recordDate) return;
+    if (!headerData?.disaMachine || !recordDate) return;
 
-  try {
-    const res = await axios.get(
-      `${API_BASE}/error-proof2/details`,
-      { params: { machine: headerData.disaMachine, date: recordDate } }
-    );
+    try {
+      const res = await axios.get(
+        `${API_BASE}/error-proof2/details`,
+        { params: { machine: headerData.disaMachine, date: recordDate } }
+      );
 
-    setHofList(res.data.hofs || []);
-    setOperatorList(res.data.operators || []);
-    setSupervisorList(res.data.supervisors || []);
-    setQfHistory(res.data.qfHistory || []); // 🔥 Set QF History
+      setHofList(res.data.hofs || []);
+      setOperatorList(res.data.operators || []);
+      setSupervisorList(res.data.supervisors || []);
+      setQfHistory(res.data.qfHistory || []); 
 
-    const masterData = res.data.masterConfig || [];
-    const transData = res.data.verifications || [];
+      const masterData = res.data.masterConfig || [];
+      const transData = res.data.verifications || [];
 
-    const mergedVerifications = [];
+      // Determine which shifts are already locked/saved in DB
+      const lockedShifts = new Set();
+      if (transData.length > 0) {
+        if (transData.some(r => r.Date1_Shift1_Res)) lockedShifts.add(1);
+        if (transData.some(r => r.Date1_Shift2_Res)) lockedShifts.add(2);
+        if (transData.some(r => r.Date1_Shift3_Res)) lockedShifts.add(3);
+      }
+      setSubmittedShifts(lockedShifts);
 
-    if (transData.length > 0) {
-      transData.forEach((transItem, index) => {
-        const masterItem = masterData[index];
+      const mergedVerifications = [];
 
-        if (masterItem) {
-          mergedVerifications.push({
-            ...transItem,
-            Line: masterItem.Line,
-            ErrorProofName: masterItem.ErrorProofName,
-            NatureOfErrorProof: masterItem.NatureOfErrorProof,
-            Frequency: masterItem.Frequency,
-            isLegacy: false
-          });
-        } else {
-          mergedVerifications.push({
-            ...transItem,
-            isLegacy: true
-          });
+      if (transData.length > 0) {
+        transData.forEach((transItem, index) => {
+          const masterItem = masterData[index];
+
+          if (masterItem) {
+            mergedVerifications.push({
+              ...transItem,
+              Line: masterItem.Line,
+              ErrorProofName: masterItem.ErrorProofName,
+              NatureOfErrorProof: masterItem.NatureOfErrorProof,
+              Frequency: masterItem.Frequency,
+              isLegacy: false
+            });
+          } else {
+            mergedVerifications.push({
+              ...transItem,
+              isLegacy: true
+            });
+          }
+        });
+
+        if (masterData.length > transData.length) {
+          for (let i = transData.length; i < masterData.length; i++) {
+            const mItem = masterData[i];
+            mergedVerifications.push({
+              Id: `temp-${Date.now()}-${i}`,
+              Line: mItem.Line,
+              ErrorProofName: mItem.ErrorProofName,
+              NatureOfErrorProof: mItem.NatureOfErrorProof,
+              Frequency: mItem.Frequency,
+              Date1_Shift1_Res: null,
+              Date1_Shift2_Res: null,
+              Date1_Shift3_Res: null,
+              isLegacy: false
+            });
+          }
         }
-      });
-
-      if (masterData.length > transData.length) {
-        for (let i = transData.length; i < masterData.length; i++) {
-          const mItem = masterData[i];
+      } else {
+        masterData.forEach((mItem, index) => {
           mergedVerifications.push({
-            Id: `temp-${Date.now()}-${i}`,
+            Id: `temp-${Date.now()}-${index}`,
             Line: mItem.Line,
             ErrorProofName: mItem.ErrorProofName,
             NatureOfErrorProof: mItem.NatureOfErrorProof,
@@ -139,56 +142,42 @@ const ErrorProofVerification2 = () => {
             Date1_Shift3_Res: null,
             isLegacy: false
           });
-        }
-      }
-    } else {
-      masterData.forEach((mItem, index) => {
-        mergedVerifications.push({
-          Id: `temp-${Date.now()}-${index}`,
-          Line: mItem.Line,
-          ErrorProofName: mItem.ErrorProofName,
-          NatureOfErrorProof: mItem.NatureOfErrorProof,
-          Frequency: mItem.Frequency,
-          Date1_Shift1_Res: null,
-          Date1_Shift2_Res: null,
-          Date1_Shift3_Res: null,
-          isLegacy: false
         });
-      });
+      }
+
+      setVerifications(mergedVerifications);
+      setReactionPlans(res.data.reactionPlans || []);
+
+      if (transData.length > 0) {
+        setHeaderData(prev => ({
+          ...prev,
+          reviewedBy: transData[0].ReviewedByHOF || '',
+          approvedBy: transData[0].ApprovedBy || '',
+          assignedHOF: transData[0].AssignedHOF || '',
+          operatorSignature: transData[0].OperatorSignature || '',
+          hofSignature: transData[0].HOFSignature || '',
+          isHofSent: !!transData[0].AssignedHOF
+        }));
+      } else {
+        setHeaderData(prev => ({
+          ...prev,
+          reviewedBy: '',
+          approvedBy: '',
+          assignedHOF: '',
+          operatorSignature: '',
+          hofSignature: '',
+          isHofSent: false
+        }));
+      }
+
+    } catch (error) {
+      toast.error("Failed to load data from server.");
     }
-
-    setVerifications(mergedVerifications);
-    setReactionPlans(res.data.reactionPlans || []);
-
-    if (transData.length > 0) {
-      setHeaderData(prev => ({
-        ...prev,
-        reviewedBy: transData[0].ReviewedByHOF || '',
-        approvedBy: transData[0].ApprovedBy || '',
-        assignedHOF: transData[0].AssignedHOF || '',
-        operatorSignature: transData[0].OperatorSignature || '',
-        hofSignature: transData[0].HOFSignature || ''
-      }));
-    } else {
-      setHeaderData(prev => ({
-        ...prev,
-        reviewedBy: '',
-        approvedBy: '',
-        assignedHOF: '',
-        operatorSignature: '',
-        hofSignature: ''
-      }));
-    }
-
-  } catch (error) {
-    toast.error("Failed to load data from server.");
-  }
-
-}, [headerData.disaMachine, recordDate]);
+  }, [headerData.disaMachine, recordDate]);
 
   useEffect(() => {
-  fetchData();
-}, [fetchData]);
+    fetchData();
+  }, [fetchData]);
 
 
   const handleInputChange = (id, field, value) => {
@@ -215,29 +204,79 @@ const ErrorProofVerification2 = () => {
     setReactionPlans(updatedPlans);
   };
 
-  const handleSaveAll = async () => {
-    if (!headerData.reviewedBy.trim() || !headerData.approvedBy.trim()) { toast.warning('Please fill in both "Reviewed By HOF" and "Moulding Incharge".'); return; }
-    if (opSigCanvas.current.isEmpty() && !headerData.operatorSignature) { toast.warning('Please provide Operator Signature.'); return; }
-    if (!headerData.assignedHOF) { toast.warning("Please assign a HOF for verification."); return; }
+  // 🔥 NEW: DYNAMIC SAVE AND HOF SUBMISSION LOGIC 🔥
+  const saveToServer = async (isHofSubmission = false) => {
+    // 1. Identify which shifts are currently being modified and not yet locked
+    const activeShifts = [1, 2, 3].filter(s => !submittedShifts.has(s) && verifications.some(v => v[`Date1_Shift${s}_Res`]));
+
+    // 2. Validate HOF Submission specific requirements
+    if (isHofSubmission) {
+      const shift3Done = activeShifts.includes(3) || submittedShifts.has(3);
+      if (!shift3Done) {
+        toast.error('You can only send to the HOF after completing the 3rd shift.');
+        return;
+      }
+      if (!headerData.assignedHOF) {
+        toast.error('Please assign an HOF before sending.');
+        document.getElementById('hof-assign-select')?.scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+    }
+
+    if (activeShifts.length === 0 && !isHofSubmission) {
+      toast.error('Please enter results for at least one new shift before saving.');
+      return;
+    }
+
+    // 3. Validate that the entire column for the active shift is filled out
+    for (const shift of activeShifts) {
+      const hasEmpty = verifications.some(v => !v[`Date1_Shift${shift}_Res`]);
+      if (hasEmpty) {
+        toast.error(`Please complete all observations for Shift ${shift}.`);
+        return;
+      }
+    }
+
+    // 4. Validate Headers and Signatures
+    if (!headerData.reviewedBy.trim() || !headerData.approvedBy.trim()) { 
+      toast.warning('Please fill in both "Reviewed By HOF" and "Moulding Incharge".'); 
+      return; 
+    }
+    
+    if (opSigCanvas.current.isEmpty() && !headerData.operatorSignature) { 
+      toast.warning('Please provide Operator Signature.'); 
+      return; 
+    }
 
     const signatureData = !opSigCanvas.current.isEmpty() ? opSigCanvas.current.getCanvas().toDataURL("image/png") : headerData.operatorSignature;
+    const finalHOF = isHofSubmission ? headerData.assignedHOF : (headerData.isHofSent ? headerData.assignedHOF : '');
 
     try {
       const plansToSave = reactionPlans.map((p, i) => ({ ...p, SNo: i + 1 }));
       await axios.post(`${API_BASE}/error-proof2/save`, {
-        machine: headerData.disaMachine, date: recordDate, verifications, reactionPlans: plansToSave, operatorSignature: signatureData,
-        headerDetails: { reviewedBy: headerData.reviewedBy, approvedBy: headerData.approvedBy, assignedHOF: headerData.assignedHOF }
+        machine: headerData.disaMachine, 
+        date: recordDate, 
+        verifications, 
+        reactionPlans: plansToSave, 
+        operatorSignature: signatureData,
+        headerDetails: { 
+          reviewedBy: headerData.reviewedBy, 
+          approvedBy: headerData.approvedBy, 
+          assignedHOF: finalHOF 
+        }
       });
-      toast.success('Data saved and assigned successfully!');
+      
+      toast.success(isHofSubmission ? 'Sent to HOF Successfully!' : 'Shift Data Saved Successfully!');
       setTimeout(() => fetchData(), 1500);
-    } catch (error) { toast.error('Failed to save data.'); }
+    } catch (error) { 
+      toast.error('Failed to save data.'); 
+    }
   };
 
   const generatePDF = () => {
     try {
       const doc = new jsPDF('l', 'mm', 'a4');
 
-      // 🔥 MATCH QF VALUE TO CURRENT FORM DATE 🔥
       let currentPageQfValue = "QF/07/FYQ-05, Rev.No: 02 dt 28.02.2023";
       const repDate = new Date(recordDate);
       repDate.setHours(0, 0, 0, 0);
@@ -252,12 +291,8 @@ const ErrorProofVerification2 = () => {
           }
       }
 
-      // ==============================================================
-      // 🔥 STANDARDIZED HEADER WITH IMAGE LOGO (PAGE 1)
-      // ==============================================================
       doc.setLineWidth(0.3);
       
-      // Box 1: SAKTHI AUTO (Logo Area)
       doc.rect(10, 10, 40, 20);
       try {
         doc.addImage(logo, 'PNG', 12, 11, 36, 18);
@@ -267,20 +302,17 @@ const ErrorProofVerification2 = () => {
         doc.text("AUTO", 30, 26, { align: 'center' });
       }
 
-      // Box 2: Title
       doc.rect(50, 10, 187, 20);
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text("ERROR PROOF VERIFICATION CHECK LIST - FDY", 143.5, 22, { align: 'center' });
 
-      // Box 3: Meta (DISA & Date)
       doc.rect(237, 10, 50, 20);
       doc.setFontSize(11);
       doc.text(headerData.disaMachine, 262, 16, { align: 'center' });
       doc.line(237, 20, 287, 20);
       doc.setFontSize(10);
       doc.text(`Date: ${currentDate}`, 262, 26, { align: 'center' });
-      // ==============================================================
 
       const mainHead = [
         [
@@ -323,19 +355,14 @@ const ErrorProofVerification2 = () => {
         doc.addImage(headerData.hofSignature, 'PNG', 131, finalY + 3, 38, 13);
       }
 
-      // 🔥 Print QF Value at the end of page 1
       doc.setFontSize(8); doc.setFont('helvetica', 'normal');
       doc.text(currentPageQfValue, 10, doc.internal.pageSize.getHeight() - 10);
 
       if (reactionPlans.length > 0) {
         doc.addPage();
         
-        // ==============================================================
-        // 🔥 STANDARDIZED HEADER WITH IMAGE LOGO (PAGE 2)
-        // ==============================================================
         doc.setLineWidth(0.3);
         
-        // Box 1: SAKTHI AUTO (Logo Area)
         doc.rect(10, 10, 40, 20);
         try {
           doc.addImage(logo, 'PNG', 12, 11, 36, 18);
@@ -345,20 +372,17 @@ const ErrorProofVerification2 = () => {
           doc.text("AUTO", 30, 26, { align: 'center' });
         }
 
-        // Box 2: Title
         doc.rect(50, 10, 187, 20);
         doc.setFontSize(15);
         doc.setFont('helvetica', 'bold');
         doc.text("REACTION PLAN", 143.5, 22, { align: 'center' });
 
-        // Box 3: Meta (DISA & Date)
         doc.rect(237, 10, 50, 20);
         doc.setFontSize(11);
         doc.text(headerData.disaMachine, 262, 16, { align: 'center' });
         doc.line(237, 20, 287, 20);
         doc.setFontSize(10);
         doc.text(`Date: ${currentDate}`, 262, 26, { align: 'center' });
-        // ==============================================================
 
         const planHead = [['S.No', 'Error Proof No', 'Error Proof Name', 'Verification Date / Shift', 'Problem', 'Root Cause', 'Corrective Action', 'Status', 'Reviewed By (Op)', 'Approved By (Sup)', 'Remarks']];
         const planBody = reactionPlans.map((p, i) => [
@@ -387,7 +411,6 @@ const ErrorProofVerification2 = () => {
           }
         });
 
-        // 🔥 Print QF Value at the end of page 2
         doc.setFontSize(8); doc.setFont('helvetica', 'normal');
         doc.text(currentPageQfValue, 10, doc.internal.pageSize.getHeight() - 10);
       }
@@ -440,7 +463,18 @@ const ErrorProofVerification2 = () => {
                   <th colSpan="3" className="border border-gray-300 p-2 bg-orange-200 font-bold text-orange-900 tracking-wider text-sm border-b-2 border-b-gray-300">Date: {currentDate}</th>
                 </tr>
                 <tr className="bg-gray-100 text-xs font-bold tracking-wide text-gray-800 border-b border-gray-300">
-                  {['I Shift', 'II Shift', 'III Shift'].map((shift, j) => (<th key={j} className="border border-gray-300 p-2">{shift}</th>))}
+                  {[1, 2, 3].map((shiftNum, j) => (
+                    <th key={j} className="border border-gray-300 p-2 text-center">
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <span>Shift {shiftNum}</span>
+                        {submittedShifts.has(shiftNum) && (
+                          <span className="flex items-center gap-1 bg-green-100 border border-green-400 text-green-700 text-[9px] px-1.5 py-0.5 rounded-full shadow-sm">
+                            <Lock size={10} /> LOCKED
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  ))}
                 </tr>
                 <tr className="text-[10px] font-semibold bg-gray-100 text-gray-600 uppercase tracking-wide">
                   {[1, 2, 3].map((_, j) => (<th key={j} className="border border-gray-300 p-1.5 bg-gray-200">Observation Result</th>))}
@@ -456,17 +490,21 @@ const ErrorProofVerification2 = () => {
                     </td>
                     <td className="border border-gray-300 p-4 text-left text-xs whitespace-pre-wrap font-medium text-gray-700">{row.NatureOfErrorProof}</td>
                     <td className="border border-gray-300 p-4 font-bold text-gray-800 border-r-2 border-r-gray-300 bg-gray-50 text-xs">{row.Frequency}</td>
+                    
                     {[1, 2, 3].map(s => {
-                      const resKey = `Date1_Shift${s}_Res`; const result = row[resKey];
+                      const resKey = `Date1_Shift${s}_Res`; 
+                      const result = row[resKey];
+                      const isLocked = submittedShifts.has(s);
+
                       return (
-                        <td key={s} className={`border border-gray-300 p-2 align-middle transition-colors ${result === 'NOT OK' ? 'bg-red-50' : result === 'OK' ? 'bg-green-50' : 'bg-white'}`}>
+                        <td key={s} className={`border border-gray-300 p-2 align-middle transition-colors ${isLocked ? 'bg-gray-100/50' : result === 'NOT OK' ? 'bg-red-50' : result === 'OK' ? 'bg-green-50' : 'bg-white'}`}>
                           <div className="flex flex-row items-center justify-center gap-4 px-2 w-full h-full min-h-[60px] whitespace-nowrap">
-                            <label className="flex items-center gap-1.5 cursor-pointer group/radio p-1.5 hover:bg-white/60 rounded transition-colors">
-                              <input type="radio" name={`res-${row.Id}-1-${s}`} checked={result === 'OK'} onChange={() => handleResultChange(row, s, 'OK')} className="accent-green-600 w-4 h-4 cursor-pointer m-0" />
+                            <label className={`flex items-center gap-1.5 p-1.5 rounded transition-colors group/radio ${isLocked ? 'cursor-not-allowed opacity-50 grayscale' : 'cursor-pointer hover:bg-white/60'}`}>
+                              <input type="radio" name={`res-${row.Id}-1-${s}`} disabled={isLocked} checked={result === 'OK'} onChange={() => handleResultChange(row, s, 'OK')} className={`accent-green-600 w-4 h-4 m-0 ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`} />
                               <span className="text-[10px] font-bold text-gray-700 group-hover/radio:text-green-800 leading-none mt-0.5">OK</span>
                             </label>
-                            <label className="flex items-center gap-1.5 cursor-pointer group/radio p-1.5 hover:bg-white/60 rounded transition-colors">
-                              <input type="radio" name={`res-${row.Id}-1-${s}`} checked={result === 'NOT OK'} onChange={() => handleResultChange(row, s, 'NOT OK')} className="accent-red-600 w-4 h-4 cursor-pointer m-0" />
+                            <label className={`flex items-center gap-1.5 p-1.5 rounded transition-colors group/radio ${isLocked ? 'cursor-not-allowed opacity-50 grayscale' : 'cursor-pointer hover:bg-white/60'}`}>
+                              <input type="radio" name={`res-${row.Id}-1-${s}`} disabled={isLocked} checked={result === 'NOT OK'} onChange={() => handleResultChange(row, s, 'NOT OK')} className={`accent-red-600 w-4 h-4 m-0 ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`} />
                               <span className="text-[10px] font-bold text-gray-700 group-hover/radio:text-red-800 leading-none mt-0.5">NOT OK</span>
                             </label>
                           </div>
@@ -530,7 +568,7 @@ const ErrorProofVerification2 = () => {
             </ul>
           </div>
 
-          <div className="mt-2 pt-4 border-t-2 border-gray-200 flex flex-col md:flex-row justify-between items-end gap-8 bg-gray-50 p-6 rounded-b-xl shadow-inner">
+          <div id="hof-assign-select" className="mt-2 pt-4 border-t-2 border-gray-200 flex flex-col md:flex-row justify-between items-end gap-8 bg-gray-50 p-6 rounded-b-xl shadow-inner">
             <div className="w-full md:w-1/3 flex flex-col">
               <label className="text-xs font-black text-gray-700 uppercase mb-2">Operator Signature</label>
               <div className="border-2 border-dashed border-gray-400 bg-white rounded-lg h-24 mb-2 overflow-hidden">
@@ -539,8 +577,8 @@ const ErrorProofVerification2 = () => {
               <button onClick={() => opSigCanvas.current.clear()} className="text-xs text-red-500 hover:text-red-700 font-bold self-end uppercase">Clear Pad</button>
             </div>
 
-            <div className="w-full md:w-1/3 flex flex-col gap-4">
-              <div>
+            <div className="w-full md:w-2/3 flex flex-col gap-4 items-end">
+              <div className="w-full md:w-1/2">
                 <label className="text-xs font-black text-gray-700 uppercase mb-2 block">Assign HOF for Final Verification</label>
                 <select value={headerData.assignedHOF} onChange={(e) => setHeaderData({ ...headerData, assignedHOF: e.target.value })} className="w-full p-3 border-2 border-gray-400 bg-white rounded-lg font-bold text-gray-800 outline-none focus:border-blue-500">
                   <option value="">Select HOF...</option>
@@ -548,12 +586,17 @@ const ErrorProofVerification2 = () => {
                 </select>
               </div>
 
-              <div className="flex gap-4">
-                <button onClick={generatePDF} className="w-1/2 bg-gray-800 hover:bg-gray-900 text-white py-3 rounded font-bold transition-colors shadow-md flex justify-center items-center gap-2">
-                  <FileDown size={18} /> Preview PDF
+              <div className="flex flex-wrap gap-4 w-full md:w-auto justify-end mt-2">
+                <button onClick={generatePDF} className="bg-white border-2 border-gray-900 text-gray-900 hover:bg-gray-200 font-bold py-3 px-6 rounded-lg shadow-md uppercase flex items-center gap-2 transition-colors">
+                  <FileDown size={20} /> Preview PDF
                 </button>
-                <button onClick={handleSaveAll} className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded font-bold transition-colors shadow-lg flex justify-center items-center gap-2">
-                  <Save size={18} /> Save & Assign
+
+                <button onClick={() => saveToServer(false)} className="bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 px-8 rounded-lg shadow-lg uppercase transition-colors flex items-center gap-3">
+                  <Save className="w-5 h-5" /> Save Shifts Data
+                </button>
+
+                <button onClick={() => saveToServer(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg uppercase transition-colors flex items-center gap-3">
+                  <Send className="w-5 h-5" /> Send to HOF
                 </button>
               </div>
             </div>

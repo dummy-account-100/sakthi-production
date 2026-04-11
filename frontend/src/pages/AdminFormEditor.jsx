@@ -264,7 +264,7 @@ const DmmEditor = ({ date, disa, toast, setToast }) => {
     if (loading) return <CenteredLoader />;
     if (!data) return <NoData />;
 
-    const BASE_COLS = ['Customer', 'ItemDescription', 'Time', 'PpThickness', 'PpHeight', 'SpThickness', 'SpHeight',
+    const BASE_COLS = ['Customer', 'ItemDescription', 'Time', 'PpThickness', 'PpHeight', 'SpThickness', 'SpHeight','CoreMaskThickness',
         'CoreMaskOut', 'CoreMaskIn', 'SandShotPressure', 'CorrectionShotTime', 'SqueezePressure',
         'PpStripAccel', 'PpStripDist', 'SpStripAccel', 'SpStripDist', 'MouldThickness', 'CloseUpForce', 'Remarks'];
 

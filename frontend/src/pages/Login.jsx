@@ -12,6 +12,8 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+  const API_BASE = process.env.REACT_APP_API_URL;
+
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
     
@@ -20,7 +22,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const res = await axios.post(`/api/auth/login`, { employeeId, password });
+      const res = await axios.post(`${API_BASE}/auth/login`, { employeeId, password });
 
       // ✅ res.data = { username, role }
       localStorage.setItem("user", JSON.stringify(res.data));

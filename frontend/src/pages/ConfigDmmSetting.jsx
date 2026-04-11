@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Save, Plus, Trash2, ArrowLeft, Loader, Settings, AlertTriangle, CheckCircle } from 'lucide-react';
 
@@ -11,7 +11,7 @@ const NotificationToast = ({ data, onClose }) => {
     const isError = data.type === 'error';
     const isLoading = data.type === 'loading';
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (data.show && !isLoading) {
             const timer = setTimeout(() => onClose(), 3000);
             return () => clearTimeout(timer);
@@ -21,7 +21,7 @@ const NotificationToast = ({ data, onClose }) => {
     if (!data.show) return null;
 
     return (
-        <div className="fixed top-6 right-6 z-[200] animate-slide-in-right">
+        <div className="fixed top-6 right-6 z-[250] animate-in slide-in-from-right-8 duration-300">
             <div className={`
                 flex items-center gap-4 px-6 py-4 rounded-xl shadow-2xl backdrop-blur-md border 
                 ${isError ? 'bg-red-500/10 border-red-500/30 text-red-200'
@@ -44,11 +44,9 @@ const NotificationToast = ({ data, onClose }) => {
 
 const ConfigDmmSetting = ({ onBack }) => {
     const navigate = useNavigate();
-
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [notification, setNotification] = useState({ show: false, type: '', message: '' });
-
     const [items, setItems] = useState([]);
 
     const API_BASE_DMM_SETTINGS = `${API_BASE}/config/dmm-setting-parameters`;
@@ -100,14 +98,16 @@ const ConfigDmmSetting = ({ onBack }) => {
 
         try {
             const activeData = items.filter(c => !(c.isNew && c.isDeleted));
-            await axios.post(`${API_BASE}/master`, { config: activeData });
+            
+            await axios.post(`${API_BASE}/config/dmm-setting-parameters/master`, { config: activeData });
 
-            setNotification({ show: true, type: 'success', message: 'Schema Updated Successfully!' });
+            setNotification({ show: true, type: 'success', message: 'Master Schema Updated Successfully!' });
             setTimeout(() => {
                 if (onBack) onBack();
                 else navigate('/admin');
             }, 1500);
         } catch (error) {
+            console.error("Save Config Error:", error);
             setNotification({ show: true, type: 'error', message: 'Failed to save configuration.' });
         } finally {
             setSaving(false);
@@ -120,7 +120,7 @@ const ConfigDmmSetting = ({ onBack }) => {
     };
 
     return (
-        <div className="min-h-screen bg-[#2d2d2d] flex flex-col font-sans relative pb-20 z-[200]">
+        <div className="min-h-screen bg-[#2d2d2d] flex flex-col font-sans relative pb-20">
             <NotificationToast data={notification} onClose={() => setNotification(prev => ({ ...prev, show: false }))} />
 
             <div className="h-1.5 bg-[#ff9100] flex-shrink-0 shadow-[0_0_15px_rgba(255,145,0,0.5)]" />
@@ -150,7 +150,6 @@ const ConfigDmmSetting = ({ onBack }) => {
             </div>
 
             <div className="flex-1 max-w-7xl w-full mx-auto p-10">
-
                 <div className="bg-[#383838] border border-white/5 rounded-2xl shadow-xl overflow-hidden">
                     <div className="bg-black/20 grid grid-cols-12 gap-4 p-4 border-b border-white/5 text-xs font-bold text-white/50 uppercase tracking-widest text-center">
                         <div className="col-span-1">S.No</div>
@@ -170,7 +169,6 @@ const ConfigDmmSetting = ({ onBack }) => {
                         <div className="divide-y divide-white/5">
                             {items.map((cp, index) => (
                                 <div key={cp.id} className={`grid grid-cols-12 gap-4 p-4 items-center transition-all ${cp.isDeleted ? 'opacity-40 bg-red-900/10' : 'hover:bg-white/5'} ${cp.isNew ? 'border-[#ff9100]/30 border-l-4' : 'border-transparent border-l-4'}`}>
-
                                     <div className="col-span-1 text-center font-bold text-white/50">
                                         {cp.isDeleted ? 'DEL' : index + 1}
                                     </div>
@@ -234,7 +232,6 @@ const ConfigDmmSetting = ({ onBack }) => {
                                             <Trash2 className="w-5 h-5" />
                                         </button>
                                     </div>
-
                                 </div>
                             ))}
 
@@ -246,11 +243,9 @@ const ConfigDmmSetting = ({ onBack }) => {
                                     <Plus className="w-5 h-5" /> Add New Parameter Column
                                 </button>
                             </div>
-
                         </div>
                     )}
                 </div>
-
             </div>
         </div>
     );
