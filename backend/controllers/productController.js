@@ -168,6 +168,7 @@ exports.signReport = async (req, res) => {
   }
 };
 
+
 // ==========================================
 //             FORM SUBMISSION
 // ==========================================
@@ -191,26 +192,32 @@ exports.createReport = async (req, res) => {
       )
     `;
 
+    // 🔥 FIX 1: Must include to extract the ID from the recordset array
     const reportId = reportResult.recordset[0].id;
 
     if (productions.length > 0) {
+      // 🔥 FIX 2: Must include to get the values from the first production row
       const firstProduced = safeNum(productions[0].produced);
+      const firstPoured = safeNum(productions[0].poured); 
       
       await sql.query`
         WITH CTE AS (
-          SELECT TOP 1 p.produced
+          SELECT TOP 1 p.produced, p.poured
           FROM DisamaticProduction p
           INNER JOIN DisamaticProductReport r ON p.reportId = r.id
           WHERE r.disa = ${disa}
           ORDER BY r.reportDate DESC, r.id DESC, p.id DESC
         )
-        UPDATE CTE SET produced = ${firstProduced}
+        UPDATE CTE SET produced = ${firstProduced}, poured = ${firstPoured}
       `;
 
       for (let i = 0; i < productions.length; i++) {
         const p = productions[i];
         if (safeStr(p.componentName)) {
+          // Shift BOTH produced and poured values by 1 index. 
+          // The last row automatically gets null (which renders as a hyphen in PDF/Admin)
           const producedValue = (i === productions.length - 1) ? null : safeNum(productions[i + 1].produced);
+          const pouredValue = (i === productions.length - 1) ? null : safeNum(productions[i + 1].poured);
 
           await sql.query`
             INSERT INTO DisamaticProduction (
@@ -219,7 +226,7 @@ exports.createReport = async (req, res) => {
             )
             VALUES (
               ${reportId}, ${safeStr(p.componentName)}, ${safeNum(p.mouldCounterNo)},
-              ${producedValue}, ${safeNum(p.poured)},
+              ${producedValue}, ${pouredValue},
               ${safeNum(p.cycleTime)}, ${safeNum(p.mouldsPerHour)},
               ${safeStr(p.remarks)}
             )
