@@ -192,6 +192,7 @@ const DisamaticProductReport = () => {
       patternCode: "", 
       castedWeight: "", 
       pouredWeight: "", 
+      cavity: 0, // Added
       mouldCounterNo: "", 
       produced: "", 
       poured: "", 
@@ -200,13 +201,13 @@ const DisamaticProductReport = () => {
       remarks: "" 
     }
   ]);
+  const [lastReportCavity, setLastReportCavity] = useState(0); // Added
   const [resetKey, setResetKey] = useState(0);
 
   const [incharges, setIncharges] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [operators, setOperators] = useState([]);
   const [components, setComponents] = useState([]);
-  const [previousMouldCounter, setPreviousMouldCounter] = useState(0);
   const [nextShiftPlans, setNextShiftPlans] = useState([{ componentName: "", plannedMoulds: "", remarks: "" }]);
   
   const [delays, setDelays] = useState([{ delayType: "", startTime: "", endTime: "", duration: "" }]);
@@ -248,41 +249,11 @@ const DisamaticProductReport = () => {
             if (!isFirstRender.current) toast.info(`First entry for DISA-${formData.disa} in this shift.`);
           }
 
-          const counterRes = await axios.get(`${API_BASE}/forms/last-mould-counter`, {
-            params: { disa: formData.disa }
+          // 🔥 FETCH LAST COMPONENT CAVITY 🔥
+          const compRes = await axios.get(`${API_BASE}/forms/last-component`, {
+            params: { disa: formData.disa, shift: formData.shift }
           });
-          const fetchedCounter = Number(counterRes.data.lastMouldCounter) || 0;
-          setPreviousMouldCounter(fetchedCounter);
-          
-          setProductions(prevList => {
-            let prev = fetchedCounter || 0; 
-            return prevList.map((item) => {
-              if (item.mouldCounterNo === "-" || String(item.mouldCounterNo).trim() === "") return { ...item, produced: "-" };
-              
-              let currentInput = Number(item.mouldCounterNo) || 0;
-              let produced = 0;
-              let displayCounter = String(item.mouldCounterNo);
-
-              if (currentInput > 600000) {
-                const remainder = currentInput % 600000;
-                produced = (600000 - prev) + remainder;
-                displayCounter = String(remainder);
-                prev = remainder;
-              } else if (currentInput > 0 && currentInput < prev) {
-                produced = (600000 - prev) + currentInput;
-                prev = currentInput;
-              } else {
-                produced = currentInput ? Math.max(0, currentInput - prev) : 0;
-                prev = currentInput;
-              }
-
-              return { 
-                ...item, 
-                mouldCounterNo: displayCounter, 
-                produced: isNaN(produced) ? "-" : produced 
-              };
-            });
-          });
+          setLastReportCavity(compRes.data?.cavity || 0);
 
         } catch (err) {
           console.error("Failed to fetch dynamic personnel/counter data", err);
@@ -406,7 +377,7 @@ const DisamaticProductReport = () => {
   };
 
   const addProduction = () => {
-    setProductions([...productions, { componentName: "", pouredWeight: "", mouldCounterNo: "", produced: "", poured: "", cycleTime: "", mouldsPerHour: "", remarks: "" }]);
+    setProductions([...productions, { componentName: "", patternCode: "", castedWeight: "", pouredWeight: "", cavity: 0, mouldCounterNo: "", produced: "", poured: "", cycleTime: "", mouldsPerHour: "", remarks: "" }]);
   };
   
   const removeProduction = (index) => {
@@ -423,15 +394,12 @@ const DisamaticProductReport = () => {
       updated[index].patternCode = itemObj?.code || value;
       updated[index].pouredWeight = itemObj?.pouredWeight || "";
       updated[index].castedWeight = itemObj?.castedWeight || "";
+      updated[index].cavity = itemObj?.cavity || 0; // Added
       setProductions(updated);
     }
     else if (field === "mouldCounterNo" || field === "prevCount") {
       updated[index][field] = value;
-      if (index === 0 && field === "prevCount") {
-        recalculateChain(updated, Number(value));
-      } else {
-        recalculateChain(updated);
-      }
+      recalculateChain(updated);
     } 
     else if (field === "cycleTime") {
       updated[index][field] = value;
@@ -449,11 +417,18 @@ const DisamaticProductReport = () => {
     }
   };
 
-  const recalculateChain = (list, baseCounter = previousMouldCounter) => {
-    let prev = Number(baseCounter) || 0; 
-    const newList = list.map((item) => {
+  const recalculateChain = (list) => {
+    let prev = 0; 
+    const newList = list.map((item, index) => {
+      let startCount = 0;
       if (item.prevCount !== undefined && item.prevCount !== null && item.prevCount !== "") {
-          prev = Number(item.prevCount);
+          startCount = Number(item.prevCount);
+          prev = startCount;
+      } else if (index === 0) {
+          startCount = 0;
+          prev = startCount;
+      } else {
+          startCount = prev;
       }
 
       if (item.mouldCounterNo === "-" || String(item.mouldCounterNo).trim() === "") {
@@ -461,27 +436,12 @@ const DisamaticProductReport = () => {
       }
       
       let currentInput = Number(item.mouldCounterNo) || 0;
-      let produced = 0;
-      let displayCounter = String(item.mouldCounterNo);
-
-      if (currentInput > 600000) {
-        const remainder = currentInput % 600000;
-        produced = (600000 - prev) + remainder;
-        displayCounter = String(remainder); 
-        prev = remainder;
-      } 
-      else if (currentInput > 0 && currentInput < prev) {
-        produced = (600000 - prev) + currentInput;
-        prev = currentInput;
-      } 
-      else {
-        produced = currentInput ? Math.max(0, currentInput - prev) : 0;
-        prev = currentInput;
-      }
+      let produced = currentInput ? Math.max(0, currentInput - startCount) : 0;
+      prev = currentInput;
 
       return { 
         ...item, 
-        mouldCounterNo: displayCounter, 
+        mouldCounterNo: String(item.mouldCounterNo), 
         produced: isNaN(produced) ? "-" : produced 
       };
     });
@@ -524,13 +484,6 @@ const DisamaticProductReport = () => {
       await axios.post(`${API_BASE}/forms`, {
         ...formData, productions, delays, nextShiftPlans, mouldHardness, patternTemps
       });
-
-      const lastItem = productions[productions.length - 1];
-      const newPreviousCounter = lastItem.mouldCounterNo && lastItem.mouldCounterNo !== "-" && !isNaN(Number(lastItem.mouldCounterNo))
-        ? Number(lastItem.mouldCounterNo) 
-        : (Number(previousMouldCounter) || 0);
-        
-      setPreviousMouldCounter(newPreviousCounter);
 
       const { date: newDate, shift: newShift } = getProductionDateTime();
       setFormData((prev) => ({
@@ -659,84 +612,100 @@ const DisamaticProductReport = () => {
                 <button type="button" onClick={addProduction} className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-3 py-1 rounded flex items-center justify-center leading-none" title="Add Row">+ Add Row</button>
               </div>
 
-              {productions.map((prod, index) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50 relative">
-                  {productions.length > 1 && (
-                    <button type="button" onClick={() => removeProduction(index)} className="absolute top-2 right-2 text-red-600 font-bold hover:text-red-800">✕</button>
-                  )}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    
-                    <div className="flex flex-col gap-2">
-                      <div>
-                        <label className="font-medium text-sm text-gray-700 block mb-1">Open Mould Counter No.</label>
-                        <input type="text" value={String(prod.mouldCounterNo)} onChange={(e) => updateProduction(index, "mouldCounterNo", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
-                      </div>
-                      <div>
-                        <label className="font-medium text-sm text-gray-700 block mb-1">Closed Mould Count</label>
-                        <input 
-                          type="text" 
-                          value={String(prod.prevCount ?? (index === 0 ? previousMouldCounter : (productions[index - 1].mouldCounterNo || "0")))} 
-                          onChange={(e) => updateProduction(index, "prevCount", e.target.value)}
-                          className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" 
-                          placeholder="Edit start count"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col gap-4">
-                    {/* Component Name Selection */}
-                    <SearchableSelect 
-                      label="Component Name"
-                      key={`prod-comp-${index}-${resetKey}`} 
-                      options={components} 
-                      displayKey="description" 
-                      value={prod.componentName} 
-                      onSelect={(item) => updateProduction(index, "componentName", item.description, item)} 
-                    />
+              {productions.map((prod, index) => {
+                const prevCavity = index === 0 ? lastReportCavity : (productions[index - 1].cavity || 0);
+                const quantity = (Number(prod.poured) && prevCavity) ? (Number(prod.poured) * prevCavity) : null;
 
-                    {/* Pattern Code Selection */}
-                    <SearchableSelect 
-                      label="Pattern Code"
-                      key={`prod-patt-${index}-${resetKey}`} 
-                      options={components} 
-                      displayKey="code" 
-                      value={prod.patternCode} 
-                      onSelect={(item) => updateProduction(index, "patternCode", item.code, item)} 
-                    />
-                    
-                    {/* Styled Weights Row */}
-                    <div className="flex justify-between items-center px-1">
-                      <span className="text-sm font-bold text-blue-700">
-                        Poured: {prod.pouredWeight ? `${prod.pouredWeight} kg` : "-"}
-                      </span>
-                      <span className="text-sm font-bold text-green-700">
-                        Casted: {prod.castedWeight ? `${prod.castedWeight} kg` : "-"}
-                      </span>
+                return (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50 relative">
+                    {productions.length > 1 && (
+                      <button type="button" onClick={() => removeProduction(index)} className="absolute top-2 right-2 text-red-600 font-bold hover:text-red-800">✕</button>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      
+                      <div className="flex flex-col gap-2">
+                        <div>
+                          <label className="font-medium text-sm text-gray-700 block mb-1">Open Mould Counter No.</label>
+                          <input type="text" value={String(prod.mouldCounterNo)} onChange={(e) => updateProduction(index, "mouldCounterNo", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
+                        </div>
+                        <div>
+                          <label className="font-medium text-sm text-gray-700 block mb-1">Closed Mould Count</label>
+                          <input 
+                            type="text" 
+                            value={String(prod.prevCount ?? (index === 0 ? "" : (productions[index - 1].mouldCounterNo || "")))} 
+                            onChange={(e) => updateProduction(index, "prevCount", e.target.value)}
+                            className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" 
+                            placeholder="Edit start count"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col gap-4">
+                        {/* Component Name Selection */}
+                        <SearchableSelect 
+                          label="Component Name"
+                          key={`prod-comp-${index}-${resetKey}`} 
+                          options={components} 
+                          displayKey="description" 
+                          value={prod.componentName} 
+                          onSelect={(item) => updateProduction(index, "componentName", item.description, item)} 
+                        />
+
+                        {/* Pattern Code Selection */}
+                        <SearchableSelect 
+                          label="Pattern Code"
+                          key={`prod-patt-${index}-${resetKey}`} 
+                          options={components} 
+                          displayKey="code" 
+                          value={prod.patternCode} 
+                          onSelect={(item) => updateProduction(index, "patternCode", item.code, item)} 
+                        />
+                        
+                        {/* Styled Weights Row */}
+                        <div className="flex justify-between items-center px-1">
+                          <span className="text-sm font-bold text-blue-700">
+                            Poured: {prod.pouredWeight ? `${prod.pouredWeight} kg` : "-"}
+                          </span>
+                          <span className="text-sm font-bold text-green-700">
+                            Casted: {prod.castedWeight ? `${prod.castedWeight} kg` : "-"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-medium text-sm text-gray-500">Produced </label>
+                        <input type="text" value={String(prod.produced)} readOnly className="w-full border border-gray-300 p-2 rounded bg-gray-200 cursor-not-allowed text-gray-600" />
+                      </div>
+
+                      <div>
+                        <label className="font-medium text-sm text-gray-700">Poured</label>
+                        <input type="text" value={String(prod.poured)} onChange={(e) => updateProduction(index, "poured", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
+                        {quantity !== null && !isNaN(quantity) && (
+                        <div className="mt-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded text-blue-700 font-bold text-sm">
+                          Quantity : {quantity}
+                        </div>
+                      )}
+                      </div>
+
+                      <div>
+                        <label className="font-medium text-sm text-gray-700">Cycle Time</label>
+                        <input type="text" value={String(prod.cycleTime)} onChange={(e) => updateProduction(index, "cycleTime", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
+                      </div>
+
+                      <div>
+                        <label className="font-medium text-sm text-gray-700">Moulds Per Hour</label>
+                        <input type="text" value={String(prod.mouldsPerHour)} onChange={(e) => updateProduction(index, "mouldsPerHour", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="font-medium text-sm text-gray-700">Remarks</label>
+                        <textarea value={String(prod.remarks)} onChange={(e) => updateProduction(index, "remarks", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 h-10 resize-y bg-white" placeholder="Type '-' if none" />
+                      </div>
+
                     </div>
                   </div>
-                    <div>
-                      <label className="font-medium text-sm text-gray-500">Produced </label>
-                      <input type="text" value={String(prod.produced)} readOnly className="w-full border border-gray-300 p-2 rounded bg-gray-200 cursor-not-allowed text-gray-600" />
-                    </div>
-                    <div>
-                      <label className="font-medium text-sm text-gray-700">Poured</label>
-                      <input type="text" value={String(prod.poured)} onChange={(e) => updateProduction(index, "poured", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
-                    </div>
-                    <div>
-                      <label className="font-medium text-sm text-gray-700">Cycle Time</label>
-                      <input type="text" value={String(prod.cycleTime)} onChange={(e) => updateProduction(index, "cycleTime", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
-                    </div>
-                    <div>
-                      <label className="font-medium text-sm text-gray-700">Moulds Per Hour</label>
-                      <input type="text" value={String(prod.mouldsPerHour)} onChange={(e) => updateProduction(index, "mouldsPerHour", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 bg-white" placeholder="Type '-' if none" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="font-medium text-sm text-gray-700">Remarks</label>
-                      <textarea value={String(prod.remarks)} onChange={(e) => updateProduction(index, "remarks", e.target.value)} className="w-full border border-gray-300 p-2 rounded focus:outline-orange-500 h-10 resize-y bg-white" placeholder="Type '-' if none" />
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* NEXT SHIFT PLAN */}

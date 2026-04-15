@@ -13,7 +13,7 @@ const safeNum = (val) => {
 };
 
 const safeStr = (val) => {
-  if (val === null || val === undefined || String(val).trim() === "" || String(val).trim() === "-") return null;
+  if (val === null || val === undefined || String(val).trim() === "" || String(val).trim() === "-") return "-";
   return String(val).trim();
 };
 
@@ -36,9 +36,9 @@ exports.createDailyPerformance = async (req, res) => {
     for (let sh of shifts) {
       const sData = summary[sh] || {};
       await sql.query`
-                INSERT INTO DailyPerformanceSummary (reportId, shiftName, pouredMoulds, tonnage, casted, shiftValue)
+                INSERT INTO DailyPerformanceSummary (reportId, shiftName, pouredMoulds, tonnage, quantity, casted, shiftValue)
                 VALUES (${reportId}, ${sh}, ${safeNum(sData.pouredMoulds)},
-                        ${safeNum(sData.tonnage)}, ${safeNum(sData.casted)}, ${safeNum(sData.value)})`;
+                        ${safeNum(sData.tonnage)}, ${safeNum(sData.quantity)}, ${safeNum(sData.casted)}, ${safeNum(sData.value)})`;
     }
 
     if (details && details.length > 0) {
@@ -80,11 +80,17 @@ exports.getSummaryByDate = async (req, res) => {
       SELECT 
         r.shift,
         SUM(ISNULL(TRY_CAST(p.poured AS INT), 0)) AS totalPouredMoulds,
-        SUM(ISNULL(TRY_CAST(p.poured AS INT), 0) * ISNULL(TRY_CAST(c.pouredWeight AS DECIMAL(10,3)), 0)) AS totalTonnageKg,
-        SUM(ISNULL(TRY_CAST(p.poured AS INT), 0) * ISNULL(TRY_CAST(c.castedWeight AS DECIMAL(10,3)), 0) * ISNULL(TRY_CAST(c.cavity AS INT), 0)) AS totalCastedKg
+        SUM(ISNULL(TRY_CAST(p.poured AS INT), 0) * ISNULL(TRY_CAST(comp.pouredWeight AS DECIMAL(10,3)), 0)) AS totalTonnageKg,
+        SUM(ISNULL(TRY_CAST(p.poured AS INT), 0) * ISNULL(TRY_CAST(comp.castedWeight AS DECIMAL(10,3)), 0) * ISNULL(TRY_CAST(comp.cavity AS INT), 0)) AS totalCastedKg,
+        SUM(ISNULL(TRY_CAST(p.poured AS INT), 0) * ISNULL(TRY_CAST(comp.cavity AS INT), 0)) AS totalQuantity
       FROM DisamaticProductReport r
       JOIN DisamaticProduction p ON r.id = p.reportId
-      LEFT JOIN Component c ON p.componentName = c.description
+      OUTER APPLY (
+        SELECT TOP 1 pouredWeight, castedWeight, cavity
+        FROM Component comp
+        WHERE comp.description = p.componentName
+        ORDER BY CASE WHEN comp.isActive = 'Active' THEN 0 ELSE 1 END
+      ) comp
       WHERE CAST(r.reportDate AS DATE) = CAST(${date} AS DATE) 
         AND r.disa = ${disa}
       GROUP BY r.shift
@@ -314,6 +320,7 @@ exports.updateReport = async (req, res) => {
           await sql.query`UPDATE DailyPerformanceSummary SET 
                         pouredMoulds = ${safeNum(s.pouredMoulds)},
                         tonnage = ${safeNum(s.tonnage)},
+                        quantity = ${safeNum(s.quantity)},
                         casted = ${safeNum(s.casted)},
                         shiftValue = ${safeNum(s.value || s.shiftValue)}
                         WHERE reportId = ${Number(id)} AND shiftName = ${shift}`;
@@ -395,7 +402,7 @@ exports.downloadPDF = async (req, res) => {
     } else if (date && disa) {
       const safeDisa = disa.replace('DISA - ', '').trim();
       const reportQuery = await sql.query`
-        SELECT * FROM DailyPerformanceReport 
+        SELECT TOP 1 * FROM DailyPerformanceReport 
         WHERE CAST(productionDate AS DATE) = CAST(${date} AS DATE) 
         AND (disa = ${safeDisa} OR disa = 'DISA - ' + ${safeDisa})
         ORDER BY id DESC
@@ -500,28 +507,36 @@ exports.downloadPDF = async (req, res) => {
       doc.font('Helvetica-Bold').fontSize(10).text(`DATE OF PRODUCTION : ${reportDateStr.split('-').reverse().join('-')}            DISA: ${report.disa}`, startX + 5, currentY + 6);
       currentY += 20;
 
-      const sumCols = [{ w: 60, l: 'SHIFT' }, { w: 115, l: 'POURED MOULDS' }, { w: 120, l: 'TONNAGE' }, { w: 120, l: 'CASTED' }, { w: 120, l: 'VALUE' }];
+      const sumCols = [
+        { w: 45, l: 'SHIFT' }, 
+        { w: 90, l: 'POURED MOULDS' }, 
+        { w: 100, l: 'TONNAGE' }, 
+        { w: 100, l: 'QUANTITY' }, 
+        { w: 100, l: 'CASTED' }, 
+        { w: 100, l: 'VALUE' }
+      ];
       let xHeaderPos = startX;
       sumCols.forEach(col => {
         drawCell(col.l, xHeaderPos, currentY, col.w, 20, 'center', 'Helvetica', 9, true);
         xHeaderPos += col.w;
       });
       currentY += 20;
-
-      let tMoulds = 0, tTonnage = 0, tCasted = 0, tValue = 0;
+      let tMoulds = 0, tTonnage = 0, tQuantity = 0, tCasted = 0, tValue = 0;
       ["I", "II", "III"].forEach(shiftName => {
         const row = summaryData.find(s => s.shiftName === shiftName) || {};
         tMoulds += Number(row.pouredMoulds) || 0;
         tTonnage += Number(row.tonnage) || 0;
+        tQuantity += Number(row.quantity) || 0;
         tCasted += Number(row.casted) || 0;
         tValue += Number(row.shiftValue) || 0;
-
+ 
         let xPos = startX;
         drawCell(shiftName, xPos, currentY, sumCols[0].w, 20, 'center', 'Helvetica', 9, true); xPos += sumCols[0].w;
         drawCell(row.pouredMoulds > 0 ? row.pouredMoulds : "-", xPos, currentY, sumCols[1].w, 20); xPos += sumCols[1].w;
         drawCell(row.tonnage > 0 ? Number(row.tonnage).toFixed(3) : "-", xPos, currentY, sumCols[2].w, 20); xPos += sumCols[2].w;
-        drawCell(row.casted > 0 ? Number(row.casted).toFixed(0) : "-", xPos, currentY, sumCols[3].w, 20); xPos += sumCols[3].w;
-        drawCell(row.shiftValue > 0 ? Number(row.shiftValue).toFixed(2) : "-", xPos, currentY, sumCols[4].w, 20);
+        drawCell(row.quantity > 0 ? row.quantity : "-", xPos, currentY, sumCols[3].w, 20); xPos += sumCols[3].w;
+        drawCell(row.casted > 0 ? Number(row.casted).toFixed(0) : "-", xPos, currentY, sumCols[4].w, 20); xPos += sumCols[4].w;
+        drawCell(row.shiftValue > 0 ? Number(row.shiftValue).toFixed(2) : "-", xPos, currentY, sumCols[5].w, 20);
         currentY += 20;
       });
 
@@ -529,8 +544,9 @@ exports.downloadPDF = async (req, res) => {
       drawCell("TOTAL", xPos, currentY, sumCols[0].w, 20, 'center', 'Helvetica', 9, true); xPos += sumCols[0].w;
       drawCell(tMoulds > 0 ? tMoulds : "-", xPos, currentY, sumCols[1].w, 20, 'center', 'Helvetica', 9, true); xPos += sumCols[1].w;
       drawCell(tTonnage > 0 ? tTonnage.toFixed(3) : "-", xPos, currentY, sumCols[2].w, 20, 'center', 'Helvetica', 9, true); xPos += sumCols[2].w;
-      drawCell(tCasted > 0 ? tCasted.toFixed(0) : "-", xPos, currentY, sumCols[3].w, 20, 'center', 'Helvetica', 9, true); xPos += sumCols[3].w;
-      drawCell(tValue > 0 ? tValue.toFixed(2) : "-", xPos, currentY, sumCols[4].w, 20, 'center', 'Helvetica', 9, true);
+      drawCell(tQuantity > 0 ? tQuantity : "-", xPos, currentY, sumCols[3].w, 20, 'center', 'Helvetica', 9, true); xPos += sumCols[3].w;
+      drawCell(tCasted > 0 ? tCasted.toFixed(0) : "-", xPos, currentY, sumCols[4].w, 20, 'center', 'Helvetica', 9, true); xPos += sumCols[4].w;
+      drawCell(tValue > 0 ? tValue.toFixed(2) : "-", xPos, currentY, sumCols[5].w, 20, 'center', 'Helvetica', 9, true);
       currentY += 30;
 
       const detCols = [{ w: 25 }, { w: 90 }, { w: 100 }, { w: 35 }, { w: 35 }, { w: 45 }, { w: 45 }, { w: 25 }, { w: 135 }];
@@ -668,6 +684,102 @@ exports.downloadPDF = async (req, res) => {
       checkPageBreak(20);
       doc.font('Helvetica').fontSize(8).fillColor('black');
       
+      doc.text(currentPageQfValue, startX, currentY);
+
+      // 🔥 PAGE 2: PRODUCTION DELAYS 🔥
+      doc.addPage();
+      currentY = 30;
+
+      const groupedDelaysMap = {};
+      let totalI = 0, totalII = 0, totalIII = 0, totalDuration = 0;
+
+      delaysData.forEach(d => {
+        const reason = d.reason || "-";
+        const shift = d.shift;
+        const dur = Number(d.duration) || 0;
+
+        if (!groupedDelaysMap[reason]) {
+          groupedDelaysMap[reason] = { I: 0, II: 0, III: 0, total: 0 };
+        }
+        if (shift === "I") { groupedDelaysMap[reason].I += dur; totalI += dur; }
+        else if (shift === "II") { groupedDelaysMap[reason].II += dur; totalII += dur; }
+        else if (shift === "III") { groupedDelaysMap[reason].III += dur; totalIII += dur; }
+        
+        groupedDelaysMap[reason].total += dur;
+        totalDuration += dur;
+      });
+
+      const groupedDelaysArray = Object.keys(groupedDelaysMap).map(reason => ({
+        reason,
+        ...groupedDelaysMap[reason]
+      }));
+
+      const delayCols = [
+        { w: 35, l: 'S.No.' }, 
+        { w: 230, l: 'Reasons' }, 
+        { w: 60, l: 'Shift I' }, 
+        { w: 60, l: 'Shift II' }, 
+        { w: 60, l: 'Shift III' }, 
+        { w: 90, l: 'Total (Mins)' }
+      ];
+
+      const drawDelaysHeader = () => {
+        checkPageBreak(40);
+        doc.rect(startX, currentY, tableWidth, 20).fillAndStroke('#e5e7eb', 'black');
+        doc.fillColor('black').font('Helvetica-Bold').fontSize(10);
+        doc.text("Production delays / Remarks", startX, currentY + 6, { width: tableWidth, align: 'center' });
+        currentY += 20;
+
+        let x = startX;
+        delayCols.forEach(c => {
+          drawCell(c.l, x, currentY, c.w, 20, 'center', 'Helvetica', 9, true);
+          x += c.w;
+        });
+        currentY += 20;
+      };
+
+      drawDelaysHeader();
+
+      if (groupedDelaysArray.length === 0) {
+        doc.rect(startX, currentY, tableWidth, 20).stroke();
+        drawCell("-", startX, currentY, tableWidth, 20);
+        currentY += 20;
+      } else {
+        groupedDelaysArray.forEach((d, i) => {
+          let maxH = 20;
+          doc.fontSize(9);
+          let rsnH = doc.heightOfString(d.reason || "-", { width: delayCols[1].w - 4 });
+          if (rsnH + 10 > maxH) maxH = rsnH + 10;
+
+          if (checkPageBreak(maxH)) {
+            drawDelaysHeader();
+          }
+
+          let rX = startX;
+          drawCell(i + 1, rX, currentY, delayCols[0].w, maxH); rX += delayCols[0].w;
+          drawCell(d.reason || "-", rX, currentY, delayCols[1].w, maxH, 'left'); rX += delayCols[1].w;
+          drawCell(d.I > 0 ? d.I : "-", rX, currentY, delayCols[2].w, maxH); rX += delayCols[2].w;
+          drawCell(d.II > 0 ? d.II : "-", rX, currentY, delayCols[3].w, maxH); rX += delayCols[3].w;
+          drawCell(d.III > 0 ? d.III : "-", rX, currentY, delayCols[4].w, maxH); rX += delayCols[4].w;
+          drawCell(d.total > 0 ? d.total : "-", rX, currentY, delayCols[5].w, maxH, 'center', 'Helvetica-Bold', 9, true);
+          currentY += maxH;
+        });
+
+        if (checkPageBreak(20)) drawDelaysHeader();
+        let tX = startX;
+        doc.rect(tX, currentY, delayCols[0].w + delayCols[1].w, 20).stroke();
+        drawCell("TOTAL", tX, currentY, delayCols[0].w + delayCols[1].w, 20, 'center', 'Helvetica', 9, true);
+        tX += delayCols[0].w + delayCols[1].w;
+        drawCell(totalI > 0 ? totalI : "-", tX, currentY, delayCols[2].w, 20, 'center', 'Helvetica', 9, true); tX += delayCols[2].w;
+        drawCell(totalII > 0 ? totalII : "-", tX, currentY, delayCols[3].w, 20, 'center', 'Helvetica', 9, true); tX += delayCols[3].w;
+        drawCell(totalIII > 0 ? totalIII : "-", tX, currentY, delayCols[4].w, 20, 'center', 'Helvetica', 9, true); tX += delayCols[4].w;
+        drawCell(totalDuration > 0 ? totalDuration : "-", tX, currentY, delayCols[5].w, 20, 'center', 'Helvetica', 9, true);
+        currentY += 20;
+      }
+
+      currentY += 15;
+      checkPageBreak(20);
+      doc.font('Helvetica').fontSize(8).fillColor('black');
       doc.text(currentPageQfValue, startX, currentY);
     }
 

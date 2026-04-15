@@ -16,6 +16,7 @@ router.get("/mould-hardness-remarks", formController.getMouldHardnessRemarks);
 // --- Form Transaction Routes ---
 router.get("/forms/last-mould-counter", formController.getLastMouldCounter);
 router.get("/forms/last-personnel", formController.getLastPersonnel);
+router.get("/forms/last-component", formController.getLastComponent); // Added
 router.post("/forms", formController.createReport);
 router.get("/forms/download-pdf", formController.downloadAllReports);
 

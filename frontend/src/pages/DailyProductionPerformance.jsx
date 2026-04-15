@@ -4,9 +4,9 @@ import Header from "../components/Header";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-const API_BASE = process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL !== "undefined" 
-                 ? process.env.REACT_APP_API_URL 
-                 : "/api";
+const API_BASE = process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL !== "undefined"
+  ? process.env.REACT_APP_API_URL
+  : "/api";
 
 // --- HELPER: Calculate Production Date (Strict 7 AM to 7 AM Logic) ---
 const getProductionDate = () => {
@@ -123,18 +123,18 @@ const DailyProductionPerformance = () => {
   const getAuthHeaders = () => {
     let token = localStorage.getItem('token');
     if (!token) {
-        const userData = localStorage.getItem('user');
-        if (userData) {
-            try {
-                const parsedUser = JSON.parse(userData);
-                token = parsedUser.token || ''; 
-            } catch (e) {
-                console.error("Failed to parse user data");
-            }
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        try {
+          const parsedUser = JSON.parse(userData);
+          token = parsedUser.token || '';
+        } catch (e) {
+          console.error("Failed to parse user data");
         }
+      }
     }
     return {
-        headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` }
     };
   };
 
@@ -160,14 +160,14 @@ const DailyProductionPerformance = () => {
       })
       .catch((err) => console.error("Failed to fetch supervisors", err));
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- STATE: SUMMARY TABLE (Defaulted to "-") ---
   const [summary, setSummary] = useState({
-    I: { pouredMoulds: "-", tonnage: "-", casted: "", value: "" },
-    II: { pouredMoulds: "-", tonnage: "-", casted: "", value: "" },
-    III: { pouredMoulds: "-", tonnage: "-", casted: "", value: "" },
+    I: { pouredMoulds: "-", tonnage: "-", quantity: "-", casted: "", value: "" },
+    II: { pouredMoulds: "-", tonnage: "-", quantity: "-", casted: "", value: "" },
+    III: { pouredMoulds: "-", tonnage: "-", quantity: "-", casted: "", value: "" },
   });
 
   const [delays, setDelays] = useState([]);
@@ -192,6 +192,7 @@ const DailyProductionPerformance = () => {
           ["I", "II", "III"].forEach(s => {
             newSummary[s].pouredMoulds = "-";
             newSummary[s].tonnage = "-";
+            newSummary[s].quantity = "-";
             newSummary[s].casted = "";
             newSummary[s].value = "";
           });
@@ -202,6 +203,9 @@ const DailyProductionPerformance = () => {
 
               if (item.totalTonnageKg > 0) {
                 newSummary[item.shift].tonnage = (item.totalTonnageKg / 1000).toFixed(3);
+              }
+              if (item.totalQuantity > 0) {
+                newSummary[item.shift].quantity = item.totalQuantity;
               }
               if (item.totalCastedKg > 0) {
                 newSummary[item.shift].casted = item.totalCastedKg.toFixed(0);
@@ -251,6 +255,7 @@ const DailyProductionPerformance = () => {
   const summaryTotals = {
     pouredMoulds: ["I", "II", "III"].reduce((acc, s) => acc + parseNum(summary[s].pouredMoulds), 0),
     tonnage: ["I", "II", "III"].reduce((acc, s) => acc + parseNum(summary[s].tonnage), 0),
+    quantity: ["I", "II", "III"].reduce((acc, s) => acc + parseNum(summary[s].quantity), 0),
     casted: ["I", "II", "III"].reduce((acc, s) => acc + parseNum(summary[s].casted), 0),
     value: ["I", "II", "III"].reduce((acc, s) => acc + parseNum(summary[s].value), 0),
   };
@@ -315,10 +320,19 @@ const DailyProductionPerformance = () => {
     const updated = [...details];
     updated[index][field] = value;
 
-    if (field === "mouldsPour") {
-      const pour = Number(updated[index].mouldsPour);
-      const weight = Number(updated[index].unitWeight);
-      updated[index].totalWeight = (!isNaN(pour) && !isNaN(weight) && pour > 0 && weight > 0) ? Math.round(pour * weight) : "-";
+    // Recalculate total weight if either mouldsPour or unitWeight changes
+    if (field === "mouldsPour" || field === "unitWeight") {
+      const pourVal = String(updated[index].mouldsPour).trim();
+      const weightVal = String(updated[index].unitWeight).trim();
+
+      // If either value is a hyphen or empty, set totalWeight to '-'
+      if (pourVal === "-" || weightVal === "-" || pourVal === "" || weightVal === "") {
+        updated[index].totalWeight = "-";
+      } else {
+        const pour = Number(pourVal);
+        const weight = Number(weightVal);
+        updated[index].totalWeight = (!isNaN(pour) && !isNaN(weight) && pour > 0 && weight > 0) ? Math.round(pour * weight) : "-";
+      }
     }
 
     setDetails(updated);
@@ -373,7 +387,7 @@ const DailyProductionPerformance = () => {
     }
 
     if (isInvalid(unplannedReasons)) return false;
-    
+
     if (isInvalid(signatures.incharge) || isInvalid(signatures.hof) || isInvalid(signatures.hod)) return false;
 
     return true;
@@ -388,13 +402,13 @@ const DailyProductionPerformance = () => {
     }
 
     const payload = {
-      productionDate, 
-      disa, 
-      supervisorName: signatures.incharge, 
-      summary, 
-      details, 
-      unplannedReasons, 
-      signatures, 
+      productionDate,
+      disa,
+      supervisorName: signatures.incharge,
+      summary,
+      details,
+      unplannedReasons,
+      signatures,
       delays
     };
 
@@ -403,9 +417,9 @@ const DailyProductionPerformance = () => {
       toast.success("Report sent to Supervisor successfully!");
 
       setSummary({
-        I: { pouredMoulds: "-", tonnage: "-", casted: "", value: "" },
-        II: { pouredMoulds: "-", tonnage: "-", casted: "", value: "" },
-        III: { pouredMoulds: "-", tonnage: "-", casted: "", value: "" },
+        I: { pouredMoulds: "-", tonnage: "-", quantity: "-", casted: "", value: "" },
+        II: { pouredMoulds: "-", tonnage: "-", quantity: "-", casted: "", value: "" },
+        III: { pouredMoulds: "-", tonnage: "-", quantity: "-", casted: "", value: "" },
       });
       setDetails([{ patternCode: "", itemDescription: "-", planned: "", unplanned: "", mouldsProd: "", mouldsPour: "", cavity: "-", unitWeight: "-", totalWeight: "-" }]);
       setUnplannedReasons("");
@@ -453,7 +467,7 @@ const DailyProductionPerformance = () => {
     }
   };
 
-  
+
 
   return (
     <>
@@ -506,6 +520,7 @@ const DailyProductionPerformance = () => {
                     <th className="border border-gray-800 p-2 w-32">SHIFT</th>
                     <th className="border border-gray-800 p-2">POURED MOULDS</th>
                     <th className="border border-gray-800 p-2">TONNAGE</th>
+                    <th className="border border-gray-800 p-2">QUANTITY</th>
                     <th className="border border-gray-800 p-2">CASTED</th>
                     <th className="border border-gray-800 p-2">VALUE</th>
                   </tr>
@@ -521,6 +536,9 @@ const DailyProductionPerformance = () => {
                         <input type="text" value={String(summary[shift].tonnage)} readOnly className="w-full h-full text-center outline-none bg-gray-50 py-2 cursor-not-allowed font-semibold text-gray-600" />
                       </td>
                       <td className="border border-gray-800 p-0">
+                        <input type="text" value={String(summary[shift].quantity)} readOnly className="w-full h-full text-center outline-none bg-gray-50 py-2 cursor-not-allowed font-semibold text-gray-600" />
+                      </td>
+                      <td className="border border-gray-800 p-0">
                         <input type="text" value={String(summary[shift].casted)} onChange={(e) => handleSummaryChange(shift, "casted", e.target.value)} placeholder="Type '-' if none" className="w-full h-full text-center outline-none bg-transparent py-2" />
                       </td>
                       <td className="border border-gray-800 p-0">
@@ -533,6 +551,7 @@ const DailyProductionPerformance = () => {
                     <td className="border border-gray-800 p-2">TOTAL</td>
                     <td className="border border-gray-800 p-2">{summaryTotals.pouredMoulds > 0 ? summaryTotals.pouredMoulds : "-"}</td>
                     <td className="border border-gray-800 p-2">{summaryTotals.tonnage > 0 ? summaryTotals.tonnage.toFixed(3) : "-"}</td>
+                    <td className="border border-gray-800 p-2">{summaryTotals.quantity > 0 ? summaryTotals.quantity : "-"}</td>
                     <td className="border border-gray-800 p-2">{summaryTotals.casted > 0 ? summaryTotals.casted.toFixed(0) : "-"}</td>
                     <td className="border border-gray-800 p-2">{summaryTotals.value > 0 ? summaryTotals.value.toFixed(2) : "-"}</td>
                   </tr>
@@ -578,9 +597,17 @@ const DailyProductionPerformance = () => {
                         />
                       </td>
 
-                      <td className="border border-gray-800 p-0">
-                        <input type="text" value={String(row.itemDescription)} readOnly className="w-full h-full text-left outline-none bg-gray-50 text-gray-700 py-2 px-2 cursor-not-allowed" />
+                      <td className="border border-gray-800 p-1 relative overflow-visible text-left">
+                        <SearchableSelect
+                          key={`desc-${index}-${resetKey}`}
+                          options={components}
+                          displayKey="description"
+                          value={row.itemDescription === "-" ? "" : row.itemDescription}
+                          placeholder="Search Component..."
+                          onSelect={(item) => handleComponentSelect(index, item)}
+                        />
                       </td>
+
                       <td className="border border-gray-800 p-0">
                         <input type="text" value={String(row.planned)} onChange={(e) => handleDetailChange(index, "planned", e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2" />
                       </td>
@@ -599,7 +626,14 @@ const DailyProductionPerformance = () => {
                       <td className="border border-gray-800 p-0">
                         <div className="flex items-center justify-center w-full h-full gap-1 px-1 font-semibold text-gray-700">
                           <span>[</span>
-                          <input type="text" placeholder="Wt" value={String(row.unitWeight)} readOnly className="w-12 text-center outline-none border-b border-gray-400 bg-transparent py-1 font-normal text-gray-500 cursor-not-allowed" />
+                          {/* NEW CODE */}
+                          <input
+                            type="text"
+                            placeholder="Wt"
+                            value={String(row.unitWeight)}
+                            onChange={(e) => handleDetailChange(index, "unitWeight", e.target.value)}
+                            className="w-12 text-center outline-none border-b border-gray-500 bg-transparent py-1 font-normal text-gray-800 focus:border-orange-500 transition-colors"
+                          />
                           <span className="mx-1">X</span>
                           <input type="text" value={String(row.mouldsPour)} readOnly placeholder="Qty" className="w-12 text-center outline-none border-b border-gray-400 bg-transparent py-1 font-normal text-gray-500 cursor-not-allowed" />
                           <span>] =</span>
@@ -723,7 +757,7 @@ const DailyProductionPerformance = () => {
                 Submit & Send to Supervisor
               </button>
             </div>
-            
+
           </form>
         </div>
       </div>

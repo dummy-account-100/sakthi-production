@@ -114,6 +114,27 @@ exports.getLastPersonnel = async (req, res) => {
 };
 
 // ==========================================
+//        FETCH LAST COMPONENT CAVITY
+// ==========================================
+exports.getLastComponent = async (req, res) => {
+  const { disa, shift } = req.query;
+  try {
+    const result = await sql.query`
+      SELECT TOP 1 p.componentName, c.cavity
+      FROM DisamaticProduction p
+      JOIN DisamaticProductReport r ON p.reportId = r.id
+      LEFT JOIN Component c ON p.componentName = c.description
+      WHERE r.disa = ${disa} AND r.shift = ${shift}
+      ORDER BY r.reportDate DESC, r.id DESC, p.id DESC
+    `;
+    res.json(result.recordset[0] || { componentName: null, cavity: 0 });
+  } catch (error) {
+    console.error("Error fetching last component:", error);
+    res.status(500).json({ error: "Failed to fetch last component" });
+  }
+};
+
+// ==========================================
 //             LAST MOULD COUNTER
 // ==========================================
 exports.getLastMouldCounter = async (req, res) => {
@@ -546,7 +567,9 @@ exports.downloadAllReports = async (req, res) => {
         };
       }
       
-      grouped[key].reportIds.push(r.id);
+      if (!grouped[key].reportIds.includes(r.id)) {
+        grouped[key].reportIds.push(r.id);
+      }
       grouped[key].incharge = r.incharge || grouped[key].incharge;
       grouped[key].member = r.member || grouped[key].member;
       grouped[key].ppOperator = r.ppOperator || grouped[key].ppOperator;
@@ -795,7 +818,7 @@ exports.downloadAllReports = async (req, res) => {
         { label: "Cycle Time", key: "cycleTime", w: 45 },
         { label: "Moulds/Hr", key: "mouldsPerHour", w: 45 },
         { label: "Remarks", key: "remarks", w: 130, align: 'left' }
-      ], `SELECT p.*, c.pouredWeight FROM DisamaticProduction p LEFT JOIN Component c ON p.componentName = c.description WHERE p.reportId IN (${idsList}) ORDER BY p.id ASC`, 
+      ], `SELECT p.*, (SELECT TOP 1 pouredWeight FROM Component WHERE description = p.componentName) AS pouredWeight FROM DisamaticProduction p WHERE p.reportId IN (${idsList}) ORDER BY p.id ASC`, 
       'componentName', 
       { labelCol: 'componentName', labelText: 'Total : ', sumCols: ['produced', 'poured'], calcTonnage: true });
 
