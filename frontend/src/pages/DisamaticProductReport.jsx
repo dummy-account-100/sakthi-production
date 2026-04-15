@@ -613,8 +613,7 @@ const DisamaticProductReport = () => {
               </div>
 
               {productions.map((prod, index) => {
-                const prevCavity = index === 0 ? lastReportCavity : (productions[index - 1].cavity || 0);
-                const quantity = (Number(prod.poured) && prevCavity) ? (Number(prod.poured) * prevCavity) : null;
+                const quantity = (Number(prod.poured) && prod.cavity) ? (Number(prod.poured) * prod.cavity) : null;
 
                 return (
                   <div key={index} className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50 relative">

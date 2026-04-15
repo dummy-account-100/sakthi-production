@@ -217,28 +217,12 @@ exports.createReport = async (req, res) => {
     const reportId = reportResult.recordset[0].id;
 
     if (productions.length > 0) {
-      // 🔥 FIX 2: Must include to get the values from the first production row
-      const firstProduced = safeNum(productions[0].produced);
-      const firstPoured = safeNum(productions[0].poured); 
-      
-      await sql.query`
-        WITH CTE AS (
-          SELECT TOP 1 p.produced, p.poured
-          FROM DisamaticProduction p
-          INNER JOIN DisamaticProductReport r ON p.reportId = r.id
-          WHERE r.disa = ${disa}
-          ORDER BY r.reportDate DESC, r.id DESC, p.id DESC
-        )
-        UPDATE CTE SET produced = ${firstProduced}, poured = ${firstPoured}
-      `;
-
       for (let i = 0; i < productions.length; i++) {
         const p = productions[i];
         if (safeStr(p.componentName)) {
-          // Shift BOTH produced and poured values by 1 index. 
-          // The last row automatically gets null (which renders as a hyphen in PDF/Admin)
-          const producedValue = (i === productions.length - 1) ? null : safeNum(productions[i + 1].produced);
-          const pouredValue = (i === productions.length - 1) ? null : safeNum(productions[i + 1].poured);
+          // Store directly on the current row without shifting
+          const producedValue = safeNum(p.produced);
+          const pouredValue = safeNum(p.poured);
 
           await sql.query`
             INSERT INTO DisamaticProduction (
@@ -767,6 +751,8 @@ exports.downloadAllReports = async (req, res) => {
             let totals = {};
             totalConfig.sumCols.forEach(k => totals[k] = 0);
             let totalTonnage = 0;
+            let totalQuantity = 0; // Added for Quantity
+
             data.forEach(r => {
               totalConfig.sumCols.forEach(k => {
                 let val = Number(r[k]);
@@ -775,11 +761,15 @@ exports.downloadAllReports = async (req, res) => {
               if (totalConfig.calcTonnage) {
                 const poured = Number(r.poured) || 0;
                 const weight = Number(r.pouredWeight) || 0;
+                const cavity = Number(r.cavity) || 0; // Extract cavity
+
                 totalTonnage += (poured * weight);
+                totalQuantity += (poured * cavity); // Calculate Quantity
               }
             });
 
-            const rowHeight = totalConfig.calcTonnage ? 35 : 20;
+            // Increase row height from 35 to 55 to fit 4 lines of text comfortably
+            const rowHeight = totalConfig.calcTonnage ? 55 : 20; 
             if (checkPageBreak(rowHeight)) currentY = 50;
             
             let rX = startX;
@@ -793,14 +783,22 @@ exports.downloadAllReports = async (req, res) => {
               } else if (totalConfig.sumCols.includes(col.key)) {
                 cellText = totals[col.key] === 0 ? "-" : totals[col.key].toString();
               } else if (totalConfig.calcTonnage && col.key === 'remarks') {
+                
+                // Calculate unpoured metrics
                 let tonnageStr = `Tonnage: ${totalTonnage > 0 ? (totalTonnage / 1000).toFixed(3): '-'}`; 
                 let unpouredPerc = "-";
+                let unpouredCount = "-";
+                
                 if (totals['produced'] > 0) {
                   let unp = totals['produced'] - totals['poured'];
+                  unpouredCount = unp;
                   unpouredPerc = ((unp / totals['produced']) * 100).toFixed(2);
                 }
-                cellText = `${tonnageStr}\nUnpoured %: ${unpouredPerc}`; 
+                
+                // Construct the 4-line string
+                cellText = `${tonnageStr}\nQuantity: ${totalQuantity > 0 ? totalQuantity : '-'}\nUnpoured %: ${unpouredPerc}\nUnpoured: ${unpouredCount}`; 
               }
+              
               drawCellText(cellText, rX, currentY, col.w, rowHeight, align, 'Helvetica-Bold');
               doc.rect(rX, currentY, col.w, rowHeight).stroke();
               rX += col.w;
@@ -818,7 +816,10 @@ exports.downloadAllReports = async (req, res) => {
         { label: "Cycle Time", key: "cycleTime", w: 45 },
         { label: "Moulds/Hr", key: "mouldsPerHour", w: 45 },
         { label: "Remarks", key: "remarks", w: 130, align: 'left' }
-      ], `SELECT p.*, (SELECT TOP 1 pouredWeight FROM Component WHERE description = p.componentName) AS pouredWeight FROM DisamaticProduction p WHERE p.reportId IN (${idsList}) ORDER BY p.id ASC`, 
+      ], `SELECT p.*, 
+            (SELECT TOP 1 pouredWeight FROM Component WHERE description = p.componentName) AS pouredWeight,
+            (SELECT TOP 1 cavity FROM Component WHERE description = p.componentName) AS cavity 
+          FROM DisamaticProduction p WHERE p.reportId IN (${idsList}) ORDER BY p.id ASC`, 
       'componentName', 
       { labelCol: 'componentName', labelText: 'Total : ', sumCols: ['produced', 'poured'], calcTonnage: true });
 
@@ -917,14 +918,15 @@ exports.downloadAllReports = async (req, res) => {
       
       currentY = blockStartY + splitBlockH;
 
-      // ==========================================
+     // ==========================================
       // 🔥 FIXED FOOTER BLOCK (Maintenance + Sign + QF)
       // ==========================================
       const maintText = Array.from(g.maintenances).join(' | ') || "-";
-      const totalFooterHeight = 40 + 50; // Maintenance (40) + Sign/QF block (50)
 
-      // Check if the entire block fits, if not, move EVERYTHING to the next page
-      if (checkPageBreak(totalFooterHeight + 10)) {
+      // 1. Check if Maintenance fits. If not, move to next page.
+      // We explicitly check currentY to guarantee mathematical precision
+      if (currentY + 45 > pageBottom) {
+        doc.addPage();
         currentY = 50;
       }
 
@@ -934,8 +936,14 @@ exports.downloadAllReports = async (req, res) => {
       doc.font('Helvetica').fontSize(9).text(maintText, startX + 5, currentY + 15, { width: tableWidth - 10 });
       currentY += 40;
 
-      // Draw Supervisor & QF Box
+      // 2. Check if Signature block fits. If not, move the ENTIRE signature block to next page.
       const footerHeight = 50; 
+      if (currentY + footerHeight + 15 > pageBottom) {
+        doc.addPage();
+        currentY = 50;
+      }
+      
+      // Draw Supervisor & QF Box
       doc.rect(startX, currentY, tableWidth, footerHeight).stroke(); 
       doc.font('Helvetica-Bold').fontSize(9).text(`Supervisor Name : ${g.supervisorName || "-"}`, startX + 330, currentY + 10);
       doc.text("Signature :", startX + 330, currentY + 30);
