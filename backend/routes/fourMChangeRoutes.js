@@ -415,20 +415,50 @@ router.get("/report", async (req, res) => {
             return tableHeaderY + minRowHeight;
         };
 
-        const drawFooter = (yPos, dynamicQfString) => {
+const drawFooter = (yPos, dynamicQfString) => {
             const footerY = doc.page.height - 35;
+            
+            // Draw QF String on the left
             doc.font("Helvetica").fontSize(8).text(dynamicQfString, startX, footerY, { align: "left" });
-            const rightX = doc.page.width - 130;
-            doc.text("HOD Sign", rightX, footerY, { align: "right" });
+            
+            // Set explicit X coordinate for the HOD Sign block on the right
+            const rightX = doc.page.width - 180; 
+            
+            // 1. Draw "HOD Sign :" Label
+            doc.fillColor('black');
+            doc.fontSize(10);
+            doc.font('Helvetica-Bold');
+            doc.text("HOD Sign :", rightX, footerY);
 
-            if (hodSignature && hodSignature.startsWith('data:image')) {
+            // 2. Draw the Signature Status next to the label
+            if (hodSignature === 'Approved' || hodSignature === 'APPROVED') {
+                // Draw Green Checkmark + APPROVED Text
+                doc.fillColor('#16a34a'); // Dark green
+                doc.fontSize(14);
+                doc.font('ZapfDingbats');
+                doc.text('4', rightX + 55, footerY - 2); // Tick Mark
+                
+                doc.fontSize(10);
+                doc.font('Helvetica-Bold');
+                doc.text('APPROVED', rightX + 67, footerY); // Text
+                
+                doc.fillColor('black'); // Reset
+                doc.font('Helvetica');
+            } else if (hodSignature && hodSignature.startsWith('data:image')) {
                 try {
-                    const base64Data = hodSignature.split('base64,')[1];
+                    const base64Data = hodSignature.split('base64,');
                     const imgBuffer = Buffer.from(base64Data, 'base64');
-                    doc.image(imgBuffer, rightX + 20, footerY - 15, { fit: [80, 25] });
+                    // Placed perfectly next to "HOD Sign :"
+                    doc.image(imgBuffer, rightX + 55, footerY - 15, { fit: [width - 4, height - 4]});
                 } catch (e) { }
             } else {
-                doc.moveTo(rightX + 20, footerY - 5).lineTo(rightX + 100, footerY - 5).stroke();
+                // Pending State
+                doc.fillColor('#dc2626'); // Red
+                doc.fontSize(10);
+                doc.font('Helvetica-Bold');
+                doc.text("Pending", rightX + 55, footerY);
+                doc.fillColor('black');
+                doc.font('Helvetica');
             }
         };
 
@@ -436,12 +466,36 @@ router.get("/report", async (req, res) => {
             const centerX = x + width / 2;
             const centerY = y + (height / 2);
 
-            if (isSignature && value && value.startsWith('data:image')) {
-                try {
-                    const base64Data = value.split('base64,')[1];
-                    const imgBuffer = Buffer.from(base64Data, 'base64');
-                    doc.image(imgBuffer, x + 2, y + 2, { fit: [width - 4, height - 4], align: 'center', valign: 'center' });
-                } catch (e) { doc.font("Helvetica").fontSize(8).text("Invalid Sig", x, y + 10, { width, align: "center" }); }
+            if (isSignature) {
+                if (value === "Approved" || value === "APPROVED") {
+                    // 🔥 Perfectly center the tick + text block
+                    const startX = centerX - 20; 
+                    
+                    doc.fillColor('#16a34a');
+                    doc.fontSize(12);
+                    doc.font('ZapfDingbats');
+                    doc.text('4', startX, centerY - 4); 
+                    
+                    doc.fontSize(6.5);
+                    doc.font("Helvetica-Bold");
+                    doc.text("APPROVED", startX + 10, centerY - 1);
+                    
+                    doc.fillColor('black');
+                    doc.font('Helvetica');
+                } else if (value && value.startsWith('data:image')) {
+                    try {
+                        const base64Data = value.split('base64,');
+                        const imgBuffer = Buffer.from(base64Data, 'base64');
+                        doc.image(imgBuffer, x + 2, y + 2, { fit: [width - 4, height - 4], align: 'center', valign: 'center' });
+                    } catch (e) { doc.font("Helvetica").fontSize(8).text("Invalid Sig", x, y + 10, { width, align: "center" }); }
+                } else {
+                    doc.fillColor('#dc2626');
+                    doc.fontSize(8);
+                    doc.font("Helvetica-Bold");
+                    doc.text("Pending", x, centerY - 3, { width: width, align: "center" });
+                    doc.fillColor('black');
+                    doc.font('Helvetica');
+                }
             } else if (value === "OK") {
                 doc.save().lineWidth(1.5).moveTo(centerX - 4, centerY + 2).lineTo(centerX - 1, centerY + 6).lineTo(centerX + 6, centerY - 4).stroke().restore();
             } else if (value === "Not OK") {

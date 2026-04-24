@@ -241,16 +241,14 @@ const Hod = () => {
   };
 
   const submitFourMSignature = async () => {
-    if (fourMSigCanvas.current.isEmpty()) { toast.warning("Please provide your signature."); return; }
-    const signatureData = fourMSigCanvas.current.getCanvas().toDataURL("image/png");
-
     try {
       await axios.post(`${API_BASE}/4m-change/sign-hod`, { 
-          reportId: selectedFourMReport.id, signature: signatureData 
+          reportId: selectedFourMReport.id, signature: "Approved" 
       });
-      toast.success("4M Change Report signed by HOD!");
-      setSelectedFourMReport(null); fetchFourMReports();
-    } catch (err) { toast.error("Failed to save 4M signature."); }
+      toast.success("4M Change Report approved by HOD!");
+      setSelectedFourMReport(null); 
+      fetchFourMReports();
+    } catch (err) { toast.error("Failed to save 4M approval."); }
   };
 
   // ===============================================
@@ -434,14 +432,10 @@ const Hod = () => {
                   <p><span className="font-bold">Part:</span> {selectedFourMReport.partName}</p>
                   <p><span className="font-bold">Type:</span> {selectedFourMReport.type4M}</p>
                 </div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 block">HOF Signature</label>
-                <div className="border-2 border-dashed border-gray-300 bg-white rounded-xl overflow-hidden mb-2 shadow-inner">
-                  <SignatureCanvas ref={fourMSigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-64 cursor-crosshair' }} />
-                </div>
-                <button onClick={() => fourMSigCanvas.current.clear()} className="text-xs text-gray-500 hover:text-red-600 font-bold uppercase tracking-wider underline self-end mb-8">Clear Signature</button>
+                
                 <div className="mt-auto">
                   <button onClick={submitFourMSignature} className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">
-                    Approve & Sign
+                    Approve Report
                   </button>
                 </div>
               </div>

@@ -1285,8 +1285,43 @@ export const generateFourMChangePDF = (data, dateRange) => {
             rowData.forEach((cell, i) => {
                 doc.rect(x, y, colWidths[i], maxRowHeight).stroke();
 
-                if (i === 11 && cell && cell.startsWith('data:image')) {
-                    try { doc.addImage(cell, 'PNG', x + 2, y + 2, colWidths[i] - 4, maxRowHeight - 4); } catch (e) { }
+                if (i === 11) {
+                    // 🔥 Supervisor Signature Column
+                    if (cell === "Approved" || cell === "APPROVED") {
+                        const centerX = x + colWidths[i] / 2;
+                        const centerY = y + maxRowHeight / 2;
+                        
+                        // Background Box
+                        doc.setFillColor(220, 255, 220); 
+                        doc.rect(x + 0.5, y + 0.5, colWidths[i] - 1, maxRowHeight - 1, 'F');
+                        
+                        // Green Checkmark
+                        doc.setTextColor(0, 120, 0); 
+                        doc.setFontSize(12);
+                        doc.setFont('zapfdingbats', 'normal');
+                        doc.text('3', centerX - 9, centerY + 3, { align: 'center' }); 
+                        
+                        // APPROVED Text
+                        doc.setFontSize(6.5);
+                        doc.setFont("helvetica", "bold");
+                        doc.text("APPROVED", centerX + 5, centerY + 2, { align: 'center' });
+                        
+                        // Reset
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
+                    } else if (cell && String(cell).startsWith('data:image')) {
+                        // Old Signature Fallback
+                        try { doc.addImage(cell, 'PNG', x + 2, y + 2, colWidths[i] - 4, maxRowHeight - 4); } catch (e) { }
+                    } else {
+                        // Pending State
+                        const centerY = y + maxRowHeight / 2;
+                        doc.setTextColor(220, 0, 0);
+                        doc.setFontSize(8);
+                        doc.setFont("helvetica", "bold");
+                        doc.text("Pending", x + colWidths[i] / 2, centerY + 3, { align: "center" });
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
+                    }
                 } else if (cell === "OK") {
                     doc.save().setLineWidth(1).moveTo(x + colWidths[i] / 2 - 3, y + maxRowHeight / 2 + 1).lineTo(x + colWidths[i] / 2 - 1, y + maxRowHeight / 2 + 4).lineTo(x + colWidths[i] / 2 + 4, y + maxRowHeight / 2 - 3).stroke().restore();
                 } else if (cell === "Not OK") {
