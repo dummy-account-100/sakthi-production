@@ -80,7 +80,7 @@ const Hod = () => {
     } catch (err) { toast.error("Failed to load Disa Machine reports."); }
   };
 
-  const handleOpenSignModal = async (report) => {
+const handleOpenSignModal = async (report) => {
     setSelectedReport(report); setPdfUrl(null); setIsPdfLoading(true);
 
     try {
@@ -148,18 +148,29 @@ const Hod = () => {
         didDrawCell: function(data) {
            if (data.row.index >= tableBody.length && data.column.index > 2) {
                const dayIndex = data.column.index - 2; 
-               if (data.cell.text[0] === 'SIG') {
-                   const isOpRow = data.row.index === tableBody.length;
-                   const sigData = isOpRow ? opSigMap[dayIndex] : hodSigMap[dayIndex];
-                   if (sigData && sigData.startsWith('data:image')) {
-                       doc.setFillColor(255, 255, 255); doc.rect(data.cell.x + 0.5, data.cell.y + 0.5, data.cell.width - 1, data.cell.height - 1, 'F');
-                       try { doc.addImage(sigData, 'PNG', data.cell.x + 0.5, data.cell.y + 0.5, data.cell.width - 1, data.cell.height - 1); } catch(e){}
-                   }
+               const isOpRow = data.row.index === tableBody.length;
+               const sigData = isOpRow ? opSigMap[dayIndex] : hodSigMap[dayIndex];
+
+               if (sigData && String(sigData).trim().toUpperCase() === "APPROVED") {
+                   doc.setDrawColor(0, 128, 0); doc.setLineWidth(0.3);
+                   const startX = data.cell.x + 1.2;
+                   const midY = data.cell.y + 4;
+                   // Clean Right Mark Only
+                   doc.line(startX, midY, startX + 1, midY + 1.2);
+                   doc.line(startX + 1, midY + 1.2, startX + 2.8, midY - 1.5);
+                   doc.setDrawColor(0, 0, 0);
+               } else if (sigData && String(sigData).startsWith('data:image')) {
+                   doc.setFillColor(255, 255, 255); doc.rect(data.cell.x + 0.5, data.cell.y + 0.5, data.cell.width - 1, data.cell.height - 1, 'F');
+                   try { doc.addImage(sigData, 'PNG', data.cell.x + 0.5, data.cell.y + 0.5, data.cell.width - 1, data.cell.height - 1); } catch(e){}
                }
            }
         },
         didParseCell: function(data) {
            if (data.row.index >= tableBody.length && data.column.index === 1) { data.cell.styles.fontStyle = 'bold'; }
+           if (data.row.index >= tableBody.length && data.column.index > 2) {
+               data.cell.text = ['']; 
+               data.cell.styles.minCellHeight = 8;
+           }
            if (data.column.index > 2 && data.row.index < tableBody.length) {
              const rawTextArray = data.cell.text || []; const rawTextString = rawTextArray.join('').replace(/\n/g, ''); const text = rawTextArray[0] ? rawTextArray[0] : '';
              if (text === 'Y') { data.cell.styles.font = 'ZapfDingbats'; data.cell.text = '3'; data.cell.styles.textColor = [0, 100, 0]; } 
@@ -185,7 +196,7 @@ const Hod = () => {
       doc.text("DISA MACHINE OPERATOR CHECK SHEET", 168, 18, { align: 'center' }); doc.setFontSize(14); doc.text("Non-Conformance Report", 168, 26, { align: 'center' });
 
       const ncRows = ncReports.map((r, index) => [
-        index + 1, new Date(r.ReportDate).toLocaleDateString('en-GB'), r.NonConformityDetails || '', r.Correction || '', r.RootCause || '', r.CorrectiveAction || '', r.TargetDate ? new Date(r.TargetDate).toLocaleDateString('en-GB') : '', r.Responsibility || '', r.Sign || '', r.Status || ''
+        index + 1, new Date(r.ReportDate).toLocaleDateString('en-GB'), r.NonConformityDetails || '', r.Correction || '', r.RootCause || '', r.CorrectiveAction || '', r.TargetDate ? new Date(r.TargetDate).toLocaleDateString('en-GB') : '', r.Responsibility || '', r.Sign || r.SupervisorSignature || '', r.Status || ''
       ]);
       if(ncRows.length === 0) { for(let i=0; i<5; i++) ncRows.push(['', '', '', '', '', '', '', '', '', '']); }
 
@@ -193,7 +204,25 @@ const Hod = () => {
         startY: 35, head: [[ 'S.No', 'Date', 'Non-Conformities Details', 'Correction', 'Root Cause', 'Corrective Action', 'Target Date', 'Responsibility', 'Name', 'Status' ]],
         body: ncRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0], valign: 'top', overflow: 'linebreak' },
         headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0], fontStyle: 'bold', halign: 'center', valign: 'middle' },
-        columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 20, halign: 'center' }, 2: { cellWidth: 40 }, 3: { cellWidth: 35 }, 4: { cellWidth: 35 }, 5: { cellWidth: 35 }, 6: { cellWidth: 20, halign: 'center' }, 7: { cellWidth: 25 }, 8: { cellWidth: 20 }, 9: { cellWidth: 20, halign: 'center' } }
+        columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 20, halign: 'center' }, 2: { cellWidth: 40 }, 3: { cellWidth: 35 }, 4: { cellWidth: 35 }, 5: { cellWidth: 35 }, 6: { cellWidth: 20, halign: 'center' }, 7: { cellWidth: 25 }, 8: { cellWidth: 20 }, 9: { cellWidth: 20, halign: 'center' } },
+        didDrawCell: (data) => {
+          if (data.section === 'body' && data.column.index === 8) {
+            const sig = ncRows[data.row.index][8];
+            if (sig && String(sig).trim().toUpperCase() === "APPROVED") {
+              doc.setDrawColor(0, 128, 0); doc.setLineWidth(0.5);
+              doc.line(data.cell.x + 2, data.cell.y + 4, data.cell.x + 4, data.cell.y + 6);
+              doc.line(data.cell.x + 4, data.cell.y + 6, data.cell.x + 8, data.cell.y + 2);
+              doc.setDrawColor(0, 0, 0);
+            } else if (sig && String(sig).startsWith('data:image')) {
+              try { doc.addImage(sig, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch (e) {}
+            }
+          }
+        },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 8) {
+             data.cell.text = ['']; 
+          }
+        }
       });
 
       // 🔥 DYNAMIC QF VALUE FOR PAGE 2 🔥
@@ -206,11 +235,13 @@ const Hod = () => {
     setIsPdfLoading(false);
   };
 
-  const submitSignature = async () => {
-    if (sigCanvas.current.isEmpty()) { toast.warning("Please provide a signature first."); return; }
-    const signatureData = sigCanvas.current.getCanvas().toDataURL("image/png");
+const submitSignature = async () => {
     try {
-      await axios.post(`${API_BASE}/disa-checklist/sign`, { date: selectedReport.reportDate, disaMachine: selectedReport.disa, signature: signatureData });
+      await axios.post(`${API_BASE}/disa-checklist/sign`, { 
+          date: selectedReport.reportDate, 
+          disaMachine: selectedReport.disa, 
+          signature: "APPROVED" 
+      });
       toast.success("Checklist approved and signed!"); setSelectedReport(null); fetchReports(); 
     } catch (err) { toast.error("Failed to save signature."); }
   };
@@ -394,14 +425,10 @@ const Hod = () => {
                   <p><span className="font-bold">Date:</span> {formatDate(selectedReport.reportDate)}</p>
                   <p><span className="font-bold">Machine:</span> {selectedReport.disa}</p>
                 </div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 block">HOF Signature</label>
-                <div className="border-2 border-dashed border-gray-300 bg-white rounded-xl overflow-hidden mb-2 shadow-inner">
-                  <SignatureCanvas ref={sigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-64 cursor-crosshair' }} />
-                </div>
-                <button onClick={() => { if(sigCanvas.current) sigCanvas.current.clear() }} className="text-xs text-gray-500 hover:text-red-600 font-bold uppercase tracking-wider underline self-end mb-8">Clear Signature</button>
+                
                 <div className="mt-auto">
                   <button onClick={submitSignature} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">
-                    Approve & Sign
+                    Approve Checklist
                   </button>
                 </div>
               </div>

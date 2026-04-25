@@ -60,19 +60,19 @@ const Supervisor = () => {
   const [selectedBottomReport, setSelectedBottomReport] = useState(null);
   const [bottomPdfUrl, setBottomPdfUrl] = useState(null);
   const [isBottomPdfLoading, setIsBottomPdfLoading] = useState(false);
-  const bottomSigCanvas = useRef({});
+  
 
   // --- States for Non-Conformance Reports (NCR) ---
   const [ncrReports, setNcrReports] = useState([]);
   const [selectedNcrReport, setSelectedNcrReport] = useState(null);
-  const ncrSigCanvas = useRef({});
+
 
   // --- States for DMM Setting Parameters ---
   const [dmmReports, setDmmReports] = useState([]);
   const [selectedDmmReport, setSelectedDmmReport] = useState(null);
   const [dmmPdfUrl, setDmmPdfUrl] = useState(null);
   const [isDmmPdfLoading, setIsDmmPdfLoading] = useState(false);
-  const dmmSigCanvas = useRef({});
+  
 
   // --- States for 4M Change Reports ---
   const [fourMReports, setFourMReports] = useState([]);
@@ -215,7 +215,7 @@ const Supervisor = () => {
     } catch (err) { toast.error("Failed to load Bottom Level Audits."); }
   };
 
-  const handleOpenBottomModal = async (report) => {
+const handleOpenBottomModal = async (report) => {
     setSelectedBottomReport(report); 
     setBottomPdfUrl(null); 
     setIsBottomPdfLoading(true);
@@ -305,7 +305,15 @@ const Supervisor = () => {
         didDrawCell: function (data) {
           if (data.row.index === tableBody.length && data.column.index > 1) {
             const sigData = supSigMap[data.column.index - 1];
-            if (sigData && sigData.startsWith('data:image')) { try { doc.addImage(sigData, 'PNG', data.cell.x + 0.5, data.cell.y + 0.5, data.cell.width - 1, data.cell.height - 1); } catch (e) { } }
+            if (sigData && String(sigData).trim().toUpperCase() === "APPROVED") {
+               doc.setDrawColor(0, 128, 0); doc.setLineWidth(0.3);
+               const cx = data.cell.x + data.cell.width / 2;
+               const cy = data.cell.y + data.cell.height / 2;
+               doc.line(cx - 1, cy, cx - 0.2, cy + 1); doc.line(cx - 0.2, cy + 1, cx + 1.5, cy - 1);
+               doc.setDrawColor(0, 0, 0);
+            } else if (sigData && sigData.startsWith('data:image')) { 
+               try { doc.addImage(sigData, 'PNG', data.cell.x + 0.5, data.cell.y + 0.5, data.cell.width - 1, data.cell.height - 1); } catch (e) { } 
+            }
           }
           if (data.row.index === tableBody.length + 1 && data.cell.colSpan === 5) {
             if (hofSig && hofSig.startsWith('data:image')) { try { doc.addImage(hofSig, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch (e) { } }
@@ -340,7 +348,11 @@ const Supervisor = () => {
       doc.rect(50, 10, 237, 20); doc.setFontSize(16); doc.setFont('helvetica', 'bold');
       doc.text("LAYERED PROCESS AUDIT - BOTTOM LEVEL", 168.5, 18, { align: 'center' }); doc.setFontSize(14); doc.text("Non-Conformance Report", 168.5, 26, { align: 'center' });
 
-      const ncRows = ncReports.map((r, index) => [ index + 1, new Date(r.ReportDate).toLocaleDateString('en-GB'), r.NonConformityDetails || '', r.Correction || '', r.RootCause || '', r.CorrectiveAction || '', r.TargetDate ? new Date(r.TargetDate).toLocaleDateString('en-GB') : '', r.Responsibility || '', '', r.Status || '' ]);
+      // FIX: Insert signature instead of empty string
+      const ncRows = ncReports.map((r, index) => {
+          const sigVal = r.SupervisorSignature || r.Sign || '';
+          return [ index + 1, new Date(r.ReportDate).toLocaleDateString('en-GB'), r.NonConformityDetails || '', r.Correction || '', r.RootCause || '', r.CorrectiveAction || '', r.TargetDate ? new Date(r.TargetDate).toLocaleDateString('en-GB') : '', r.Responsibility || '', sigVal, r.Status || '' ];
+      });
       if (ncRows.length === 0) { for (let i = 0; i < 5; i++) ncRows.push(['', '', '', '', '', '', '', '', '', '']); }
 
       autoTable(doc, {
@@ -350,15 +362,33 @@ const Supervisor = () => {
         columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 20, halign: 'center' }, 2: { cellWidth: 40 }, 3: { cellWidth: 35 }, 4: { cellWidth: 35 }, 5: { cellWidth: 35 }, 6: { cellWidth: 20, halign: 'center' }, 7: { cellWidth: 25 }, 8: { cellWidth: 20, halign: 'center' }, 9: { cellWidth: 20, halign: 'center' } },
         didDrawCell: function (data) {
           if (data.section === 'body' && data.column.index === 8) {
-            const rowData = ncReports[data.row.index];
-            if (rowData && rowData.SupervisorSignature && rowData.SupervisorSignature.startsWith('data:image')) { try { doc.addImage(rowData.SupervisorSignature, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch (e) { } }
+            const sig = data.row.raw[8];
+            const status = data.row.raw[9];
+            
+            const isApproved = (sig && String(sig).trim().toUpperCase() === "APPROVED") || 
+                               (status && String(status).trim().toUpperCase() === "COMPLETED");
+
+            if (isApproved) {
+               const cx = data.cell.x + data.cell.width / 2;
+               const cy = data.cell.y + data.cell.height / 2;
+               doc.setDrawColor(0, 128, 0); doc.setLineWidth(0.5);
+               doc.line(cx - 2, cy - 1.5, cx - 0.5, cy + 0.5);
+               doc.line(cx - 0.5, cy + 0.5, cx + 2.5, cy - 2.5);
+               doc.setDrawColor(0, 0, 0);
+               doc.setFontSize(5); doc.setTextColor(0, 128, 0); doc.setFont('helvetica', 'bold');
+               doc.text("APPROVED", cx, cy + 2.5, { align: 'center' });
+               doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
+            } else if (sig && String(sig).startsWith('data:image')) { 
+               try { doc.addImage(sig, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch (e) { } 
+            }
           }
         },
         didParseCell: function (data) {
+          if (data.section === 'body' && data.column.index === 8) { data.cell.text = ['']; }
           if (data.section === 'body' && data.column.index === 9) {
-            const statusText = (data.cell.text || [])[0] || '';
-            if (statusText === 'Completed') { data.cell.styles.textColor = [0, 150, 0]; data.cell.styles.fontStyle = 'bold'; } 
-            else if (statusText === 'Pending') { data.cell.styles.textColor = [200, 0, 0]; data.cell.styles.fontStyle = 'bold'; }
+            const statusText = String(data.row.raw[9] || '');
+            if (statusText.toUpperCase() === 'COMPLETED') { data.cell.styles.textColor = [0, 150, 0]; data.cell.styles.fontStyle = 'bold'; } 
+            else if (statusText.toUpperCase() === 'PENDING') { data.cell.styles.textColor = [200, 0, 0]; data.cell.styles.fontStyle = 'bold'; }
           }
         }
       });
@@ -372,23 +402,29 @@ const Supervisor = () => {
     setIsBottomPdfLoading(false);
   };
 
-  const submitBottomSignature = async () => {
-    if (bottomSigCanvas.current.isEmpty()) { toast.warning("Please provide your signature."); return; }
-    const signatureData = bottomSigCanvas.current.getCanvas().toDataURL("image/png");
+const submitBottomSignature = async () => {
     const localDate = new Date(selectedBottomReport.reportDate);
     const offset = localDate.getTimezoneOffset();
     const cleanDate = new Date(localDate.getTime() - (offset * 60 * 1000)).toISOString().split('T')[0];
 
     try {
-      await axios.post(`${API_BASE}/bottom-level-audit/sign-supervisor`, { date: cleanDate, disaMachine: selectedBottomReport.disa, signature: signatureData });
-      toast.success("Bottom Level Audit approved!"); setSelectedBottomReport(null); fetchBottomReports();
-    } catch (err) { toast.error("Failed to save signature."); }
+      await axios.post(`${API_BASE}/bottom-level-audit/sign-supervisor`, { 
+        date: cleanDate, 
+        disaMachine: selectedBottomReport.disa, 
+        signature: "APPROVED" 
+      });
+      toast.success("Bottom Level Audit approved!"); 
+      setSelectedBottomReport(null); 
+      fetchBottomReports();
+    } catch (err) { 
+      toast.error("Failed to save approval."); 
+    }
   };
 
   // ==========================================
   // 4. NCR LOGIC (🔥 FETCHES FROM BOTH LPA AND CHECKLIST)
   // ==========================================
-  const fetchNcrReports = async () => {
+const fetchNcrReports = async () => {
     try {
       let lpaData = [];
       let checklistData = [];
@@ -412,9 +448,6 @@ const Supervisor = () => {
   };
 
   const submitNcrSignature = async () => {
-    if (ncrSigCanvas.current.isEmpty()) { toast.warning("Please provide your signature."); return; }
-    const signatureData = ncrSigCanvas.current.getCanvas().toDataURL("image/png");
-    
     try {
       const endpoint = selectedNcrReport.source === 'Checklist' 
           ? '/disa-checklist/sign-ncr' 
@@ -422,14 +455,14 @@ const Supervisor = () => {
 
       await axios.post(`${process.env.REACT_APP_API_URL}${endpoint}`, { 
         reportId: selectedNcrReport.ReportId || selectedNcrReport.id, 
-        signature: signatureData 
+        signature: "APPROVED" 
       });
       
       toast.success("NCR Verified and Completed!"); 
       setSelectedNcrReport(null); 
       fetchNcrReports(); 
     } catch (err) { 
-      toast.error("Failed to save NCR signature."); 
+      toast.error("Failed to save NCR approval."); 
     }
   };
 
@@ -505,11 +538,39 @@ const Supervisor = () => {
             });
          }
          autoTable(doc, {
-            startY: currentY, margin: { left: 5, right: 5 }, head: tableHeader, body: tableBody, theme: 'grid',
-            styles: { fontSize: 5.5, cellPadding: 0.8, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0], halign: 'center', valign: 'middle' },
-            headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 5 },
-            columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 25 }, 2: { cellWidth: 28 }, 19: { cellWidth: 'auto' } }
-         });
+        startY: 35, margin: { left: 10, right: 10 }, 
+        head: [['SHIFT', 'OPERATOR NAME', 'VERIFIED BY', 'SIGNATURE']],
+        body: [
+            ['SHIFT I', shiftsMeta[1].operator || '-', shiftsMeta[1].supervisor || '-', ''],
+            ['SHIFT II', shiftsMeta[2].operator || '-', shiftsMeta[2].supervisor || '-', ''],
+            ['SHIFT III', shiftsMeta[3].operator || '-', shiftsMeta[3].supervisor || '-', '']
+        ],
+        theme: 'grid', styles: { fontSize: 8, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1, halign: 'center', valign: 'middle' },
+        headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+        didDrawCell: function (data) {
+          if (data.section === 'body' && data.column.index === 3) {
+            const shiftNum = data.row.index + 1;
+            const sig = shiftsMeta[shiftNum]?.supervisorSignature;
+
+            if (sig && String(sig).trim().toUpperCase() === "APPROVED") {
+              // Draw rightmark + APPROVED text
+              doc.setDrawColor(0, 128, 0); doc.setLineWidth(0.5);
+              doc.line(data.cell.x + 2, data.cell.y + 4, data.cell.x + 4, data.cell.y + 6);
+              doc.line(data.cell.x + 4, data.cell.y + 6, data.cell.x + 8, data.cell.y + 2);
+              doc.setDrawColor(0, 0, 0);
+              
+              doc.setFontSize(5);
+              doc.setTextColor(0, 128, 0);
+              doc.setFont('helvetica', 'bold');
+              doc.text("APPROVED", data.cell.x + 9, data.cell.y + 5);
+              doc.setTextColor(0, 0, 0); 
+              doc.setFont('helvetica', 'normal');
+            } else if (sig && String(sig).startsWith('data:image')) { 
+              try { doc.addImage(sig, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch (e) { } 
+            }
+          }
+        }
+      });
 
          currentY = doc.lastAutoTable.finalY + 5; 
          if (currentY > 175 && index < 2) { 
@@ -525,16 +586,21 @@ const Supervisor = () => {
   };
 
   const submitDmmSignature = async () => {
-    if (dmmSigCanvas.current.isEmpty()) { toast.warning("Please provide your signature."); return; }
-    const signatureData = dmmSigCanvas.current.getCanvas().toDataURL("image/png");
+    // Removed canvas check
     const localDate = new Date(selectedDmmReport.reportDate);
     const offset = localDate.getTimezoneOffset();
     const cleanDate = new Date(localDate.getTime() - (offset * 60 * 1000)).toISOString().split('T')[0];
 
     try {
-      await axios.post(`${API_BASE}/dmm-settings/sign`, { date: cleanDate, disaMachine: selectedDmmReport.disa, shift: selectedDmmReport.shift, signature: signatureData });
+      await axios.post(`${API_BASE}/dmm-settings/sign`, { 
+        date: cleanDate, 
+        disaMachine: selectedDmmReport.disa, 
+        shift: selectedDmmReport.shift, 
+        signature: "APPROVED" // Pass the string here!
+      });
       toast.success("DMM Settings Shift signed successfully!");
-      setSelectedDmmReport(null); fetchDmmReports();
+      setSelectedDmmReport(null); 
+      fetchDmmReports();
     } catch (err) { toast.error("Failed to save signature."); }
   };
 
@@ -1038,14 +1104,10 @@ const Supervisor = () => {
                     <p><span className="font-bold">Date:</span> {formatDate(selectedBottomReport.reportDate)}</p>
                     <p><span className="font-bold">Machine:</span> {selectedBottomReport.disa}</p>
                   </div>
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 block">Supervisor Signature</label>
-                  <div className="border-2 border-dashed border-gray-300 bg-white rounded-xl overflow-hidden mb-2 shadow-inner">
-                    <SignatureCanvas ref={bottomSigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-64 cursor-crosshair' }} />
-                  </div>
-                  <button onClick={() => bottomSigCanvas.current.clear()} className="text-xs text-gray-500 hover:text-red-600 font-bold uppercase tracking-wider underline self-end mb-8">Clear Signature</button>
+                  
                   <div className="mt-auto">
                       <button onClick={submitBottomSignature} className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">
-                        Approve & Sign
+                        Approve Report
                       </button>
                   </div>
               </div>
@@ -1075,14 +1137,12 @@ const Supervisor = () => {
                     <p><span className="font-bold">Shift:</span> Shift {selectedDmmReport.shift}</p>
                     <p><span className="font-bold">Machine:</span> {selectedDmmReport.disa}</p>
                   </div>
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 block">Supervisor Signature</label>
-                  <div className="border-2 border-dashed border-gray-300 bg-white rounded-xl overflow-hidden mb-2 shadow-inner">
-                    <SignatureCanvas ref={dmmSigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-64 cursor-crosshair' }} />
-                  </div>
-                  <button onClick={() => dmmSigCanvas.current.clear()} className="text-xs text-gray-500 hover:text-red-600 font-bold uppercase tracking-wider underline self-end mb-8">Clear Signature</button>
+                  
+                  {/* SignatureCanvas Removed! */}
+
                   <div className="mt-auto">
-                      <button onClick={submitDmmSignature} className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">
-                        Approve & Sign
+                      <button onClick={submitDmmSignature} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">
+                        Approve Report
                       </button>
                   </div>
               </div>
@@ -1202,7 +1262,10 @@ const Supervisor = () => {
       {selectedNcrReport && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="bg-red-600 text-white px-6 py-4 flex justify-between items-center shrink-0"><h3 className="font-bold text-lg">Verify Non-Conformance Report</h3><button onClick={() => setSelectedNcrReport(null)} className="text-red-200 hover:text-white font-bold text-2xl leading-none">&times;</button></div>
+            <div className="bg-red-600 text-white px-6 py-4 flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-lg">Verify Non-Conformance Report</h3>
+              <button onClick={() => setSelectedNcrReport(null)} className="text-red-200 hover:text-white font-bold text-2xl leading-none">&times;</button>
+            </div>
             <div className="p-6 overflow-y-auto">
                <div className="bg-red-50 p-4 rounded-lg border border-red-200 mb-6 flex flex-col gap-3 text-sm text-gray-800">
                   <div className="flex justify-between border-b border-red-200 pb-2">
@@ -1210,15 +1273,21 @@ const Supervisor = () => {
                       <p><span className="font-bold">Date:</span> {formatDate(selectedNcrReport.ReportDate)}</p>
                       <p><span className="font-bold">Machine:</span> {selectedNcrReport.DisaMachine}</p>
                   </div>
-                  <p><span className="font-bold">NC Details:</span> {selectedNcrReport.NonConformityDetails || 'N/A'}</p><p><span className="font-bold">Correction:</span> {selectedNcrReport.Correction || 'N/A'}</p><p><span className="font-bold">Root Cause:</span> {selectedNcrReport.RootCause || 'N/A'}</p><p><span className="font-bold">Corrective Action:</span> {selectedNcrReport.CorrectiveAction || 'N/A'}</p>
+                  <p><span className="font-bold">NC Details:</span> {selectedNcrReport.NonConformityDetails || 'N/A'}</p>
+                  <p><span className="font-bold">Correction:</span> {selectedNcrReport.Correction || 'N/A'}</p>
+                  <p><span className="font-bold">Root Cause:</span> {selectedNcrReport.RootCause || 'N/A'}</p>
+                  <p><span className="font-bold">Corrective Action:</span> {selectedNcrReport.CorrectiveAction || 'N/A'}</p>
                </div>
-               <label className="block text-gray-800 font-bold mb-2 text-sm">Sign below to confirm resolution:</label><div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg overflow-hidden mb-2"><SignatureCanvas ref={ncrSigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-40 cursor-crosshair' }} /></div><div className="flex justify-end mb-6"><button onClick={() => ncrSigCanvas.current.clear()} className="text-sm text-red-500 hover:text-red-700 font-bold underline">Clear Pad</button></div>
-               <div className="flex flex-col gap-3"><button onClick={submitNcrSignature} className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded font-bold shadow-md text-lg">Verify & Complete NCR</button></div>
+               
+               <div className="flex flex-col gap-3 mt-4">
+                 <button onClick={submitNcrSignature} className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-lg font-bold shadow-md text-lg tracking-wider uppercase transition-transform hover:-translate-y-1">
+                   Approve & Complete NCR
+                 </button>
+               </div>
             </div>
           </div>
         </div>
       )}
-
     </>
   );
 };

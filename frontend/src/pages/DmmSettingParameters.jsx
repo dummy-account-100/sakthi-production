@@ -3,7 +3,6 @@ import axios from 'axios';
 import { X, CheckCircle, AlertTriangle, FileDown, Loader, Save, PlusCircle, Trash2, Lock, Send } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import SignatureCanvas from 'react-signature-canvas';
 import Header from '../components/Header';
 import logo from '../Assets/logo.png';
 
@@ -116,8 +115,8 @@ const DmmSettingParameters = () => {
   const [headerData, setHeaderData] = useState({ 
     date: getShiftDate(), 
     disaMachine: 'DISA - I',
-    assignedHOF: '', // 🔥 NEW
-    isHofSent: false // 🔥 NEW
+    assignedHOF: '', 
+    isHofSent: false 
   });
   const [allColumns, setAllColumns] = useState([...baseColumns]);
 
@@ -129,12 +128,10 @@ const DmmSettingParameters = () => {
 
   const [shiftsData, setShiftsData] = useState({ 1: [], 2: [], 3: [] });
   const [submittedShifts, setSubmittedShifts] = useState(new Set());
-  const [dropdowns, setDropdowns] = useState({ operators: [], supervisors: [], hofs: [] }); // 🔥 ADDED HOFS
+  const [dropdowns, setDropdowns] = useState({ operators: [], supervisors: [], hofs: [] }); 
   const [qfHistory, setQfHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState({ show: false, type: '', message: '' });
-
-  const sigRefs = { 1: useRef(null), 2: useRef(null), 3: useRef(null) };
 
   useEffect(() => { loadSchemaAndData(); }, [headerData.date, headerData.disaMachine]);
 
@@ -156,10 +153,9 @@ const DmmSettingParameters = () => {
       setDropdowns({ 
         operators: res.data.operators || [], 
         supervisors: res.data.supervisors || [], 
-        hofs: res.data.hofs || [] // 🔥 NEW
+        hofs: res.data.hofs || [] 
       });
 
-      // Track assignment state
       setHeaderData(prev => ({ 
         ...prev, 
         assignedHOF: res.data.assignedHOF || '',
@@ -235,13 +231,10 @@ const DmmSettingParameters = () => {
     });
   };
 
-  // 🔥 NEW: Dynamic Save Handler with Shift 3 Validation for HOF Submission
   const saveToServer = async (isHofSubmission = false) => {
     const activeShifts = getActiveShifts();
 
-    // Specific logic when sending to HOF
     if (isHofSubmission) {
-      // Must have Shift 3 completed (either actively saving now or already locked in DB)
       const shift3Done = activeShifts.includes(3) || submittedShifts.has(3);
       if (!shift3Done) {
         return setNotification({ show: true, type: 'error', message: 'You can only send to the HOF after completing the 3rd shift.' });
@@ -256,7 +249,6 @@ const DmmSettingParameters = () => {
       return setNotification({ show: true, type: 'error', message: 'Please select an operator (or mark as Line Idle) for at least one new shift before submitting.' });
     }
 
-    // Validate only active (non-submitted) shifts
     let hasEmpty = false;
     let emptyShift = null;
 
@@ -300,7 +292,7 @@ const DmmSettingParameters = () => {
         shiftsData,
         shiftsMeta,
         shiftsToSave: activeShifts,
-        assignedHOF: finalHOF // 🔥 Pass HOF selection to Backend
+        assignedHOF: finalHOF 
       });
 
       if (isHofSubmission) {
@@ -367,7 +359,17 @@ const DmmSettingParameters = () => {
           if (data.section === 'body' && data.column.index === 3) {
             const shiftNum = data.row.index + 1;
             const sigData = shiftsMeta[shiftNum]?.supervisorSignature;
-            if (sigData && sigData.startsWith('data:image')) {
+            
+            if (sigData && String(sigData).trim().toUpperCase() === 'APPROVED') {
+              doc.setDrawColor(0, 128, 0); doc.setLineWidth(0.5);
+              doc.line(data.cell.x + 2, data.cell.y + 4, data.cell.x + 4, data.cell.y + 6);
+              doc.line(data.cell.x + 4, data.cell.y + 6, data.cell.x + 8, data.cell.y + 2);
+              doc.setDrawColor(0, 0, 0);
+
+              doc.setFontSize(5); doc.setTextColor(0, 128, 0); doc.setFont('helvetica', 'bold');
+              doc.text("APPROVED", data.cell.x + 9, data.cell.y + 5);
+              doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal');
+            } else if (sigData && String(sigData).startsWith('data:image')) {
               try { doc.addImage(sigData, 'PNG', data.cell.x + 2, data.cell.y + 1, data.cell.width - 4, data.cell.height - 2); } catch (e) { }
             }
           }

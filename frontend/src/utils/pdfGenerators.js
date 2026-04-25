@@ -379,8 +379,23 @@ export const generateDmmSettingPDF = async (data, dateRange) => {
                 didDrawCell: function (data) {
                     if (data.section === 'body' && data.column.index === 3) {
                         const m = machineData.shiftsMeta[data.row.index + 1] || {};
-                        if (m.supervisorSignature && m.supervisorSignature.startsWith('data:image')) {
-                            try { doc.addImage(m.supervisorSignature, 'PNG', data.cell.x + 2, data.cell.y + 1, data.cell.width - 4, data.cell.height - 2); } catch (e) { }
+                        const sig = m.supervisorSignature;
+
+                        if (sig && String(sig).trim().toUpperCase() === "APPROVED") {
+                            // Draw rightmark + APPROVED text
+                            doc.setDrawColor(0, 128, 0); doc.setLineWidth(0.5);
+                            doc.line(data.cell.x + 2, data.cell.y + 4, data.cell.x + 4, data.cell.y + 6);
+                            doc.line(data.cell.x + 4, data.cell.y + 6, data.cell.x + 8, data.cell.y + 2);
+                            doc.setDrawColor(0, 0, 0);
+                            
+                            doc.setFontSize(5);
+                            doc.setTextColor(0, 128, 0);
+                            doc.setFont('helvetica', 'bold');
+                            doc.text("APPROVED", data.cell.x + 9, data.cell.y + 5);
+                            doc.setTextColor(0, 0, 0); 
+                            doc.setFont('helvetica', 'normal');
+                        } else if (sig && String(sig).startsWith('data:image')) { 
+                            try { doc.addImage(sig, 'PNG', data.cell.x + 2, data.cell.y + 1, data.cell.width - 4, data.cell.height - 2); } catch (e) { } 
                         }
                     }
                 }
@@ -505,7 +520,6 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
         const [year, month] = monthKey.split('-');
         const reportMonthDate = new Date(year, parseInt(month) - 1, 1);
 
-        // 🔥 MATCH QF VALUE TO CURRENT FORM DATE
         let reportDateStr = monthKey + '-01';
         if (machineTrans && machineTrans.length > 0) {
             reportDateStr = machineTrans[0].LogDate || machineTrans[0].RecordDate || machineTrans[0].date;
@@ -519,10 +533,12 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
         const prevMaintDays = new Set();
         const sig1Map = {};
         const sig2Map = {};
+        let monthlyHofSig = null; // Used to capture the single HOF signature for the month
 
         machineTrans.forEach(log => {
-            const dateObj = new Date(log.LogDate || log.RecordDate || log.date);
-            const logDay = dateObj.getDate();
+            const logDateStr = getSafeDateStr(log.LogDate || log.RecordDate || log.date);
+            const logDay = logDateStr ? parseInt(logDateStr.split('-')[2], 10) : 1;
+
             const key = String(log.MasterId);
 
             const isHol = Number(log.IsHoliday) === 1 || log.IsHoliday === true || String(log.IsHoliday) === '1';
@@ -533,11 +549,20 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
             else if (isVat) vatDays.add(logDay);
             else if (isPM) prevMaintDays.add(logDay);
 
-            if (log.OperatorSignature) sig1Map[logDay] = log.OperatorSignature;
-            if (log.SupervisorSignature) sig1Map[logDay] = log.SupervisorSignature;
+            const opSig = log.OperatorSignature || log.operatorSignature || log.OperatorSign || log.Sign || log.sign;
+            const supSig = log.SupervisorSignature || log.supervisorSignature || log.SupervisorSign;
+            const hodSig = log.HODSignature || log.hodSignature || log.HodSignature || log.HODSign;
+            const hofSig = log.HOFSignature || log.hofSignature || log.HofSignature || log.HOFSign;
 
-            if (log.HODSignature) sig2Map[logDay] = log.HODSignature;
-            if (log.HOFSignature) sig2Map[logDay] = log.HOFSignature;
+            if (isLPA) {
+                if (supSig && String(supSig).trim() !== '' && String(supSig) !== 'null') sig1Map[logDay] = supSig;
+                if (!monthlyHofSig && hofSig && String(hofSig).trim() !== '' && String(hofSig) !== 'null') {
+                    monthlyHofSig = hofSig; // Capture the HOF signature for the entire month
+                }
+            } else {
+                if (opSig && String(opSig).trim() !== '' && String(opSig) !== 'null') sig1Map[logDay] = opSig;
+                if (hodSig && String(hodSig).trim() !== '' && String(hodSig) !== 'null') sig2Map[logDay] = hodSig;
+            }
 
             if (!historyMap[key]) historyMap[key] = {};
 
@@ -552,7 +577,7 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
             }
         });
 
-        // 🔥 PAGE 1 HEADER 🔥
+        // PAGE 1 HEADER
         doc.setLineWidth(0.3);
         doc.rect(10, 10, 40, 20);
         try {
@@ -600,7 +625,18 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
 
         for (let i = 1; i <= 31; i++) {
             sig1Row.push("");
-            sig2Row.push("");
+        }
+
+        if (isLPA) {
+            // For Bottom Level Audit, leave space and span the last 5 columns for HOF signature
+            for (let i = 1; i <= 31 - 5; i++) {
+                sig2Row.push("");
+            }
+            sig2Row.push({ content: '', colSpan: 5, styles: { halign: 'center', valign: 'middle' } });
+        } else {
+            for (let i = 1; i <= 31; i++) {
+                sig2Row.push("");
+            }
         }
 
         const footerRows = [sig1Row, sig2Row];
@@ -609,18 +645,54 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
 
         autoTable(doc, {
             startY: 35,
+            margin: { left: 10, right: 10 }, 
             head: [['Sl.No', 'CHECK POINTS', 'CHECK METHOD', ...days]],
             body: [...tableBody, ...footerRows],
-            theme: 'grid', styles: { fontSize: 6, cellPadding: 0.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0], valign: 'middle' },
+            theme: 'grid', 
+            styles: { fontSize: 6, cellPadding: 0.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0], valign: 'middle' },
             headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0] },
             columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 60 }, 2: { cellWidth: 25 }, ...dynamicColumnStyles },
             didDrawCell: function (data) {
                 if (data.row.index >= tableBody.length && data.column.index > 2) {
                     const dayIndex = data.column.index - 2;
                     const isSig1Row = data.row.index === tableBody.length;
+                    const isSig2Row = data.row.index === tableBody.length + 1;
+                    
+                    let sigData = null;
 
-                    const sigData = isSig1Row ? sig1Map[dayIndex] : sig2Map[dayIndex];
-                    if (sigData && sigData.startsWith('data:image')) {
+                    if (isSig1Row) {
+                        sigData = sig1Map[dayIndex];
+                    } else if (isSig2Row) {
+                        if (isLPA) {
+                            if (data.cell.colSpan === 5) {
+                                sigData = monthlyHofSig; // Uses the month-end HOF signature
+                            }
+                        } else {
+                            sigData = sig2Map[dayIndex]; // Disa HOD daily signature
+                        }
+                    }
+                    
+                    if (sigData && String(sigData).trim().toUpperCase() === "APPROVED") {
+                        const cx = data.cell.x + data.cell.width / 2;
+                        const cy = data.cell.y + data.cell.height / 2;
+                        
+                        if (isLPA && isSig2Row && data.cell.colSpan === 5) {
+                            // 🔥 Draw right mark + APPROVED text at the end for HOF 
+                            doc.setDrawColor(0, 128, 0); doc.setLineWidth(0.5);
+                            doc.line(cx - 2, cy - 1.5, cx - 0.5, cy + 0.5);
+                            doc.line(cx - 0.5, cy + 0.5, cx + 2.5, cy - 2.5);
+                            doc.setDrawColor(0, 0, 0);
+                            doc.setFontSize(5); doc.setTextColor(0, 128, 0); doc.setFont('helvetica', 'bold');
+                            doc.text("APPROVED", cx, cy + 2.5, { align: 'center' });
+                            doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
+                        } else {
+                            // Standard daily green tick
+                            doc.setDrawColor(0, 128, 0); doc.setLineWidth(0.6); 
+                            doc.line(cx - 1.5, cy, cx - 0.5, cy + 1.5);
+                            doc.line(cx - 0.5, cy + 1.5, cx + 2, cy - 1.5);
+                            doc.setDrawColor(0, 0, 0); 
+                        }
+                    } else if (sigData && String(sigData).startsWith('data:image')) {
                         doc.setFillColor(255, 255, 255);
                         doc.rect(data.cell.x + 0.5, data.cell.y + 0.5, data.cell.width - 1, data.cell.height - 1, 'F');
                         try { doc.addImage(sigData, 'PNG', data.cell.x + 0.5, data.cell.y + 0.5, data.cell.width - 1, data.cell.height - 1); } catch (e) { }
@@ -629,11 +701,10 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
             },
             didParseCell: function (data) {
                 if (data.row.index >= tableBody.length && data.column.index === 1) data.cell.styles.fontStyle = 'bold';
-
                 if (data.row.index >= tableBody.length && data.column.index > 2) {
-                    data.cell.text = [];
+                    data.cell.text = [''];
+                    data.cell.styles.minCellHeight = 8;
                 }
-
                 if (data.column.index > 2 && data.row.index < tableBody.length) {
                     const text = data.cell.text?.[0] || '';
                     if (text === 'Y') { data.cell.styles.font = 'ZapfDingbats'; data.cell.text = ['3']; data.cell.styles.textColor = [0, 100, 0]; }
@@ -652,10 +723,10 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
 
         doc.text(currentPageQfValue, 10, 200);
 
+        // Render Page 2 (NCR Table) if any exist
         if (machineNc.length > 0) {
             doc.addPage();
 
-            // 🔥 PAGE 2 HEADER (NCR) 🔥
             doc.setLineWidth(0.3);
             doc.rect(10, 10, 40, 20);
             try {
@@ -669,40 +740,70 @@ export const generateChecklistPDF = (data, dateRange, title1, title2) => {
             doc.text(title2, 168.5, 18, { align: 'center' }); doc.setFontSize(14);
             doc.text("Non-Conformance Report", 168.5, 26, { align: 'center' });
 
-            const ncRows = machineNc.map((report, index) => [
-                index + 1, formatDate(report.ReportDate || report.RecordDate || report.date), report.NonConformityDetails || '', report.Correction || '',
-                report.RootCause || '', report.CorrectiveAction || '', report.TargetDate ? formatDate(report.TargetDate) : '',
-                report.Responsibility || '', report.Sign || '', report.Status || ''
-            ]);
+            const ncRows = machineNc.map((report, index) => {
+                const signatureVal = report.Sign || report.sign || report.SupervisorSignature || report.supervisorSignature || report.HODSignature || report.hodSignature || report.HodSignature || '';
+                return [
+                    index + 1, formatDate(report.ReportDate || report.RecordDate || report.date), report.NonConformityDetails || '', report.Correction || '',
+                    report.RootCause || '', report.CorrectiveAction || '', report.TargetDate ? formatDate(report.TargetDate) : '',
+                    report.Responsibility || '', signatureVal, report.Status || ''
+                ];
+            });
 
             autoTable(doc, {
                 startY: 35,
-                // 🔥 Always use Signature column header, removed the isLPA restriction
+                margin: { left: 10, right: 10 }, 
                 head: [['S.No', 'Date', 'Non-Conformities Details', 'Correction', 'Root Cause', 'Corrective Action', 'Target Date', 'Responsibility', 'Signature', 'Status']],
-                body: ncRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0], valign: 'top', overflow: 'linebreak' },
+                body: ncRows, 
+                theme: 'grid', 
+                styles: { fontSize: 8, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0], valign: 'top', overflow: 'linebreak' },
                 headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0], fontStyle: 'bold', halign: 'center', valign: 'middle' },
-                columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 20, halign: 'center' }, 2: { cellWidth: 40 }, 3: { cellWidth: 35 }, 4: { cellWidth: 35 }, 5: { cellWidth: 35 }, 6: { cellWidth: 20, halign: 'center' }, 7: { cellWidth: 25 }, 8: { cellWidth: 20, halign: 'center' }, 9: { cellWidth: 20, halign: 'center' } },
+                columnStyles: { 
+                    0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 16, halign: 'center' }, 6: { cellWidth: 16, halign: 'center' }, 
+                    7: { cellWidth: 20 }, 8: { cellWidth: 20, halign: 'center' }, 9: { cellWidth: 18, halign: 'center' } 
+                },
                 didDrawCell: function (data) {
-                    // 🔥 Removed the isLPA check so both LPA and Checklists can draw the Signature image
                     if (data.section === 'body' && data.column.index === 8) {
-                        const rowData = machineNc[data.row.index];
-                        if (rowData && rowData.SupervisorSignature && rowData.SupervisorSignature.startsWith('data:image')) {
-                            try { doc.addImage(rowData.SupervisorSignature, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch (e) { }
+                        const sig = data.row.raw[8];
+                        const status = data.row.raw[9];
+                        
+                        const isApproved = (sig && String(sig).trim().toUpperCase() === "APPROVED") || 
+                                           (status && String(status).trim().toUpperCase() === "COMPLETED");
+
+                        if (isApproved) {
+                            const cx = data.cell.x + data.cell.width / 2;
+                            const cy = data.cell.y + data.cell.height / 2;
+
+                            doc.setDrawColor(0, 128, 0); 
+                            doc.setLineWidth(0.5);
+                            doc.line(cx - 2, cy - 1.5, cx - 0.5, cy + 0.5);
+                            doc.line(cx - 0.5, cy + 0.5, cx + 2.5, cy - 2.5);
+                            doc.setDrawColor(0, 0, 0); 
+
+                            doc.setFontSize(5);
+                            doc.setTextColor(0, 128, 0);
+                            doc.setFont('helvetica', 'bold');
+                            doc.text("APPROVED", cx, cy + 2.5, { align: 'center' });
+                            
+                            doc.setFont('helvetica', 'normal');
+                            doc.setTextColor(0, 0, 0);
+                        } else if (sig && String(sig).startsWith('data:image')) {
+                            try { doc.addImage(sig, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch (e) { }
                         }
                     }
                 },
                 didParseCell: function (data) {
-                    // 🔥 If a signature image exists, wipe out the cell text so it doesn't overlap the drawing
                     if (data.section === 'body' && data.column.index === 8) {
-                        const rowData = machineNc[data.row.index];
-                        if (rowData && rowData.SupervisorSignature && rowData.SupervisorSignature.startsWith('data:image')) {
-                            data.cell.text = [];
-                        }
+                        data.cell.text = [''];
                     }
                     if (data.section === 'body' && data.column.index === 9) {
-                        const statusText = (data.cell.text || [])[0] || '';
-                        if (statusText === 'Completed') { data.cell.styles.textColor = [0, 150, 0]; data.cell.styles.fontStyle = 'bold'; }
-                        else if (statusText === 'Pending') { data.cell.styles.textColor = [200, 0, 0]; data.cell.styles.fontStyle = 'bold'; }
+                        const statusText = String(data.row.raw[9] || '');
+                        if (statusText.toUpperCase() === 'COMPLETED') { 
+                            data.cell.styles.textColor = [0, 150, 0]; 
+                            data.cell.styles.fontStyle = 'bold'; 
+                        } else if (statusText.toUpperCase() === 'PENDING') { 
+                            data.cell.styles.textColor = [200, 0, 0]; 
+                            data.cell.styles.fontStyle = 'bold'; 
+                        }
                     }
                 }
             });

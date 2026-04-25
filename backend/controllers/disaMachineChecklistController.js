@@ -170,7 +170,7 @@ exports.getMonthlyReport = async (req, res) => {
       WHERE MONTH(LogDate) = ${month} AND YEAR(LogDate) = ${year} AND DisaMachine = ${disaMachine}
     `;
 
-    // 🔥 FIX: Added SupervisorSignature to the SELECT query here
+    // Added SupervisorSignature for the NCR payload
     const ncResult = await sql.query`
       SELECT ReportId, ReportDate, NonConformityDetails, Correction, RootCause, CorrectiveAction, TargetDate, Responsibility, Sign, Status, SupervisorSignature
       FROM DisaNonConformanceReport

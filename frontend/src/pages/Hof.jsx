@@ -112,7 +112,7 @@ const [errorReports, setErrorReports] = useState([]);
   const [selectedDailyReport, setSelectedDailyReport] = useState(null);
   const [dailyPdfUrl, setDailyPdfUrl] = useState(null);
   const [isDailyPdfLoading, setIsDailyPdfLoading] = useState(false);
-  const dailySigCanvas = useRef({});
+
 
   // States for Unpoured Mould Details (VIEW ONLY)
   const [unpouredReports, setUnpouredReports] = useState([]);
@@ -212,7 +212,7 @@ const [errorReports, setErrorReports] = useState([]);
     } catch (err) { toast.error("Failed to save Daily Performance approval."); }
   };
 
-  const handleOpenSignModal = async (report) => {
+const handleOpenSignModal = async (report) => {
     setSelectedReport(report); setPdfUrl(null); setIsPdfLoading(true);
     try {
       const month = report.month; const year = report.year; const disaMachine = report.disa;
@@ -279,7 +279,19 @@ const [errorReports, setErrorReports] = useState([]);
                if (sigData && sigData.startsWith('data:image')) { try { doc.addImage(sigData, 'PNG', data.cell.x + 0.5, data.cell.y + 0.5, data.cell.width - 1, data.cell.height - 1); } catch(e){} }
            }
            if (data.row.index === tableBody.length + 1 && data.cell.colSpan === 5) { 
-               if (hofSig && hofSig.startsWith('data:image')) { try { doc.addImage(hofSig, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch(e){} }
+               if (hofSig && String(hofSig).trim().toUpperCase() === "APPROVED") {
+                   const cx = data.cell.x + data.cell.width / 2;
+                   const cy = data.cell.y + data.cell.height / 2;
+                   doc.setDrawColor(0, 128, 0); doc.setLineWidth(0.5);
+                   doc.line(cx - 2, cy - 1.5, cx - 0.5, cy + 0.5);
+                   doc.line(cx - 0.5, cy + 0.5, cx + 2.5, cy - 2.5);
+                   doc.setDrawColor(0, 0, 0);
+                   doc.setFontSize(5); doc.setTextColor(0, 128, 0); doc.setFont('helvetica', 'bold');
+                   doc.text("APPROVED", cx, cy + 2.5, { align: 'center' });
+                   doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
+               } else if (hofSig && hofSig.startsWith('data:image')) { 
+                   try { doc.addImage(hofSig, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch(e){} 
+               }
            }
         },
         didParseCell: function(data) {
@@ -306,16 +318,18 @@ const [errorReports, setErrorReports] = useState([]);
     setIsPdfLoading(false);
   };
 
-  const submitSignature = async () => {
-    if (sigCanvas.current.isEmpty()) { toast.warning("Please provide a signature first."); return; }
-    const signatureData = sigCanvas.current.getCanvas().toDataURL("image/png");
+const submitSignature = async () => {
     try {
-      await axios.post(`${API_BASE_BOTTOM_AUDIT}/sign-hof`, { month: selectedReport.month, year: selectedReport.year, disaMachine: selectedReport.disa, signature: signatureData });
+      await axios.post(`${API_BASE_BOTTOM_AUDIT}/sign-hof`, { 
+        month: selectedReport.month, 
+        year: selectedReport.year, 
+        disaMachine: selectedReport.disa, 
+        signature: "APPROVED" 
+      });
       toast.success("Monthly Audit approved and signed!");
       setSelectedReport(null); fetchReports(); 
     } catch (err) { toast.error("Failed to save signature."); }
   };
-
 const handleOpenErrorModal = async (report) => {
     setSelectedErrorReport(report); 
     setErrorPdfUrl(null); 
@@ -1106,14 +1120,10 @@ const handleOpenErrorModal = async (report) => {
                   <p><span className="font-bold">Month:</span> {new Date(selectedReport.year, selectedReport.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
                   <p><span className="font-bold">Machine:</span> {selectedReport.disa}</p>
                 </div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 block">HOF Signature</label>
-                <div className="border-2 border-dashed border-gray-300 bg-white rounded-xl overflow-hidden mb-2 shadow-inner">
-                  <SignatureCanvas ref={sigCanvas} penColor="blue" canvasProps={{ className: 'w-full h-64 cursor-crosshair' }} />
-                </div>
-                <button onClick={() => { if(sigCanvas.current) sigCanvas.current.clear() }} className="text-xs text-gray-500 hover:text-red-600 font-bold uppercase tracking-wider underline self-end mb-8">Clear Signature</button>
+                
                 <div className="mt-auto">
                   <button onClick={submitSignature} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-black text-lg uppercase tracking-wider shadow-lg transition-transform hover:-translate-y-1">
-                    Approve & Sign
+                    Approve Monthly Audit
                   </button>
                 </div>
               </div>

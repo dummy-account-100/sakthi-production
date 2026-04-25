@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { X, CheckCircle, AlertTriangle, FileDown, Loader, Save } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import SignatureCanvas from 'react-signature-canvas';
 import Header from '../components/Header';
 import logo from '../Assets/logo.png'; // Make sure this path is correct
 
@@ -175,20 +174,19 @@ const BottomLevelAudit = () => {
       const selectedDate = new Date(headerData.date);
       const year = selectedDate.getFullYear(); const month = selectedDate.getMonth() + 1;
       let monthlyLogs = []; let ncReports = [];
-      let qfHistory = []; // 🔥
+      let qfHistory = []; 
 
       try {
         const res = await axios.get(`${API_BASE_BOTTOM}/monthly-report`, { params: { month, year, disaMachine: headerData.disaMachine } });
         monthlyLogs = res.data.monthlyLogs || []; 
         ncReports = res.data.ncReports || [];
-        qfHistory = res.data.qfHistory || []; // 🔥 Fetch History
+        qfHistory = res.data.qfHistory || []; 
       } catch (backendErr) {
         console.error("Backend Error:", backendErr);
         setNotification({ show: true, type: 'error', message: 'Database Error: Check backend console.' });
         return;
       }
 
-      // 🔥 FIND CORRECT QF VALUE
       let currentPageQfValue = "QF/08/MRO - 18, Rev No: 02 dt 01.01.2022";
       const reportDateObj = new Date(year, month - 1, 1);
       for (let qf of qfHistory) {
@@ -268,10 +266,30 @@ const BottomLevelAudit = () => {
         didDrawCell: function (data) {
           if (data.row.index === tableBody.length && data.column.index > 1) {
             const sigData = supSigMap[data.column.index - 1];
-            if (sigData && sigData.startsWith('data:image')) { try { doc.addImage(sigData, 'PNG', data.cell.x + 0.5, data.cell.y + 0.5, data.cell.width - 1, data.cell.height - 1); } catch (e) { } }
+            if (sigData && String(sigData).trim().toUpperCase() === "APPROVED") {
+               doc.setDrawColor(0, 128, 0); doc.setLineWidth(0.3);
+               const cx = data.cell.x + data.cell.width / 2;
+               const cy = data.cell.y + data.cell.height / 2;
+               doc.line(cx - 1, cy, cx - 0.2, cy + 1); doc.line(cx - 0.2, cy + 1, cx + 1.5, cy - 1);
+               doc.setDrawColor(0, 0, 0);
+            } else if (sigData && sigData.startsWith('data:image')) { 
+               try { doc.addImage(sigData, 'PNG', data.cell.x + 0.5, data.cell.y + 0.5, data.cell.width - 1, data.cell.height - 1); } catch (e) { } 
+            }
           }
           if (data.row.index === tableBody.length + 1 && data.cell.colSpan === 5) {
-            if (hofSig && hofSig.startsWith('data:image')) { try { doc.addImage(hofSig, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch (e) { } }
+            if (hofSig && String(hofSig).trim().toUpperCase() === "APPROVED") {
+               const cx = data.cell.x + data.cell.width / 2;
+               const cy = data.cell.y + data.cell.height / 2;
+               doc.setDrawColor(0, 128, 0); doc.setLineWidth(0.5);
+               doc.line(cx - 2, cy - 1.5, cx - 0.5, cy + 0.5);
+               doc.line(cx - 0.5, cy + 0.5, cx + 2.5, cy - 2.5);
+               doc.setDrawColor(0, 0, 0);
+               doc.setFontSize(5); doc.setTextColor(0, 128, 0); doc.setFont('helvetica', 'bold');
+               doc.text("APPROVED", cx, cy + 2.5, { align: 'center' });
+               doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
+            } else if (hofSig && hofSig.startsWith('data:image')) { 
+               try { doc.addImage(hofSig, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch (e) { } 
+            }
           }
         },
         didParseCell: function (data) {
@@ -291,10 +309,10 @@ const BottomLevelAudit = () => {
       doc.setFont('helvetica', 'normal');
       doc.text("Remarks: If Nonconformity please write on NCR format (back-side)", 10, finalY + 6);
       
-      // 🔥 DYNAMIC QF VALUE 🔥
       doc.text(currentPageQfValue, 10, 200); 
       doc.text("Page 1 of 2", 270, 200);
 
+      // Page 2 - NCR
       doc.addPage(); doc.setDrawColor(0); doc.setLineWidth(0.3); 
       doc.rect(10, 10, 40, 20); 
       try { doc.addImage(logo, 'PNG', 12, 11, 36, 18); } 
@@ -302,7 +320,10 @@ const BottomLevelAudit = () => {
       doc.rect(50, 10, 237, 20); doc.setFontSize(16); doc.setFont('helvetica', 'bold');
       doc.text("LAYERED PROCESS AUDIT - BOTTOM LEVEL", 168.5, 18, { align: 'center' }); doc.setFontSize(14); doc.text("Non-Conformance Report", 168.5, 26, { align: 'center' });
 
-      const ncRows = ncReports.map((r, index) => [ index + 1, new Date(r.ReportDate).toLocaleDateString('en-GB'), r.NonConformityDetails || '', r.Correction || '', r.RootCause || '', r.CorrectiveAction || '', r.TargetDate ? new Date(r.TargetDate).toLocaleDateString('en-GB') : '', r.Responsibility || '', '', r.Status || '' ]);
+      const ncRows = ncReports.map((r, index) => {
+          const sigVal = r.SupervisorSignature || r.Sign || '';
+          return [ index + 1, new Date(r.ReportDate).toLocaleDateString('en-GB'), r.NonConformityDetails || '', r.Correction || '', r.RootCause || '', r.CorrectiveAction || '', r.TargetDate ? new Date(r.TargetDate).toLocaleDateString('en-GB') : '', r.Responsibility || '', sigVal, r.Status || '' ];
+      });
       if (ncRows.length === 0) { for (let i = 0; i < 5; i++) ncRows.push(['', '', '', '', '', '', '', '', '', '']); }
 
       autoTable(doc, {
@@ -312,20 +333,37 @@ const BottomLevelAudit = () => {
         columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 20, halign: 'center' }, 2: { cellWidth: 40 }, 3: { cellWidth: 35 }, 4: { cellWidth: 35 }, 5: { cellWidth: 35 }, 6: { cellWidth: 20, halign: 'center' }, 7: { cellWidth: 25 }, 8: { cellWidth: 20, halign: 'center' }, 9: { cellWidth: 20, halign: 'center' } },
         didDrawCell: function (data) {
           if (data.section === 'body' && data.column.index === 8) {
-            const rowData = ncReports[data.row.index];
-            if (rowData && rowData.SupervisorSignature && rowData.SupervisorSignature.startsWith('data:image')) { try { doc.addImage(rowData.SupervisorSignature, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch (e) { } }
+            const sig = data.row.raw[8];
+            const status = data.row.raw[9];
+            
+            const isApproved = (sig && String(sig).trim().toUpperCase() === "APPROVED") || 
+                               (status && String(status).trim().toUpperCase() === "COMPLETED");
+
+            if (isApproved) {
+               const cx = data.cell.x + data.cell.width / 2;
+               const cy = data.cell.y + data.cell.height / 2;
+               doc.setDrawColor(0, 128, 0); doc.setLineWidth(0.5);
+               doc.line(cx - 2, cy - 1.5, cx - 0.5, cy + 0.5);
+               doc.line(cx - 0.5, cy + 0.5, cx + 2.5, cy - 2.5);
+               doc.setDrawColor(0, 0, 0);
+               doc.setFontSize(5); doc.setTextColor(0, 128, 0); doc.setFont('helvetica', 'bold');
+               doc.text("APPROVED", cx, cy + 2.5, { align: 'center' });
+               doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0);
+            } else if (sig && String(sig).startsWith('data:image')) { 
+               try { doc.addImage(sig, 'PNG', data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2); } catch (e) { } 
+            }
           }
         },
         didParseCell: function (data) {
+          if (data.section === 'body' && data.column.index === 8) { data.cell.text = ['']; }
           if (data.section === 'body' && data.column.index === 9) {
-            const statusText = (data.cell.text || [])[0] || '';
-            if (statusText === 'Completed') { data.cell.styles.textColor = [0, 150, 0]; data.cell.styles.fontStyle = 'bold'; } 
-            else if (statusText === 'Pending') { data.cell.styles.textColor = [200, 0, 0]; data.cell.styles.fontStyle = 'bold'; }
+            const statusText = String(data.row.raw[9] || '');
+            if (statusText.toUpperCase() === 'COMPLETED') { data.cell.styles.textColor = [0, 150, 0]; data.cell.styles.fontStyle = 'bold'; } 
+            else if (statusText.toUpperCase() === 'PENDING') { data.cell.styles.textColor = [200, 0, 0]; data.cell.styles.fontStyle = 'bold'; }
           }
         }
       });
       
-      // 🔥 DYNAMIC QF VALUE FOR PAGE 2 🔥
       doc.setFontSize(8); doc.setFont('helvetica', 'normal'); 
       doc.text(currentPageQfValue, 10, 200); 
       doc.text("Page 2 of 2", 270, 200);
