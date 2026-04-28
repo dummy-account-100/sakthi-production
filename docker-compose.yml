@@ -1,56 +1,15 @@
 version: '3.8'
 
 services:
-  db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    restart: always
-    environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "AppUser@123"
-      MSSQL_PID: "Express"
-    ports:
-      - "1433:1433"
-    volumes:
-      - mssql_data:/var/opt/mssql
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "/opt/mssql-tools18/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "AppUser@123", "-Q", "SELECT 1", "-No"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
-  # 🔥 NEW: Initialization container that runs your init.sql script
-  db-init:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    restart: "no" # Tells Docker to only run this once, it won't keep restarting
-    depends_on:
-      db:
-        condition: service_healthy # Waits for the healthcheck above to pass
-    volumes:
-      - ./mssql/init.sql:/init.sql:ro
-    command: /opt/mssql-tools18/bin/sqlcmd -S db -U sa -P "AppUser@123" -i /init.sql -C -No
-    networks:
-      - app-network
-
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     restart: always
-    env_file:
-      - ./backend/.env
-    depends_on:
-      db:
-        condition: service_healthy
+    env_file: ./backend/.env
     networks:
       - app-network
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    build: ./frontend
     restart: always
     networks:
       - app-network
@@ -59,7 +18,7 @@ services:
     image: nginx:alpine
     restart: always
     ports:
-      - "80:80"
+      - "9010:80"  # <--- Change: Maps Server Port 9010 to Nginx Port 80
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -67,9 +26,6 @@ services:
       - backend
     networks:
       - app-network
-
-volumes:
-  mssql_data:
 
 networks:
   app-network:
