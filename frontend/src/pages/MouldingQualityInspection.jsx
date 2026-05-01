@@ -3,7 +3,7 @@ import axios from "axios";
 import Header from "../components/Header";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { FileDown, Send } from "lucide-react";
+import { FileDown, Send, Edit3 } from "lucide-react";
 
 const API_BASE = process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL !== "undefined" 
                  ? process.env.REACT_APP_API_URL 
@@ -16,7 +16,6 @@ const getShiftInfo = () => {
   const m = now.getMinutes();
 
   let shift = "I";
-
   if ((h > 7 && h < 15) || (h === 7) || (h === 15 && m < 30)) {
     shift = "I";
   } else if ((h === 15 && m >= 30) || (h > 15 && h <= 23)) {
@@ -49,15 +48,13 @@ const validateMultipleNumbers = (valString, minLimit) => {
 };
 
 // ==========================================
-// COMPONENT: SearchableSelect (For Table Cells)
+// COMPONENT: SearchableSelect 
 // ==========================================
 const SearchableSelect = ({ options, displayKey, onSelect, value, placeholder }) => {
   const [search, setSearch] = useState(value || "");
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    setSearch(value || "");
-  }, [value]);
+  useEffect(() => setSearch(value || ""), [value]);
 
   const filtered = options.filter((item) =>
     item[displayKey]?.toLowerCase().includes(search.toLowerCase())
@@ -76,7 +73,7 @@ const SearchableSelect = ({ options, displayKey, onSelect, value, placeholder })
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 200)}
         className="w-full h-16 bg-transparent outline-none text-center px-3 min-w-[150px] focus:bg-orange-100 text-base font-bold text-gray-800"
-        placeholder={placeholder || "Search or type..."}
+        placeholder={placeholder || "Search..."}
       />
       {open && (
         <ul className="absolute z-50 bg-white border border-gray-300 w-full max-h-40 overflow-y-auto rounded shadow-2xl mt-1 text-left left-0">
@@ -107,13 +104,18 @@ const SearchableSelect = ({ options, displayKey, onSelect, value, placeholder })
 const MouldingQualityInspection = () => {
   const initialInfo = getShiftInfo();
 
+  // Primary States
+  const [reportId, setReportId] = useState(null); // Track if editing existing data
   const [date, setDate] = useState(initialInfo.dateStr);
   const [currentShift, setCurrentShift] = useState(initialInfo.shift);
   const [disaMachine, setDisaMachine] = useState("DISA - I");
 
+  // Dropdown States
   const [operatorList, setOperatorList] = useState([]);
   const [supervisorList, setSupervisorList] = useState([]);
   const [components, setComponents] = useState([]); 
+  
+  // Form States
   const [verifiedBy, setVerifiedBy] = useState("");
   const [approvedBy, setApprovedBy] = useState("");
 
@@ -127,6 +129,7 @@ const MouldingQualityInspection = () => {
 
   const [rows, setRows] = useState([getEmptyRow(1)]);
 
+  // Load Dropdown Options on Mount
   useEffect(() => {
     axios.get(`${API_BASE}/mould-quality/users`)
       .then(res => {
@@ -140,8 +143,38 @@ const MouldingQualityInspection = () => {
       .catch(err => console.error("Failed to fetch components", err));
   }, []);
 
+  // 🔥 CHECK EXISTING DATA WHEN DATE, SHIFT, OR MACHINE CHANGES
+  useEffect(() => {
+    const fetchExistingData = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/mould-quality/check`, {
+          params: { date, disa: disaMachine, shift: currentShift }
+        });
+        
+        if (res.data && res.data.id) {
+          // Data found -> Populate Form
+          setReportId(res.data.id);
+          setVerifiedBy(res.data.verifiedBy || "");
+          setApprovedBy(res.data.approvedBy || "");
+          setRows(res.data.rows && res.data.rows.length > 0 ? res.data.rows : [getEmptyRow(1, currentShift)]);
+          toast.info("Loaded existing report for selected Date, Shift, and Machine.");
+        } else {
+          // No Data -> Reset Form
+          setReportId(null);
+          setVerifiedBy("");
+          setApprovedBy("");
+          setRows([getEmptyRow(1, currentShift)]);
+        }
+      } catch (err) {
+        console.error("Failed to check existing data", err);
+      }
+    };
+    
+    fetchExistingData();
+  }, [date, disaMachine, currentShift]); // Triggers every time these change
+
   const addRow = () => {
-    setRows([...rows, getEmptyRow(rows.length + 1)]);
+    setRows([...rows, getEmptyRow(rows.length + 1, currentShift)]);
   };
 
   const updateRow = (index, field, value) => {
@@ -159,9 +192,8 @@ const MouldingQualityInspection = () => {
   };
 
   const handleShiftChange = (e) => {
-    const newShift = e.target.value;
-    setCurrentShift(newShift);
-    setRows(rows.map(r => ({ ...r, shift: newShift })));
+    setCurrentShift(e.target.value);
+    // Note: No longer setting rows here. The useEffect handles re-fetching/resetting rows!
   };
 
   const handleDownloadReport = async () => {
@@ -178,8 +210,7 @@ const MouldingQualityInspection = () => {
       link.parentNode.removeChild(link);
       toast.success("PDF Downloaded successfully!");
     } catch (err) {
-      console.error("Download failed", err);
-      toast.error("Failed to download PDF. Please check your connection or login again.");
+      toast.error("Failed to download PDF. Please submit data first.");
     }
   };
 
@@ -193,16 +224,11 @@ const MouldingQualityInspection = () => {
         "drInsideMouldPP", "drInsideMouldSP", "drPatternTempPP", "drPatternTempSP"
       ];
       keysToCheck.forEach(key => {
-        if (!row[key] || String(row[key]).trim() === '') {
-          hasEmpty = true;
-        }
+        if (!row[key] || String(row[key]).trim() === '') hasEmpty = true;
       });
     });
 
-    if (hasEmpty) {
-      return toast.error("Please fill all input fields. Type '-' if empty.");
-    }
-
+    if (hasEmpty) return toast.error("Please fill all input fields. Type '-' if empty.");
     if (!verifiedBy || !approvedBy) return toast.error("Operator and Supervisor names are required!");
 
     const payload = {
@@ -215,11 +241,18 @@ const MouldingQualityInspection = () => {
     };
 
     try {
-      await axios.post(`${API_BASE}/mould-quality/add`, payload);
-      toast.success("Report Submitted Successfully!");
+      if (reportId) {
+        // 🔥 UPDATE EXISTING REPORT
+        await axios.put(`${API_BASE}/mould-quality/update/${reportId}`, payload);
+        toast.success("Report Updated Successfully!");
+      } else {
+        // 🔥 CREATE NEW REPORT
+        await axios.post(`${API_BASE}/mould-quality/add`, payload);
+        toast.success("Report Submitted Successfully!");
+      }
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
-      toast.error("Failed to submit report.");
+      toast.error("Failed to save report.");
     }
   };
 
@@ -255,6 +288,7 @@ const MouldingQualityInspection = () => {
 
           <h2 className="text-3xl font-black text-center mb-8 uppercase tracking-widest text-gray-800 border-b pb-4">
             Moulding Quality Inspection Report
+            {reportId && <span className="ml-4 text-sm text-blue-600 bg-blue-100 px-3 py-1 rounded-full">(Editing Mode)</span>}
           </h2>
 
           <div className="flex flex-wrap gap-6 mb-8 justify-between bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
@@ -391,8 +425,8 @@ const MouldingQualityInspection = () => {
                 <button onClick={handleDownloadReport} className="w-1/3 bg-gray-800 hover:bg-gray-900 text-white font-black text-sm py-4 rounded-xl shadow-lg transition-transform hover:-translate-y-1 uppercase tracking-wider flex items-center justify-center gap-2">
                   <FileDown size={18} /> PDF
                 </button>
-                <button onClick={handleSubmit} className="w-2/3 bg-orange-600 hover:bg-orange-700 text-white font-black text-sm py-4 rounded-xl shadow-lg transition-transform hover:-translate-y-1 uppercase tracking-wider flex items-center justify-center gap-2">
-                  <Send size={18} /> Submit to Supervisor
+                <button onClick={handleSubmit} className={`w-2/3 text-white font-black text-sm py-4 rounded-xl shadow-lg transition-transform hover:-translate-y-1 uppercase tracking-wider flex items-center justify-center gap-2 ${reportId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'}`}>
+                  {reportId ? <><Edit3 size={18} /> Update Data</> : <><Send size={18} /> Submit to Supervisor</>}
                 </button>
               </div>
             </div>

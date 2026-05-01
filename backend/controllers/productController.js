@@ -18,6 +18,12 @@ const safeStr = (val) => {
   return String(val).trim();
 };
 
+// 🔥 NEW HELPER: Converts hyphens to "0", but keeps comma-separated strings intact!
+const safeMultiNum = (val) => {
+  if (val === null || val === undefined || String(val).trim() === "" || String(val).trim() === "-") return "0";
+  return String(val).trim();
+};
+
 // ==========================================
 //               DROPDOWN DATA
 // ==========================================
@@ -296,12 +302,12 @@ exports.createReport = async (req, res) => {
       }
     }
 
-    for (let i = 0; i < patternTemps.length; i++) {
+for (let i = 0; i < patternTemps.length; i++) {
       const pt = patternTemps[i];
       if (safeStr(pt.componentName)) {
         await sql.query`
           INSERT INTO DisamaticPatternTemp (reportId, componentName, pp, sp, remarks)
-          VALUES (${reportId}, ${safeStr(pt.componentName)}, ${safeNum(pt.pp)}, ${safeNum(pt.sp)}, ${safeStr(pt.remarks)})
+          VALUES (${reportId}, ${safeStr(pt.componentName)}, ${safeMultiNum(pt.pp)}, ${safeMultiNum(pt.sp)}, ${safeStr(pt.remarks)})
         `;
       }
     }
@@ -466,17 +472,17 @@ exports.updateDisamaticReport = async (req, res) => {
 
     // 6. Update Pattern Temps Array
     if (patternTemps && patternTemps.length > 0) {
-      for (const pt of patternTemps) {
-        if (pt.id) {
-          await sql.query`UPDATE DisamaticPatternTemp SET
-            componentName = ${safeStr(pt.componentName)},
-            pp = ${safeStr(pt.pp)},
-            sp = ${safeStr(pt.sp)},
-            remarks = ${safeStr(pt.remarks)}
-            WHERE id = ${Number(pt.id)}`;
+          for (const pt of patternTemps) {
+            if (pt.id) {
+              await sql.query`UPDATE DisamaticPatternTemp SET
+                componentName = ${safeStr(pt.componentName)},
+                pp = ${safeMultiNum(pt.pp)}, 
+                sp = ${safeMultiNum(pt.sp)}, 
+                remarks = ${safeStr(pt.remarks)}
+                WHERE id = ${Number(pt.id)}`;
+            }
+          }
         }
-      }
-    }
 
     res.json({ message: "Report updated successfully" });
   } catch (err) {
@@ -522,11 +528,26 @@ exports.downloadAllReports = async (req, res) => {
     } else if (date && disa) {
       reportResult = await sql.query`
         SELECT * FROM DisamaticProductReport 
-        WHERE reportDate = ${date} AND disa = ${disa} 
+        WHERE CAST(reportDate AS DATE) = CAST(${date} AS DATE) AND disa = ${disa} 
         ORDER BY shift DESC, id ASC
       `;
     } else if (reportId) {
-      reportResult = await sql.query`SELECT * FROM DisamaticProductReport WHERE id = ${reportId}`;
+      // 🔥 FIXED: Fetch ALL reports for the given Date/Shift/DISA combo instead of just the empty overridden ID.
+      // This merges the valid data from the first submission with the hyphens of the second submission!
+      const targetRes = await sql.query`SELECT reportDate, shift, disa FROM DisamaticProductReport WHERE id = ${reportId}`;
+      
+      if (targetRes.recordset.length > 0) {
+          const target = targetRes.recordset[0];
+          reportResult = await sql.query`
+            SELECT * FROM DisamaticProductReport 
+            WHERE CAST(reportDate AS DATE) = CAST(${target.reportDate} AS DATE) 
+              AND shift = ${target.shift} 
+              AND disa = ${target.disa}
+            ORDER BY id ASC
+          `;
+      } else {
+          reportResult = { recordset: [] };
+      }
     } else {
       reportResult = await sql.query`SELECT * FROM DisamaticProductReport ORDER BY reportDate DESC, shift DESC, disa ASC, id ASC`;
     }
@@ -852,7 +873,7 @@ exports.downloadAllReports = async (req, res) => {
       const ptData = getFilteredData(ptResult.recordset, 'componentName');
       const sigEventText = Array.from(g.sigEvents).join(' | ') || "-";
 
-      let ptTableHeight = 15;
+let ptTableHeight = 15;
       let ptRowHeights = [];
       if (ptData.length === 0) {
         ptTableHeight += 20;
@@ -860,8 +881,15 @@ exports.downloadAllReports = async (req, res) => {
       } else {
         ptData.forEach(pt => {
           let h = 20;
-          let cnH = doc.heightOfString(enforceWrap(pt.componentName, 140), { width: 140 }); 
-          if (cnH + 12 > h) h = cnH + 12;
+          let cnH = doc.heightOfString(enforceWrap(String(pt.componentName || ""), 140), { width: 140 }); 
+          
+          // 🔥 NEW: Check text height for wrapped PP and SP values to ensure the box grows
+          let ppH = doc.heightOfString(enforceWrap(String(pt.pp || ""), 50), { width: 40 }); 
+          let spH = doc.heightOfString(enforceWrap(String(pt.sp || ""), 50), { width: 40 }); 
+          
+          let maxCellHeight = Math.max(cnH, ppH, spH);
+          if (maxCellHeight + 12 > h) h = maxCellHeight + 12;
+          
           ptTableHeight += h;
           ptRowHeights.push(h);
         });
@@ -898,9 +926,12 @@ exports.downloadAllReports = async (req, res) => {
           ptData.forEach((pt, j) => {
             let rH = ptRowHeights[j];
             drawCellText(j + 1, startX, currentY, 30, rH); doc.rect(startX, currentY, 30, rH).stroke();
-            drawCellText(enforceWrap(pt.componentName, 140), startX + 30, currentY, 150, rH, 'left'); doc.rect(startX + 30, currentY, 150, rH).stroke();
-            drawCellText(pt.pp, startX + 180, currentY, 50, rH); doc.rect(startX + 180, currentY, 50, rH).stroke();
-            drawCellText(pt.sp, startX + 230, currentY, 50, rH); doc.rect(startX + 230, currentY, 50, rH).stroke();
+            drawCellText(enforceWrap(String(pt.componentName || ""), 140), startX + 30, currentY, 150, rH, 'left'); doc.rect(startX + 30, currentY, 150, rH).stroke();
+            
+            // 🔥 FIXED: Added enforceWrap() to PP and SP so commas split perfectly into new lines!
+            drawCellText(enforceWrap(String(pt.pp || ""), 50), startX + 180, currentY, 50, rH); doc.rect(startX + 180, currentY, 50, rH).stroke();
+            drawCellText(enforceWrap(String(pt.sp || ""), 50), startX + 230, currentY, 50, rH); doc.rect(startX + 230, currentY, 50, rH).stroke();
+            
             currentY += rH;
           });
       }

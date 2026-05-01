@@ -119,7 +119,18 @@ exports.getDelaysByDateAndDisa = async (req, res) => {
         AND r.disa = ${disa}
       ORDER BY r.shift, d.id
     `;
-    res.status(200).json(result.recordset);
+    
+    // 🔥 FIXED: Strip out hyphenated empty delays here before sending to frontend!
+    const validDelays = result.recordset.filter(d => {
+        const reason = String(d.reason || "").trim();
+        let durStr = String(d.duration || "").trim();
+        let dur = (durStr === "-" || durStr === "") ? 0 : Number(durStr);
+        if (isNaN(dur)) dur = 0;
+        
+        return !((reason === "-" || reason === "") && dur === 0);
+    });
+
+    res.status(200).json(validDelays);
   } catch (error) {
     console.error("Error fetching delays:", error);
     res.status(500).json({ error: "Failed to fetch delays", details: error.message });
@@ -152,7 +163,6 @@ exports.getFormUsers = async (req, res) => {
 exports.getSupervisorReports = async (req, res) => {
   try {
     const { name } = req.params;
-    // 🔥 FIXED: We fetch 'operatorSignature' but rename it to 'supervisorSignature' so the frontend understands it safely!
     const result = await sql.query`
       SELECT id, productionDate, disa, operatorSignature AS supervisorSignature, incharge, hof, hod 
       FROM DailyPerformanceReport 
@@ -169,7 +179,6 @@ exports.getSupervisorReports = async (req, res) => {
 exports.signSupervisor = async (req, res) => {
   try {
     const { reportId, signature } = req.body;
-    // 🔥 FIXED: Saving the signature into the existing 'operatorSignature' column so SQL doesn't crash!
     await sql.query`UPDATE DailyPerformanceReport SET operatorSignature = ${signature} WHERE id = ${reportId}`;
     res.json({ message: "Supervisor signature saved successfully" });
   } catch (err) {
@@ -259,7 +268,7 @@ exports.getComponentTotals = async (req, res) => {
 };
 
 // ==========================================
-//   ADMIN: FETCH REPORT BY EXACT DATE & DISA
+//  ADMIN: FETCH REPORT BY EXACT DATE & DISA
 // ==========================================
 exports.getByDate = async (req, res) => {
   const { date, disa } = req.query;
@@ -286,7 +295,15 @@ exports.getByDate = async (req, res) => {
     for (const rep of reports) {
       const summary = (await sql.query`SELECT * FROM DailyPerformanceSummary WHERE reportId = ${rep.id}`).recordset;
       const details = (await sql.query`SELECT * FROM DailyPerformanceDetails WHERE reportId = ${rep.id} ORDER BY id ASC`).recordset;
-      const delays = (await sql.query`SELECT * FROM Productiondelays WHERE reportId = ${rep.id} ORDER BY id ASC`).recordset;
+      let delays = (await sql.query`SELECT * FROM Productiondelays WHERE reportId = ${rep.id} ORDER BY id ASC`).recordset;
+      
+      // Filter out empty or hyphenated rows so they don't show up in Admin editor
+      delays = delays.filter(d => {
+          const reason = String(d.reason || "").trim();
+          const duration = Number(d.duration) || 0;
+          return !((reason === "-" || reason === "") && duration === 0);
+      });
+
       result.push({ ...rep, summary, details, delays });
     }
     res.json(result);
@@ -484,7 +501,14 @@ exports.downloadPDF = async (req, res) => {
 
       const summaryData = (await sql.query`SELECT * FROM DailyPerformanceSummary WHERE reportId = ${reportId}`).recordset;
       const detailsData = (await sql.query`SELECT * FROM DailyPerformanceDetails WHERE reportId = ${reportId} ORDER BY id ASC`).recordset;
-      const delaysData = (await sql.query`SELECT * FROM Productiondelays WHERE reportId = ${reportId} ORDER BY id ASC`).recordset;
+      let delaysData = (await sql.query`SELECT * FROM Productiondelays WHERE reportId = ${reportId} ORDER BY id ASC`).recordset;
+
+      // Filter out empty or hyphenated rows so they don't print in the PDF
+      delaysData = delaysData.filter(d => {
+          const reason = String(d.reason || "").trim();
+          const duration = Number(d.duration) || 0;
+          return !((reason === "-" || reason === "") && duration === 0);
+      });
 
       if (rIndex > 0) {
         doc.addPage();
@@ -655,13 +679,13 @@ exports.downloadPDF = async (req, res) => {
       doc.rect(startX, currentY, tableWidth, 50).stroke();
 
       const renderSig = (sigStr, xOffset) => {
-        if (sigStr === "Approved") {
-          doc.fillColor('#16a34a').font('ZapfDingbats').fontSize(14).text("4", xOffset, currentY + 15);
+        if (sigStr === "Approved" || sigStr === "APPROVED") {
+          doc.fillColor('#16a34a').font('ZapfDingbats').fontSize(14).text("3", xOffset, currentY + 15);
           doc.fillColor('#16a34a').font('Helvetica-Bold').fontSize(11).text("APPROVED", xOffset + 15, currentY + 15);
           doc.fillColor('black');
         } else if (sigStr && sigStr.startsWith('data:image')) {
           try {
-            const imgBuffer = Buffer.from(sigStr.split('base64,'), 'base64');
+            const imgBuffer = Buffer.from(sigStr.split('base64,')[1], 'base64');
             doc.image(imgBuffer, xOffset, currentY + 5, { fit: [100, 25]});
           } catch (e) { }
         } else {

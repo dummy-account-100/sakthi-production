@@ -1524,6 +1524,7 @@ const PerformanceEditor = ({ date, disa, toast, setToast }) => {
                     summaryObj[s.shiftName] = {
                         pouredMoulds: s.pouredMoulds,
                         tonnage: s.tonnage,
+                        quantity: s.quantity,
                         casted: s.casted,
                         value: s.shiftValue || s.value
                     };
@@ -1562,6 +1563,13 @@ const PerformanceEditor = ({ date, disa, toast, setToast }) => {
         updateReport('summary', sumArray);
     }
 
+    // 🔥 NEW: Update function for Delays
+    const updateDelay = (idx, field, val) => {
+        const delays = [...(report.delays || [])];
+        delays[idx] = { ...delays[idx], [field]: val };
+        updateReport('delays', delays);
+    }
+
     const getSummaryField = (shiftName, field) => {
         const s = report.summary?.find(x => x.shiftName === shiftName);
         return s ? s[field] : '';
@@ -1577,12 +1585,13 @@ const PerformanceEditor = ({ date, disa, toast, setToast }) => {
                 </div>
 
                 <SectionHeader title="Performance Summary" />
-                <SubTable headers={['Shift', 'Poured Moulds', 'Tonnage', 'Casted', 'Value']}>
+                <SubTable headers={['Shift', 'Poured Moulds', 'Tonnage', 'Quantity', 'Casted', 'Value']}>
                     {['I', 'II', 'III'].map(shift => (
                         <tr key={shift} className="border-b border-white/5">
                             <td className="p-2 text-white font-bold text-center">{shift}</td>
                             <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={getSummaryField(shift, 'pouredMoulds')} onChange={e => updateSummary(shift, 'pouredMoulds', e.target.value)} /></td>
                             <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={getSummaryField(shift, 'tonnage')} onChange={e => updateSummary(shift, 'tonnage', e.target.value)} /></td>
+                            <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={getSummaryField(shift, 'quantity')} onChange={e => updateSummary(shift, 'quantity', e.target.value)} /></td>
                             <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={getSummaryField(shift, 'casted')} onChange={e => updateSummary(shift, 'casted', e.target.value)} /></td>
                             <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={getSummaryField(shift, 'shiftValue')} onChange={e => updateSummary(shift, 'shiftValue', e.target.value)} /></td>
                         </tr>
@@ -1591,7 +1600,7 @@ const PerformanceEditor = ({ date, disa, toast, setToast }) => {
 
                 <SectionHeader title="Performance Details" />
                 <div className="overflow-x-auto custom-scrollbar">
-                    <SubTable headers={['Pattern Code', 'Item Desc', 'Planned', 'Unplanned', 'Moulds Prod', 'Moulds Pour']}>
+                    <SubTable headers={['Pattern Code', 'Item Desc', 'Planned', 'Unplanned', 'Moulds Prod', 'Moulds Pour', 'Cavity', 'Unit Wt', 'Total Wt']}>
                         {report.details?.map((d, i) => (
                             <tr key={i} className="border-b border-white/5 hover:bg-white/5">
                                 <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={d.patternCode || ''} onChange={e => updateDetail(i, 'patternCode', e.target.value)} /></td>
@@ -1600,10 +1609,31 @@ const PerformanceEditor = ({ date, disa, toast, setToast }) => {
                                 <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={d.unplanned || ''} onChange={e => updateDetail(i, 'unplanned', e.target.value)} /></td>
                                 <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={d.mouldsProd || ''} onChange={e => updateDetail(i, 'mouldsProd', e.target.value)} /></td>
                                 <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={d.mouldsPour || ''} onChange={e => updateDetail(i, 'mouldsPour', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={d.cavity || ''} onChange={e => updateDetail(i, 'cavity', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={d.unitWeight || ''} onChange={e => updateDetail(i, 'unitWeight', e.target.value)} /></td>
+                                <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={d.totalWeight || ''} onChange={e => updateDetail(i, 'totalWeight', e.target.value)} /></td>
                             </tr>
                         ))}
                     </SubTable>
                 </div>
+
+                {/* 🔥 NEW: Production Delays Table for Admin Edit */}
+                <SectionHeader title="Production Delays" />
+                {report.delays && report.delays.length > 0 ? (
+                    <div className="overflow-x-auto custom-scrollbar">
+                        <SubTable headers={['Shift', 'Duration (Mins)', 'Reason']}>
+                            {report.delays.map((d, i) => (
+                                <tr key={d.id || i} className="border-b border-white/5 hover:bg-white/5">
+                                    <td className="p-1 w-24"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={d.shift || ''} onChange={e => updateDelay(i, 'shift', e.target.value)} /></td>
+                                    <td className="p-1 w-32"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-center" value={d.duration || ''} onChange={e => updateDelay(i, 'duration', e.target.value)} /></td>
+                                    <td className="p-1"><input className="w-full bg-transparent border border-white/10 rounded text-white px-2 py-1 focus:border-[#ff9100] outline-none text-left" value={d.reason || ''} onChange={e => updateDelay(i, 'reason', e.target.value)} /></td>
+                                </tr>
+                            ))}
+                        </SubTable>
+                    </div>
+                ) : (
+                    <p className="text-white/30 text-sm italic mb-6">No valid delays recorded for this report.</p>
+                )}
 
                 <SectionHeader title="Unplanned Reasons" />
                 <Field label="Reasons" value={report.unplannedReasons} onChange={v => updateReport('unplannedReasons', v)} multiline />

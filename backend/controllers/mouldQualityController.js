@@ -42,17 +42,48 @@ exports.getComponents = async (req, res) => {
   }
 };
 
+// --- CHECK EXISTING DATA BY DATE, MACHINE, AND SHIFT ---
+exports.checkExisting = async (req, res) => {
+  try {
+    const { date, disa, shift } = req.query;
+
+    // Look for a report header on this date/machine that possesses rows matching the requested shift
+    const headerRes = await sql.query`
+      SELECT TOP 1 h.* 
+      FROM MouldQualityReport h
+      JOIN MouldQualityRows r ON h.id = r.reportId
+      WHERE CAST(h.reportDate AS DATE) = CAST(${date} AS DATE) 
+        AND h.disaMachine = ${disa}
+        AND r.shift = ${shift}
+      ORDER BY h.id DESC
+    `;
+
+    if (headerRes.recordset.length === 0) return res.json(null);
+    
+    const report = headerRes.recordset[0];
+    
+    // Fetch ONLY the rows for the selected shift 
+    const rowsRes = await sql.query`
+      SELECT * FROM MouldQualityRows 
+      WHERE reportId = ${report.id} AND shift = ${shift} 
+      ORDER BY id ASC
+    `;
+    
+    res.json({ ...report, rows: rowsRes.recordset });
+  } catch (err) {
+    console.error("Check existing error:", err);
+    res.status(500).json({ message: "DB error" });
+  }
+};
+
 // --- SAVE REPORT ---
 exports.saveReport = async (req, res) => {
-  // Extract operatorSignature from req.body
   const { recordDate, disaMachine, verifiedBy, approvedBy, operatorSignature, rows } = req.body;
   const transaction = new sql.Transaction();
   await transaction.begin();
 
   try {
     const headerReq = new sql.Request(transaction);
-    // Remove IsOperatorApproved, OperatorApprovedAt, IsSupervisorApproved
-    // Add operatorSignature, supervisorSignature
     const headerRes = await headerReq.query`
       INSERT INTO MouldQualityReport (reportDate, disaMachine, verifiedBy, approvedBy, status, operatorSignature, supervisorSignature)
       OUTPUT INSERTED.id
@@ -84,6 +115,59 @@ exports.saveReport = async (req, res) => {
   }
 };
 
+// --- UPDATE REPORT (Enhanced) ---
+exports.updateReport = async (req, res) => {
+  const { id } = req.params;
+  const { recordDate, disaMachine, verifiedBy, approvedBy, operatorSignature, rows } = req.body;
+  const transaction = new sql.Transaction();
+  await transaction.begin();
+
+  try {
+    // 1. Update the Header properties
+    await new sql.Request(transaction).query`
+      UPDATE MouldQualityReport 
+      SET reportDate = ${recordDate}, 
+          disaMachine = ${disaMachine}, 
+          verifiedBy = ${verifiedBy}, 
+          approvedBy = ${approvedBy}, 
+          operatorSignature = ${operatorSignature || 'APPROVED'}, 
+          status = 'Pending'
+      WHERE id = ${id}
+    `;
+
+    // 2. Identify the Shift being updated
+    const activeShift = rows[0]?.shift || 'I';
+
+    // 3. Delete ONLY the rows for the currently edited Shift
+    await new sql.Request(transaction).query`
+        DELETE FROM MouldQualityRows 
+        WHERE reportId = ${id} AND shift = ${activeShift}
+    `;
+
+    // 4. Insert the updated rows
+    for (const r of rows) {
+      await new sql.Request(transaction).query`
+        INSERT INTO MouldQualityRows (
+          reportId, sNo, shift, partName, dataCode, fmSoftRamming, fmMouldBreakage, fmMouldCrack, fmLooseSand, fmPatternSticking, fmCoreSetting,
+          drMouldCrush, drLooseSand, drPatternSticking, drDateHeatCode, drFilterSize, drSurfaceHardnessPP, drSurfaceHardnessSP,
+          drInsideMouldPP, drInsideMouldSP, drPatternTempPP, drPatternTempSP
+        ) VALUES (
+          ${id}, ${r.sNo}, ${r.shift}, ${r.partName}, ${r.dataCode}, ${r.fmSoftRamming}, ${r.fmMouldBreakage}, ${r.fmMouldCrack}, ${r.fmLooseSand}, ${r.fmPatternSticking}, ${r.fmCoreSetting},
+          ${r.drMouldCrush}, ${r.drLooseSand}, ${r.drPatternSticking}, ${r.drDateHeatCode}, ${r.drFilterSize}, ${r.drSurfaceHardnessPP}, ${r.drSurfaceHardnessSP},
+          ${r.drInsideMouldPP}, ${r.drInsideMouldSP}, ${r.drPatternTempPP}, ${r.drPatternTempSP}
+        )
+      `;
+    }
+
+    await transaction.commit();
+    res.json({ success: true, message: "Updated Successfully" });
+  } catch (err) {
+    await transaction.rollback();
+    console.error(err);
+    res.status(500).json({ message: "Update failed" });
+  }
+};
+
 // --- SUPERVISOR DASHBOARD ---
 exports.getSupervisorReports = async (req, res) => {
   try {
@@ -103,7 +187,6 @@ exports.getSupervisorReports = async (req, res) => {
 // --- SIGN SUPERVISOR ---
 exports.signSupervisor = async (req, res) => {
   try {
-    // Extract signature from req.body (Supervisor.jsx sends { reportId, signature: "APPROVED" })
     const { reportId, signature } = req.body;
     await sql.query`
       UPDATE MouldQualityReport 
@@ -163,7 +246,7 @@ exports.generateReport = async (req, res) => {
     // ==============================================================
     doc.lineWidth(1);
     
-    // BOX 1: LOGO (Width: 100)
+    // BOX 1: LOGO
     doc.rect(startX, y, 100, 40).stroke();
     const logoPath = path.join(__dirname, 'logo.jpg');
     if (fs.existsSync(logoPath)) {
@@ -172,12 +255,12 @@ exports.generateReport = async (req, res) => {
         doc.font("Helvetica-Bold").fontSize(12).text("SAKTHI\nAUTO", startX, y + 10, { width: 100, align: "center" });
     }
 
-    // BOX 2: TITLE (Width: 500)
+    // BOX 2: TITLE
     doc.rect(startX + 100, y, 500, 40).stroke();
     doc.font("Helvetica-Bold").fontSize(14).text("SAKTHI AUTO COMPONENT LIMITED", startX + 100, y + 8, { width: 500, align: "center" });
     doc.fontSize(12).text("MOULDING QUALITY INSPECTION REPORT", startX + 100, y + 24, { width: 500, align: "center" });
 
-    // BOX 3: META DATA (Width: 120)
+    // BOX 3: META DATA
     const displayDate = new Date(header.reportDate).toLocaleDateString('en-GB');
     doc.rect(startX + 600, y, 120, 40).stroke();
     doc.font("Helvetica-Bold").fontSize(11).text(header.disaMachine || '-', startX + 600, y + 7, { width: 120, align: "center" });
@@ -271,19 +354,10 @@ exports.generateReport = async (req, res) => {
     // --- OPERATOR SIGNATURE UPDATE ---
     doc.text(`Verified By: ${header.verifiedBy || '-'}`, startX, sigY);
     if (header.IsOperatorApproved === true || header.IsOperatorApproved === 1 || header.operatorSignature === "APPROVED") {
-        // Draw a clean green checkmark using lines
         doc.lineWidth(2).strokeColor('#008000');
-        doc.moveTo(startX + 2, sigY + 22)
-           .lineTo(startX + 6, sigY + 26)
-           .lineTo(startX + 14, sigY + 14)
-           .stroke();
-           
-        // Render APPROVED text
+        doc.moveTo(startX + 2, sigY + 22).lineTo(startX + 6, sigY + 26).lineTo(startX + 14, sigY + 14).stroke();
         doc.font('Helvetica-Bold').fontSize(12).fillColor('#008000').text("APPROVED", startX + 20, sigY + 16);
-        
-        // Reset to default
-        doc.fillColor('black'); 
-        doc.font('Helvetica-Bold').fontSize(10); 
+        doc.fillColor('black'); doc.font('Helvetica-Bold').fontSize(10); 
     } else if (header.operatorSignature && header.operatorSignature.startsWith('data:image')) {
         try { doc.image(Buffer.from(header.operatorSignature.split(',')[1], 'base64'), startX, sigY + 15, { fit: [100, 30] }); } catch(e){}
     }
@@ -293,19 +367,10 @@ exports.generateReport = async (req, res) => {
     doc.text(`Approved By: ${header.approvedBy || '-'}`, supX, sigY);
     
     if (header.IsSupervisorApproved === true || header.IsSupervisorApproved === 1 || header.supervisorSignature === "APPROVED") {
-        // Draw a clean green checkmark using lines
         doc.lineWidth(2).strokeColor('#008000');
-        doc.moveTo(supX + 2, sigY + 22)
-           .lineTo(supX + 6, sigY + 26)
-           .lineTo(supX + 14, sigY + 14)
-           .stroke();
-           
-        // Render APPROVED text
+        doc.moveTo(supX + 2, sigY + 22).lineTo(supX + 6, sigY + 26).lineTo(supX + 14, sigY + 14).stroke();
         doc.font('Helvetica-Bold').fontSize(12).fillColor('#008000').text("APPROVED", supX + 20, sigY + 16);
-        
-        // Reset to default
-        doc.fillColor('black');
-        doc.font('Helvetica-Bold').fontSize(10);
+        doc.fillColor('black'); doc.font('Helvetica-Bold').fontSize(10);
     } else if (header.supervisorSignature && header.supervisorSignature.startsWith('data:image')) {
         try { doc.image(Buffer.from(header.supervisorSignature.split(',')[1], 'base64'), supX, sigY + 15, { fit: [100, 30] }); } catch(e){}
     } else {
@@ -351,44 +416,6 @@ exports.getByDate = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "DB error" });
-  }
-};
-
-exports.updateReport = async (req, res) => {
-  const { id } = req.params;
-  const { verifiedBy, approvedBy, rows } = req.body;
-  const transaction = new sql.Transaction();
-  await transaction.begin();
-
-  try {
-    await new sql.Request(transaction).query`
-      UPDATE MouldQualityReport 
-      SET verifiedBy = ${verifiedBy}, approvedBy = ${approvedBy}
-      WHERE id = ${id}
-    `;
-
-    await new sql.Request(transaction).query`DELETE FROM MouldQualityRows WHERE reportId = ${id}`;
-
-    for (const r of rows) {
-      await new sql.Request(transaction).query`
-        INSERT INTO MouldQualityRows (
-          reportId, sNo, shift, partName, dataCode, fmSoftRamming, fmMouldBreakage, fmMouldCrack, fmLooseSand, fmPatternSticking, fmCoreSetting,
-          drMouldCrush, drLooseSand, drPatternSticking, drDateHeatCode, drFilterSize, drSurfaceHardnessPP, drSurfaceHardnessSP,
-          drInsideMouldPP, drInsideMouldSP, drPatternTempPP, drPatternTempSP
-        ) VALUES (
-          ${id}, ${r.sNo}, ${r.shift}, ${r.partName}, ${r.dataCode}, ${r.fmSoftRamming}, ${r.fmMouldBreakage}, ${r.fmMouldCrack}, ${r.fmLooseSand}, ${r.fmPatternSticking}, ${r.fmCoreSetting},
-          ${r.drMouldCrush}, ${r.drLooseSand}, ${r.drPatternSticking}, ${r.drDateHeatCode}, ${r.drFilterSize}, ${r.drSurfaceHardnessPP}, ${r.drSurfaceHardnessSP},
-          ${r.drInsideMouldPP}, ${r.drInsideMouldSP}, ${r.drPatternTempPP}, ${r.drPatternTempSP}
-        )
-      `;
-    }
-
-    await transaction.commit();
-    res.json({ success: true, message: "Updated Successfully" });
-  } catch (err) {
-    await transaction.rollback();
-    console.error(err);
-    res.status(500).json({ message: "Update failed" });
   }
 };
 
