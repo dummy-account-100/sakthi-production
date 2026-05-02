@@ -87,6 +87,7 @@ const ErrorProofVerification = () => {
   const [hofList, setHofList] = useState([]);
   
   const [assignedHOF, setAssignedHOF] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const fetchInitialData = async () => {
     try {
@@ -101,9 +102,71 @@ const ErrorProofVerification = () => {
     } catch (err) { console.error("Error fetching initial data", err); }
   };
 
-  useEffect(() => { fetchInitialData(); }, []);
+  // Fetch existing data when date changes (like 4M Change form)
+  const fetchExistingData = async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/error-proof/v1-by-date`, { params: { date: recordDate } });
+      const verifications = res.data.verifications || [];
+      const reactionPlans = res.data.reactionPlans || [];
 
-  const handleObservationChange = (index, value) => { setObservations(prev => ({ ...prev, [index]: value })); };
+      if (verifications.length > 0) {
+        // Map verifications to observations by matching error proof name
+        const loadedObs = {};
+        verifications.forEach(v => {
+          const idx = defaultErrorProofs.findIndex(p => p.name === v.errorProofName);
+          if (idx !== -1) {
+            loadedObs[idx] = v.observationResult;
+          }
+        });
+        setObservations(loadedObs);
+
+        // Load assigned HOF from the first verification
+        setAssignedHOF(verifications[0].AssignedHOF || "");
+
+        // If there's a reaction plan, load its fields
+        if (reactionPlans.length > 0) {
+          const rp = reactionPlans[0];
+          setErrorProofNo(rp.errorProofNo || "");
+          setProblem(rp.problem || "");
+          setRootCause(rp.rootCause || "");
+          setCorrectiveAction(rp.correctiveAction || "");
+          setReviewedByReaction(rp.reviewedBy || "");
+          setApprovedBy(rp.approvedBy || "");
+          setRemarks(rp.remarks || "");
+        } else {
+          // No reaction plans — clear the fields
+          setErrorProofNo(""); setProblem(""); setRootCause(""); setCorrectiveAction("");
+          setReviewedByReaction(""); setApprovedBy(""); setRemarks("");
+        }
+
+        setIsEditMode(true);
+      } else {
+        // No existing data — reset form
+        setObservations({});
+        setAssignedHOF("");
+        setErrorProofNo(""); setProblem(""); setRootCause(""); setCorrectiveAction("");
+        setReviewedByReaction(""); setApprovedBy(""); setRemarks("");
+        setIsEditMode(false);
+      }
+    } catch (err) { console.error("Error fetching existing data", err); }
+  };
+
+  useEffect(() => { fetchInitialData(); }, []);
+  useEffect(() => { if (recordDate) fetchExistingData(); }, [recordDate]);
+
+  const handleObservationChange = (index, value) => {
+    setObservations(prev => ({ ...prev, [index]: value }));
+    // When changing to OK, clear all reaction plan data completely
+    if (value === "OK") {
+      setErrorProofNo("");
+      setProblem("");
+      setRootCause("");
+      setCorrectiveAction("");
+      setReviewedByReaction("");
+      setApprovedBy("");
+      setRemarks("");
+    }
+  };
 
   const hasNotOk = Object.values(observations).includes("NOT_OK");
 
@@ -141,15 +204,22 @@ const ErrorProofVerification = () => {
             problem, rootCause, correctiveAction, status, reviewedBy: reviewedByReaction, approvedBy, remarks
           });
         }
+
+        // When changing to OK, delete any old reaction plans for this proof from the DB
+        if (obsResult === "OK") {
+          await axios.post(`${API_BASE}/error-proof/bulk-update`, {
+            verifications: [],
+            reactionPlans: [],
+            deletedProofNames: [proof.name],
+            date: recordDate
+          });
+        }
       }
 
       toast.success("Records saved and sent to HOF/Supervisor!");
 
-      setObservations({});
-      setErrorProofNo(""); setProblem(""); setRootCause(""); setCorrectiveAction(""); setReviewedByMain(""); setReviewedByReaction(""); setApprovedBy(""); setRemarks("");
-      setAssignedHOF("");
-
       fetchInitialData();
+      fetchExistingData();
     } catch (err) { 
       toast.error(err.response?.data?.message || "Error saving record"); 
     }
@@ -191,7 +261,10 @@ const ErrorProofVerification = () => {
       <div className="min-h-screen bg-[#2d2d2d] flex flex-col items-center p-6">
 
         <div className="bg-white w-full max-w-[100rem] rounded-xl p-8 shadow-2xl overflow-x-auto mt-6">
-          <h2 className="text-2xl font-bold mb-4 text-center text-gray-800 uppercase tracking-wide">Error Proof Verification Check List</h2>
+          <h2 className="text-2xl font-bold mb-4 text-center text-gray-800 uppercase tracking-wide">
+            Error Proof Verification Check List
+            {isEditMode && <span className="ml-4 text-sm text-blue-600 bg-blue-100 px-3 py-1 rounded-full align-middle normal-case">(Editing Mode)</span>}
+          </h2>
 
           <div className="flex justify-center items-center bg-gray-50 border border-gray-200 py-3 px-8 rounded-lg mb-8 max-w-sm mx-auto shadow-sm">
             <label className="text-gray-500 uppercase text-sm tracking-wider font-bold mr-2">Date:</label>
@@ -274,8 +347,8 @@ const ErrorProofVerification = () => {
                 <button onClick={handleGenerateReport} className="w-1/2 bg-gray-800 hover:bg-gray-900 text-white py-3 rounded font-bold transition-colors shadow-md flex justify-center items-center gap-2">
                   <FileDown size={18} /> Preview PDF
                 </button>
-                <button onClick={handleSubmit} className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded font-bold transition-colors shadow-lg flex justify-center items-center gap-2">
-                  <Save size={18} /> Save & Assign
+                <button onClick={handleSubmit} className={`w-1/2 ${isEditMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-500 hover:bg-orange-600'} text-white py-3 rounded font-bold transition-colors shadow-lg flex justify-center items-center gap-2`}>
+                  <Save size={18} /> {isEditMode ? 'Update & Assign' : 'Save & Assign'}
                 </button>
               </div>
             </div>
