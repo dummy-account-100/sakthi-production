@@ -31,7 +31,17 @@ const AddUser = () => {
     }
 
     try {
-      await axios.post(`${API_BASE}/users/add`, formData);
+      const token = localStorage.getItem("token");
+
+      await axios.post(
+        `${API_BASE}/users/add`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       toast.success(`User ${formData.username} added successfully!`);
 
       setFormData({ username: "", employeeId: "", password: "", role: "operator" });

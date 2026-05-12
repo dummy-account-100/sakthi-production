@@ -24,12 +24,21 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const res = await axios.post(`${API_BASE}/auth/login`, { employeeId, password });
+          const res = await axios.post(`${API_BASE}/auth/login`, {
+      employeeId,
+      password,
+    });
 
-      // ✅ res.data = { username, role }
-      localStorage.setItem("user", JSON.stringify(res.data));
 
-      const role = res.data.role;
+    // Store user info
+    localStorage.setItem("user", JSON.stringify(res.data));
+
+    // Store JWT token
+    if (res.data.token) {
+      localStorage.setItem("token", res.data.token);
+    }
+
+    const role = res.data.role;
 
       if (role === "admin") navigate("/admin");
       else if (role === "supervisor") navigate("/supervisor");
