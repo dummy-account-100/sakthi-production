@@ -5,7 +5,7 @@ async function hashExistingPasswords() {
     try {
         // Connect to the database is handled by requiring db.js
 
-        const result = await sql.query`SELECT id, password FROM Users`;
+        const result = await sql.query`SELECT id, password FROM DisaUsersTable`;
         const users = result.recordset;
 
         console.log(`Found ${users.length} users. Checking for plain text passwords...`);
@@ -20,7 +20,7 @@ async function hashExistingPasswords() {
                 const hashedPassword = await bcrypt.hash(user.password, 10);
 
                 await sql.query`
-          UPDATE Users 
+          UPDATE DisaUsersTable 
           SET password = ${hashedPassword} 
           WHERE id = ${user.id}
         `;

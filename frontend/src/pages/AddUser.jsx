@@ -5,9 +5,9 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Header from "../components/Header";
 
-const API_BASE = process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL !== "undefined" 
-                 ? process.env.REACT_APP_API_URL 
-                 : "/api";
+const API_BASE = process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL !== "undefined"
+  ? process.env.REACT_APP_API_URL
+  : "/api";
 
 const AddUser = () => {
   const navigate = useNavigate();
@@ -15,7 +15,7 @@ const AddUser = () => {
     username: "",
     employeeId: "",
     password: "",
-    role: "operator", 
+    role: "operator",
   });
 
   const handleChange = (e) => {
@@ -24,7 +24,7 @@ const AddUser = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.username || !formData.employeeId || !formData.password || !formData.role) {
       toast.warning("Please fill out all fields.");
       return;
@@ -33,9 +33,9 @@ const AddUser = () => {
     try {
       await axios.post(`${API_BASE}/users/add`, formData);
       toast.success(`User ${formData.username} added successfully!`);
-      
+
       setFormData({ username: "", employeeId: "", password: "", role: "operator" });
-      
+
       // 🔥 Send them back to "/admin" after a short delay
       setTimeout(() => navigate("/admin"), 1500);
     } catch (err) {
@@ -48,7 +48,7 @@ const AddUser = () => {
     <>
       <Header />
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} />
-      
+
       <div className="min-h-screen bg-[#2d2d2d] flex flex-col items-center justify-center p-6">
         <div className="bg-white w-full max-w-md rounded-xl p-8 shadow-2xl">
           <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 border-b pb-3">

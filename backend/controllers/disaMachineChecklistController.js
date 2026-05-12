@@ -31,10 +31,10 @@ exports.getChecklistDetails = async (req, res) => {
     `;
 
     // Fetch HODs for the main dropdown
-    const hodsResult = await sql.query`SELECT username as OperatorName FROM dbo.Users WHERE role = 'hod' ORDER BY username`;
+    const hodsResult = await sql.query`SELECT username as OperatorName FROM dbo.DisaUsersTable WHERE role = 'hod' ORDER BY username`;
 
     // Fetch Supervisors for the NC Report Responsibility dropdown
-    const supervisorsResult = await sql.query`SELECT username as OperatorName FROM dbo.Users WHERE role = 'supervisor' OR role = 'admin' ORDER BY username`;
+    const supervisorsResult = await sql.query`SELECT username as OperatorName FROM dbo.DisaUsersTable WHERE role = 'supervisor' OR role = 'admin' ORDER BY username`;
 
     const reportsResult = await sql.query`
       SELECT * FROM dbo.DisaNonConformanceReport 

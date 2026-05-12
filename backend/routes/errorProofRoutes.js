@@ -19,9 +19,9 @@ router.get("/next-sno", async (req, res) => {
 // GET Operators, Supervisors, HOFs from Users table
 router.get("/incharges", async (req, res) => {
   try {
-    const ops = await sql.query`SELECT username as name FROM dbo.Users WHERE role = 'operator' ORDER BY username ASC`;
-    const sups = await sql.query`SELECT username as name FROM dbo.Users WHERE role = 'supervisor' ORDER BY username ASC`;
-    const hofs = await sql.query`SELECT username as name FROM dbo.Users WHERE role = 'hof' ORDER BY username ASC`;
+    const ops = await sql.query`SELECT username as name FROM dbo.DisaUsersTable WHERE role = 'operator' ORDER BY username ASC`;
+    const sups = await sql.query`SELECT username as name FROM dbo.DisaUsersTable WHERE role = 'supervisor' ORDER BY username ASC`;
+    const hofs = await sql.query`SELECT username as name FROM dbo.DisaUsersTable WHERE role = 'hof' ORDER BY username ASC`;
     res.json({ operators: ops.recordset, supervisors: sups.recordset, hofs: hofs.recordset });
   } catch (err) {
     res.status(500).json({ message: "DB error" });

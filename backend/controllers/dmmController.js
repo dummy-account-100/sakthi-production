@@ -4,9 +4,9 @@ exports.getDetails = async (req, res) => {
   try {
     const { date, disa } = req.query;
 
-    const operatorsRes = await sql.query`SELECT username AS OperatorName FROM dbo.Users WHERE role IN ('operator', 'supervisor') ORDER BY username`;
-    const supervisorsRes = await sql.query`SELECT username AS supervisorName FROM dbo.Users WHERE role = 'supervisor' ORDER BY username`;
-    const hofRes = await sql.query`SELECT username AS OperatorName FROM dbo.Users WHERE role = 'hof' ORDER BY username`;
+    const operatorsRes = await sql.query`SELECT username AS OperatorName FROM dbo.DisaUsersTable WHERE role IN ('operator', 'supervisor') ORDER BY username`;
+    const supervisorsRes = await sql.query`SELECT username AS supervisorName FROM dbo.DisaUsersTable WHERE role = 'supervisor' ORDER BY username`;
+    const hofRes = await sql.query`SELECT username AS OperatorName FROM dbo.DisaUsersTable WHERE role = 'hof' ORDER BY username`;
 
     // 🔥 FIX: Explicitly selecting columns to guarantee exact key casing for React
     const recordsRes = await sql.query`

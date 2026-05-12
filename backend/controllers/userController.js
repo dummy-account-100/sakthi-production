@@ -15,7 +15,7 @@ exports.addUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     // 🔥 Changed the table name here from AppUsers to Users
     await sql.query`
-      INSERT INTO Users (username, password, role, employeeId)
+      INSERT INTO DisaUsersTable (username, password, role, employeeId)
       VALUES (${username}, ${hashedPassword}, ${role}, ${employeeId})
     `;
 
@@ -39,7 +39,7 @@ exports.getUsers = async (req, res) => {
   try {
     const result = await sql.query`
       SELECT id, username, role, employeeId 
-      FROM Users 
+      FROM DisaUsersTable 
       ORDER BY id ASC
     `;
     res.status(200).json(result.recordset);
@@ -62,7 +62,7 @@ exports.updateUser = async (req, res) => {
     }
 
     await sql.query`
-      UPDATE Users 
+      UPDATE DisaUsersTable 
       SET username = ${username}, role = ${role}, employeeId = ${employeeId} 
       WHERE id = ${id}
     `;
@@ -88,7 +88,7 @@ exports.deleteUser = async (req, res) => {
     const { id } = req.params;
 
     await sql.query`
-      DELETE FROM Users 
+      DELETE FROM DisaUsersTable 
       WHERE id = ${id}
     `;
 

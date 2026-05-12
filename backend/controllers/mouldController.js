@@ -24,7 +24,7 @@ const mouldController = {
       }));
 
       // 🔥 Fetch HOFs list and current Assigned HOF from the DB to send to the frontend
-      const hofResult = await sql.query`SELECT username as OperatorName FROM dbo.Users WHERE role = 'hof' ORDER BY username`;
+      const hofResult = await sql.query`SELECT username as OperatorName FROM dbo.DisaUsersTable WHERE role = 'hof' ORDER BY username`;
       const assignedHOF = transRes.recordset.length > 0 ? transRes.recordset[0].AssignedHOF : '';
 
       const shiftData = { 1: { customValues: {} }, 2: { customValues: {} }, 3: { customValues: {} } };

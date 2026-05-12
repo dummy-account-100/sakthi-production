@@ -12,7 +12,7 @@ router.post("/login", async (req, res) => {
   }
 
   try {
-    const result = await sql.query`SELECT * FROM Users WHERE employeeId = ${employeeId}`;
+    const result = await sql.query`SELECT * FROM DisaUsersTable WHERE employeeId = ${employeeId}`;
     const user = result.recordset[0];
 
     if (!user) {

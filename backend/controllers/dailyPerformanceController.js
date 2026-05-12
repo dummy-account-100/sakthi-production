@@ -142,9 +142,9 @@ exports.getDelaysByDateAndDisa = async (req, res) => {
 // ==========================================
 exports.getFormUsers = async (req, res) => {
   try {
-    const incharges = await sql.query`SELECT username as name FROM dbo.Users WHERE role = 'operator' ORDER BY username ASC`;
-    const hofs = await sql.query`SELECT username as name FROM dbo.Users WHERE role = 'hof' ORDER BY username ASC`;
-    const hods = await sql.query`SELECT username as name FROM dbo.Users WHERE role = 'hod' ORDER BY username ASC`;
+    const incharges = await sql.query`SELECT username as name FROM dbo.DisaUsersTable WHERE role = 'operator' ORDER BY username ASC`;
+    const hofs = await sql.query`SELECT username as name FROM dbo.DisaUsersTable WHERE role = 'hof' ORDER BY username ASC`;
+    const hods = await sql.query`SELECT username as name FROM dbo.DisaUsersTable WHERE role = 'hod' ORDER BY username ASC`;
 
     res.json({
       incharges: incharges.recordset,

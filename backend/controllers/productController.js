@@ -57,7 +57,7 @@ exports.getDelayReasons = async (req, res) => {
 
 exports.getEmployees = async (req, res) => {
   try {
-    const result = await sql.query`SELECT id, username as name FROM Users WHERE role = 'operator' ORDER BY username`;
+    const result = await sql.query`SELECT id, username as name FROM DisaUsersTable WHERE role = 'operator' ORDER BY username`;
     res.json(result.recordset);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch employees" });
@@ -66,7 +66,7 @@ exports.getEmployees = async (req, res) => {
 
 exports.getIncharges = async (req, res) => {
   try {
-    const result = await sql.query`SELECT id, username as name FROM Users WHERE role = 'supervisor' ORDER BY username`;
+    const result = await sql.query`SELECT id, username as name FROM DisaUsersTable WHERE role = 'supervisor' ORDER BY username`;
     res.json(result.recordset);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch incharges" });
@@ -75,7 +75,7 @@ exports.getIncharges = async (req, res) => {
 
 exports.getOperators = async (req, res) => {
   try {
-    const result = await sql.query`SELECT id, username as operatorName FROM Users WHERE role = 'operator' ORDER BY username`;
+    const result = await sql.query`SELECT id, username as operatorName FROM DisaUsersTable WHERE role = 'operator' ORDER BY username`;
     res.status(200).json(result.recordset);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch operators" });
@@ -84,7 +84,7 @@ exports.getOperators = async (req, res) => {
 
 exports.getSupervisors = async (req, res) => {
   try {
-    const result = await sql.query`SELECT id, username as supervisorName FROM Users WHERE role = 'supervisor' ORDER BY username`;
+    const result = await sql.query`SELECT id, username as supervisorName FROM DisaUsersTable WHERE role = 'supervisor' ORDER BY username`;
     res.status(200).json(result.recordset);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch supervisors" });

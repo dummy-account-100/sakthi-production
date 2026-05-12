@@ -19,8 +19,8 @@ exports.getChecklistDetails = async (req, res) => {
       ORDER BY M.SlNo ASC
     `;
 
-    const supervisorsResult = await sql.query`SELECT username as OperatorName FROM dbo.Users WHERE role = 'supervisor' ORDER BY username`;
-    const hofResult = await sql.query`SELECT username as OperatorName FROM dbo.Users WHERE role = 'hof' ORDER BY username`;
+    const supervisorsResult = await sql.query`SELECT username as OperatorName FROM dbo.DisaUsersTable WHERE role = 'supervisor' ORDER BY username`;
+    const hofResult = await sql.query`SELECT username as OperatorName FROM dbo.DisaUsersTable WHERE role = 'hof' ORDER BY username`;
 
     const reportsResult = await sql.query`
       SELECT * FROM dbo.BottomLevelAudit_NCR 

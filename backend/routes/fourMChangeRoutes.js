@@ -27,8 +27,8 @@ const getDynamicQfString = (recordDate, qfHistory, defaultFallback) => {
 // ══════════════════════════════════════════════════════════════════════════════
 router.get("/incharges", async (req, res) => {
     try {
-        const supRes = await sql.query`SELECT username AS name FROM dbo.Users WHERE role = 'supervisor' ORDER BY username ASC`;
-        const hodRes = await sql.query`SELECT username AS name FROM dbo.Users WHERE role = 'hod' ORDER BY username ASC`;
+        const supRes = await sql.query`SELECT username AS name FROM dbo.DisaUsersTable WHERE role = 'supervisor' ORDER BY username ASC`;
+        const hodRes = await sql.query`SELECT username AS name FROM dbo.DisaUsersTable WHERE role = 'hod' ORDER BY username ASC`;
         res.json({ supervisors: supRes.recordset, hods: hodRes.recordset });
     } catch (err) { res.status(500).json({ message: "DB error", error: err.message }); }
 });

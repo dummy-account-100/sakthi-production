@@ -45,9 +45,9 @@ router.get("/details", async (req, res) => {
       `;
     }
 
-    const hofsRes = await sql.query`SELECT username AS name FROM dbo.Users WHERE role = 'hof' ORDER BY username`;
-    const operatorsRes = await sql.query`SELECT username AS name FROM dbo.Users WHERE role = 'operator' ORDER BY username`;
-    const supervisorsRes = await sql.query`SELECT username AS name FROM dbo.Users WHERE role = 'supervisor' ORDER BY username`;
+    const hofsRes = await sql.query`SELECT username AS name FROM dbo.DisaUsersTable WHERE role = 'hof' ORDER BY username`;
+    const operatorsRes = await sql.query`SELECT username AS name FROM dbo.DisaUsersTable WHERE role = 'operator' ORDER BY username`;
+    const supervisorsRes = await sql.query`SELECT username AS name FROM dbo.DisaUsersTable WHERE role = 'supervisor' ORDER BY username`;
 
     // 🔥 FETCH QF HISTORY 🔥
     let qfHistory = [];
