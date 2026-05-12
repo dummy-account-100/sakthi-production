@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { AlertTriangle, Save, FileDown, UserCheck, ShieldCheck, X, CheckCircle, Loader, Lock, Send } from 'lucide-react';
+import { AlertTriangle, Save, FileDown, UserCheck, ShieldCheck, X, CheckCircle, Loader, Send, Edit3 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Header from "../components/Header";
@@ -50,8 +50,8 @@ const ErrorProofVerification2 = () => {
   const [verifications, setVerifications] = useState([]);
   const [reactionPlans, setReactionPlans] = useState([]);
 
-  // 🔥 NEW: Tracking submitted/locked shifts
-  const [submittedShifts, setSubmittedShifts] = useState(new Set());
+  // Track if we're editing existing data (like 4M Change form)
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const [hofList, setHofList] = useState([]);
   const [operatorList, setOperatorList] = useState([]);
@@ -79,14 +79,8 @@ const ErrorProofVerification2 = () => {
       const masterData = res.data.masterConfig || [];
       const transData = res.data.verifications || [];
 
-      // Determine which shifts are already locked/saved in DB
-      const lockedShifts = new Set();
-      if (transData.length > 0) {
-        if (transData.some(r => r.Date1_Shift1_Res)) lockedShifts.add(1);
-        if (transData.some(r => r.Date1_Shift2_Res)) lockedShifts.add(2);
-        if (transData.some(r => r.Date1_Shift3_Res)) lockedShifts.add(3);
-      }
-      setSubmittedShifts(lockedShifts);
+      // Determine if we're in edit mode (existing data found)
+      setIsEditMode(transData.length > 0);
 
       const mergedVerifications = [];
 
@@ -202,14 +196,14 @@ const ErrorProofVerification2 = () => {
     setReactionPlans(updatedPlans);
   };
 
-  // 🔥 NEW: DYNAMIC SAVE AND HOF SUBMISSION LOGIC 🔥
+  // 🔥 DYNAMIC SAVE AND HOF SUBMISSION LOGIC (Editable like 4M Change) 🔥
   const saveToServer = async (isHofSubmission = false) => {
-    // 1. Identify which shifts are currently being modified and not yet locked
-    const activeShifts = [1, 2, 3].filter(s => !submittedShifts.has(s) && verifications.some(v => v[`Date1_Shift${s}_Res`]));
+    // 1. Identify which shifts have data entered
+    const activeShifts = [1, 2, 3].filter(s => verifications.some(v => v[`Date1_Shift${s}_Res`]));
 
     // 2. Validate HOF Submission specific requirements
     if (isHofSubmission) {
-      const shift3Done = activeShifts.includes(3) || submittedShifts.has(3);
+      const shift3Done = activeShifts.includes(3);
       if (!shift3Done) {
         toast.error('You can only send to the HOF after completing the 3rd shift.');
         return;
@@ -222,7 +216,7 @@ const ErrorProofVerification2 = () => {
     }
 
     if (activeShifts.length === 0 && !isHofSubmission) {
-      toast.error('Please enter results for at least one new shift before saving.');
+      toast.error('Please enter results for at least one shift before saving.');
       return;
     }
 
@@ -435,7 +429,9 @@ const ErrorProofVerification2 = () => {
 
           <div className="bg-gray-900 py-5 px-6 flex justify-between items-center shrink-0 rounded-t-xl flex-wrap gap-4 border-b-2 border-orange-500">
             <div className="flex items-center gap-6">
-              <h2 className="text-xl font-bold text-white uppercase tracking-wide flex items-center gap-2"><span className="text-orange-500 text-2xl">🛡️</span> Error Proof Verification</h2>
+              <h2 className="text-xl font-bold text-white uppercase tracking-wide flex items-center gap-2"><span className="text-orange-500 text-2xl">🛡️</span> Error Proof Verification
+                {isEditMode && <span className="ml-3 text-sm text-blue-400 bg-blue-500/20 border border-blue-500/40 px-3 py-1 rounded-full font-bold tracking-normal normal-case flex items-center gap-1.5"><Edit3 size={13} /> Editing Mode</span>}
+              </h2>
               <select value={headerData.disaMachine} onChange={(e) => setHeaderData({ ...headerData, disaMachine: e.target.value })} className="bg-gray-800 text-white font-bold border border-orange-500 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 cursor-pointer transition-all shadow-sm">
                 <option value="DISA - I">DISA - I</option><option value="DISA - II">DISA - II</option><option value="DISA - III">DISA - III</option><option value="DISA - IV">DISA - IV</option><option value="DISA - V">DISA - V</option><option value="DISA - VI">DISA - VI</option>
               </select>
@@ -471,14 +467,7 @@ const ErrorProofVerification2 = () => {
                 <tr className="bg-gray-100 text-xs font-bold tracking-wide text-gray-800 border-b border-gray-300">
                   {[1, 2, 3].map((shiftNum, j) => (
                     <th key={j} className="border border-gray-300 p-2 text-center">
-                      <div className="flex flex-col items-center justify-center gap-1">
-                        <span>Shift {shiftNum}</span>
-                        {submittedShifts.has(shiftNum) && (
-                          <span className="flex items-center gap-1 bg-green-100 border border-green-400 text-green-700 text-[9px] px-1.5 py-0.5 rounded-full shadow-sm">
-                            <Lock size={10} /> LOCKED
-                          </span>
-                        )}
-                      </div>
+                      <span>Shift {shiftNum}</span>
                     </th>
                   ))}
                 </tr>
@@ -500,17 +489,16 @@ const ErrorProofVerification2 = () => {
                     {[1, 2, 3].map(s => {
                       const resKey = `Date1_Shift${s}_Res`; 
                       const result = row[resKey];
-                      const isLocked = submittedShifts.has(s);
 
                       return (
-                        <td key={s} className={`border border-gray-300 p-2 align-middle transition-colors ${isLocked ? 'bg-gray-100/50' : result === 'NOT OK' ? 'bg-red-50' : result === 'OK' ? 'bg-green-50' : 'bg-white'}`}>
+                        <td key={s} className={`border border-gray-300 p-2 align-middle transition-colors ${result === 'NOT OK' ? 'bg-red-50' : result === 'OK' ? 'bg-green-50' : 'bg-white'}`}>
                           <div className="flex flex-row items-center justify-center gap-4 px-2 w-full h-full min-h-[60px] whitespace-nowrap">
-                            <label className={`flex items-center gap-1.5 p-1.5 rounded transition-colors group/radio ${isLocked ? 'cursor-not-allowed opacity-50 grayscale' : 'cursor-pointer hover:bg-white/60'}`}>
-                              <input type="radio" name={`res-${row.Id}-1-${s}`} disabled={isLocked} checked={result === 'OK'} onChange={() => handleResultChange(row, s, 'OK')} className={`accent-green-600 w-4 h-4 m-0 ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`} />
+                            <label className="flex items-center gap-1.5 p-1.5 rounded transition-colors group/radio cursor-pointer hover:bg-white/60">
+                              <input type="radio" name={`res-${row.Id}-1-${s}`} checked={result === 'OK'} onChange={() => handleResultChange(row, s, 'OK')} className="accent-green-600 w-4 h-4 m-0 cursor-pointer" />
                               <span className="text-[10px] font-bold text-gray-700 group-hover/radio:text-green-800 leading-none mt-0.5">OK</span>
                             </label>
-                            <label className={`flex items-center gap-1.5 p-1.5 rounded transition-colors group/radio ${isLocked ? 'cursor-not-allowed opacity-50 grayscale' : 'cursor-pointer hover:bg-white/60'}`}>
-                              <input type="radio" name={`res-${row.Id}-1-${s}`} disabled={isLocked} checked={result === 'NOT OK'} onChange={() => handleResultChange(row, s, 'NOT OK')} className={`accent-red-600 w-4 h-4 m-0 ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`} />
+                            <label className="flex items-center gap-1.5 p-1.5 rounded transition-colors group/radio cursor-pointer hover:bg-white/60">
+                              <input type="radio" name={`res-${row.Id}-1-${s}`} checked={result === 'NOT OK'} onChange={() => handleResultChange(row, s, 'NOT OK')} className="accent-red-600 w-4 h-4 m-0 cursor-pointer" />
                               <span className="text-[10px] font-bold text-gray-700 group-hover/radio:text-red-800 leading-none mt-0.5">NOT OK</span>
                             </label>
                           </div>
@@ -591,8 +579,8 @@ const ErrorProofVerification2 = () => {
                   <FileDown size={20} /> Preview PDF
                 </button>
 
-                <button onClick={() => saveToServer(false)} className="bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 px-8 rounded-lg shadow-lg uppercase transition-colors flex items-center gap-3">
-                  <Save className="w-5 h-5" /> Save Shifts Data
+                <button onClick={() => saveToServer(false)} className={`${isEditMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-800 hover:bg-gray-900'} text-white font-bold py-3 px-8 rounded-lg shadow-lg uppercase transition-colors flex items-center gap-3`}>
+                  <Save className="w-5 h-5" /> {isEditMode ? 'Update Shifts Data' : 'Save Shifts Data'}
                 </button>
 
                 <button onClick={() => saveToServer(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg uppercase transition-colors flex items-center gap-3">
