@@ -105,13 +105,27 @@ const baseColumns = [
   { key: 'Remarks', label: 'REMARKS', width: 'w-48', inputType: 'text' }
 ];
 
+// 🔥 FIX: Fallback UUID generator that works on HTTP and HTTPS
+const generateSafeId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for non-secure contexts (HTTP)
+  return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
+};
+
 const createEmptyRow = () => {
-  const row = { id: crypto.randomUUID(), customValues: {} };
+  const row = { id: generateSafeId(), customValues: {} };
   baseColumns.forEach(c => row[c.key] = '');
   return row;
 };
 
 const DmmSettingParameters = () => {
+  // 🔥 HARDCODED FALLBACK DATA (Used if DB is empty or fails)
+const FALLBACK_OPERATORS = [{ OperatorName: 'Operator 1' }, { OperatorName: 'Operator 2' }];
+const FALLBACK_SUPERVISORS = [{ supervisorName: 'Supervisor 1' }, { supervisorName: 'Supervisor 2' }];
+const FALLBACK_HOFS = [{ OperatorName: 'HOF 1' }, { OperatorName: 'HOF 2' }];
+
   // 🔥 NEW: Check if logged-in user is a supervisor
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
   const isSupervisor = storedUser.role?.toLowerCase() === "supervisor";
@@ -142,22 +156,29 @@ const DmmSettingParameters = () => {
   const loadSchemaAndData = async () => {
     setLoading(true);
     try {
-      const configRes = await axios.get(`${API_BASE}/config/dmm-setting-parameters/master`);
-      const customCols = (configRes.data.config || []).map(c => ({
-        key: `custom_${c.id}`, id: c.id, label: c.columnLabel.replace('\\n', '\n'),
-        inputType: c.inputType, width: c.columnWidth, isCustom: true
-      }));
-      const mergedColumns = [...baseColumns, ...customCols];
+      // 1. Try to get custom columns, fallback to base columns if it fails
+      let mergedColumns = [...baseColumns];
+      try {
+        const configRes = await axios.get(`${API_BASE}/config/dmm-setting-parameters/master`);
+        const customCols = (configRes.data.config || []).map(c => ({
+          key: `custom_${c.id}`, id: c.id, label: c.columnLabel.replace('\\n', '\n'),
+          inputType: c.inputType, width: c.columnWidth, isCustom: true
+        }));
+        mergedColumns = [...baseColumns, ...customCols];
+      } catch (e) { console.warn("Custom columns API failed, using base columns."); }
+      
       setAllColumns(mergedColumns);
 
+      // 2. Try to get data
       const res = await axios.get(`${API_BASE}/dmm-settings/details`, {
         params: { date: headerData.date, disa: headerData.disaMachine }
       });
 
+      // 🔥 INJECT FALLBACKS IF DB RETURNS EMPTY ARRAYS
       setDropdowns({ 
-        operators: res.data.operators || [], 
-        supervisors: res.data.supervisors || [], 
-        hofs: res.data.hofs || [] 
+        operators: res.data.operators?.length > 0 ? res.data.operators : FALLBACK_OPERATORS, 
+        supervisors: res.data.supervisors?.length > 0 ? res.data.supervisors : FALLBACK_SUPERVISORS, 
+        hofs: res.data.hofs?.length > 0 ? res.data.hofs : FALLBACK_HOFS 
       });
 
       setHeaderData(prev => ({ 
@@ -179,22 +200,19 @@ const DmmSettingParameters = () => {
         for (let i = 1; i <= 3; i++) {
           if (res.data.shiftsMeta[i]) {
             loadedMeta[i] = res.data.shiftsMeta[i];
-            // 🔥 Keep default supervisor if DB doesn't have one saved for this shift yet
-            if (!loadedMeta[i].supervisor) {
-              loadedMeta[i].supervisor = defaultSupervisor;
-            }
+            if (!loadedMeta[i].supervisor) loadedMeta[i].supervisor = defaultSupervisor;
           }
         }
       }
       setShiftsMeta(loadedMeta);
 
       const loadedData = { 1: [], 2: [], 3: [] };
-      [1, 2, 3].forEach(shift => {
-        if (res.data.shiftsData[shift] && res.data.shiftsData[shift].length > 0) {
+     [1, 2, 3].forEach(shift => {
+        if (res.data.shiftsData && res.data.shiftsData[shift] && res.data.shiftsData[shift].length > 0) {
           newSubmittedShifts.add(shift);
           loadedData[shift] = res.data.shiftsData[shift].map(dbRow => {
             const uiRow = { id: crypto.randomUUID(), customValues: dbRow.customValues || {} };
-            baseColumns.forEach(c => uiRow[c.key] = dbRow[c.key] || '');
+            mergedColumns.forEach(c => uiRow[c.key] = dbRow[c.key] || '');
             return uiRow;
           });
         } else {
@@ -206,7 +224,12 @@ const DmmSettingParameters = () => {
       setSubmittedShifts(newSubmittedShifts);
 
     } catch (error) {
-      setNotification({ show: true, type: 'error', message: 'Failed to load data.' });
+      console.error("Backend failed completely. Forcing UI to render with fallbacks.", error);
+      
+      // 🔥 IF BACKEND CRASHES, FORCE THE UI TO RENDER ANYWAY
+      setDropdowns({ operators: FALLBACK_OPERATORS, supervisors: FALLBACK_SUPERVISORS, hofs: FALLBACK_HOFS });
+      setShiftsData({ 1: [createEmptyRow()], 2: [createEmptyRow()], 3: [createEmptyRow()] });
+      setNotification({ show: true, type: 'error', message: 'Backend connection failed. Running in Offline/Fallback mode.' });
     }
     setLoading(false);
   };
